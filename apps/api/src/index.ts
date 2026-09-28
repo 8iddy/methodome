@@ -1289,7 +1289,8 @@ app.post("/projects/:projectId/analysis-jobs", async (c) => {
     );
   }
 
-  if (!methodRegistry[parsed.data.methodId]) {
+  const requestedMethod = methodRegistry[parsed.data.methodId];
+  if (!requestedMethod) {
     return c.json(
       {
         error: {
@@ -1298,6 +1299,18 @@ app.post("/projects/:projectId/analysis-jobs", async (c) => {
         }
       },
       400
+    );
+  }
+
+  if (!requestedMethod.executable) {
+    return c.json(
+      {
+        error: {
+          code: "METHOD_NOT_EXECUTABLE",
+          message: "This method is listed in Methodome but its statistical execution engine is not enabled yet."
+        }
+      },
+      409
     );
   }
 
