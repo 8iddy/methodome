@@ -8,12 +8,12 @@
     "enabled": true
   },
   "vars": {
-    "APP_ENV": "development",
-    "AUTH_MODE": "disabled",
+    "APP_ENV": "production",
+    "AUTH_MODE": "better_auth",
     "ALLOWED_ORIGINS": "https://methodome.com,http://localhost:3000",
     "MAX_DIRECT_UPLOAD_BYTES": "26214400",
-    "STORAGE_MODE": "disabled",
-    "BETTER_AUTH_URL": "https://methodome-api.abakogideon.workers.dev"
+    "STORAGE_MODE": "r2",
+    "BETTER_AUTH_URL": "https://api.methodome.com"
   },
   "d1_databases": [
     {
@@ -29,9 +29,35 @@
         "binding": "ANALYSIS_QUEUE",
         "queue": "methodome-analysis"
       }
+    ],
+    "consumers": [
+      {
+        "queue": "methodome-analysis",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 3
+      }
     ]
   },
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "methodome-files"
+    }
+  ],
+  "services": [
+    {
+      "binding": "STATS",
+      "service": "methodome-stats"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "api.methodome.com",
+      "custom_domain": true
+    }
   ]
 }
