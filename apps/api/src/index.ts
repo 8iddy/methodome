@@ -1375,6 +1375,45 @@ app.post("/projects/:projectId/analysis-jobs", async (c) => {
     );
   }
 
+  if (parsed.data.filters.length > 0) {
+    return c.json(
+      {
+        error: {
+          code: "FILTER_EXECUTION_NOT_IMPLEMENTED",
+          message: "Saved analysis filters are not executable in the current statistical runner. Create the required derived dataset before running this analysis."
+        }
+      },
+      409
+    );
+  }
+
+  if (parsed.data.cluster || parsed.data.weights || parsed.data.strata) {
+    return c.json(
+      {
+        error: {
+          code: "COMPLEX_DESIGN_EXECUTION_NOT_IMPLEMENTED",
+          message: "Cluster, survey weight and strata execution is not enabled for the current statistical runner."
+        }
+      },
+      409
+    );
+  }
+
+  if (
+    parsed.data.missingDataStrategy &&
+    parsed.data.missingDataStrategy !== "complete_case"
+  ) {
+    return c.json(
+      {
+        error: {
+          code: "MISSING_DATA_STRATEGY_NOT_IMPLEMENTED",
+          message: "The current statistical runner executes complete-case analysis only."
+        }
+      },
+      409
+    );
+  }
+
   if (
     !(await datasetBelongsToProject(
       c.env.DB,
