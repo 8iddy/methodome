@@ -148,6 +148,32 @@ describe("protocol extraction runtime", () => {
     expect(result.researchQuestions[0]?.objectiveType).toBe("descriptive");
   });
 
+  it("classifies qualitative intent without forcing statistical analysis", async () => {
+    const env = {
+      AI: {
+        run: async () => ({
+          response: {
+            ...validExtraction,
+            researchQuestions: [
+              {
+                text: "What barriers and facilitator experiences shape eLMIS data use among health workers?",
+                objectiveType: null,
+                outcomes: [],
+                predictors: [],
+                covariates: [],
+                estimand: null
+              }
+            ]
+          }
+        })
+      }
+    } as never;
+
+    const result = await extractProtocolWithAi(env, "# Protocol\nResearch question present.");
+
+    expect(result.researchQuestions[0]?.objectiveType).toBe("qualitative");
+  });
+
   it("does not mistake mixed-methods design language for sampling design", async () => {
     const env = {
       AI: {
