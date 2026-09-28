@@ -18,7 +18,8 @@ export default defineConfig({
       "@methodome/policy-engine": root + "packages/policy-engine/src/index.ts",
       "@methodome/provenance": root + "packages/provenance/src/index.ts",
       "@methodome/data-pipeline": root + "packages/data-pipeline/src/index.ts",
-      "@methodome/benchmark": root + "packages/benchmark/src/index.ts"
+      "@methodome/benchmark": root + "packages/benchmark/src/index.ts",
+      "@methodome/analysis-plan": root + "packages/analysis-plan/src/index.ts"
     }
   }
 });
