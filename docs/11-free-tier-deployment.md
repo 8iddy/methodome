@@ -10,6 +10,17 @@ Methodome can run its current backend foundation without enabling R2.
 
 These can be used on the Workers Free plan within Cloudflare's included limits.
 
+## Deployment record — 28 September 2026
+
+- D1 database: `methodome` (`2a7e2a38-14fb-4fca-882b-8bac86d44536`), bound as `DB`.
+- Queue: `methodome-analysis`, bound as `ANALYSIS_QUEUE`; no consumer Worker has been created.
+- Worker: `methodome-api` at `https://methodome-api.abakogideon.workers.dev`.
+- Migration: remote `0001_initial.sql` completed successfully (26 commands); the expected Methodome tables were verified with a read-only query.
+- Health check: `GET /api/health` returned HTTP 200 with `service: methodome-api` and `status: ok`.
+- Protected endpoint check: `GET /api/projects` returned HTTP 503 `AUTH_NOT_CONFIGURED` and exposed no project data.
+- R2: still disabled. There is no `FILES` binding and no R2 bucket or subscription.
+- Billing: no paid Cloudflare service, billing commitment, or purchase was accepted.
+
 ## Deferred resource
 
 R2 remains disabled because Cloudflare requires adding an R2 subscription to the account. The subscription can bill the configured payment method if usage exceeds the included allowance.

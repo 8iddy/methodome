@@ -2,50 +2,36 @@
 
 Date: 28 September 2026
 
-## Status
+## Completed free-tier deployment
 
-Bootstrap is blocked before resource provisioning. Wrangler OAuth authenticated successfully with the Methodome account, but the account has not enabled R2. Wrangler returned Cloudflare API error `10042` when listing R2 buckets and instructed that R2 must be enabled in the Cloudflare Dashboard.
+Methodome's backend is deployed on the Cloudflare Workers Free plan. The deployed Worker is `methodome-api` at:
 
-No Cloudflare resources, Workers, custom domains, routes, DNS records, or authentication settings were changed during this attempt.
+`https://methodome-api.abakogideon.workers.dev`
 
-## Intended resources
-
-| Resource | Intended name | Status |
+| Resource | Name | Deployment record |
 | --- | --- | --- |
-| Worker | `methodome-api` | Not deployed |
-| D1 database | `methodome` | Not present; no database UUID assigned |
-| R2 bucket | `methodome-files` | Cannot inspect or create until R2 is enabled |
-| Queue | `methodome-analysis` | Not present |
+| Worker | `methodome-api` | Deployed to the workers.dev URL above |
+| D1 database | `methodome` | UUID `2a7e2a38-14fb-4fca-882b-8bac86d44536` |
+| Queue producer | `methodome-analysis` | Bound as `ANALYSIS_QUEUE`; no consumer Worker was created |
+| R2 | Not configured | No R2 binding, bucket, or subscription |
 
-## Checks completed
+`wrangler.jsonc` binds the database as `DB` and the queue as `ANALYSIS_QUEUE`. It keeps `workers_dev` enabled and `STORAGE_MODE` set to `disabled`.
 
-- Wrangler OAuth: authenticated.
-- D1 inventory: no `methodome` database exists.
-- Queue inventory: no `methodome-analysis` queue exists.
-- R2 inventory: blocked by Cloudflare error `10042`; no bucket was created or exposed.
-- The repository ignores local Wrangler state and local secret files.
-- TypeScript: passed.
-- Tests: passed, 16 tests across 6 test files.
-- Local D1 migration: `0001_initial.sql` applied successfully, executing 26 statements against local Wrangler state.
-- Wrangler deployment dry run: passed and validated the `DB`, `FILES`, and `ANALYSIS_QUEUE` bindings without deploying a Worker.
+## Migration and deployment checks
 
-## Cost warnings
+- Remote D1 migration `0001_initial.sql` completed successfully (26 commands).
+- The expected Methodome tables are present, including `users`, `projects`, `project_members`, `project_policies`, `files`, `dataset_versions`, `dataset_version_parents`, `transformation_events`, `transformation_inputs`, `study_specifications`, `variable_mappings`, `analysis_plans`, `analysis_jobs`, `analysis_results`, `audit_events`, `model_calls`, and `validation_profiles`.
+- `npm run typecheck` passed.
+- `npm test` passed: 18 tests in 7 test files.
+- `npm run d1:migrate:local` passed.
+- `npx wrangler deploy --dry-run --config wrangler.jsonc` passed.
+- `GET /api/health` returned HTTP 200 with `service: methodome-api` and `status: ok`.
+- `GET /api/projects` returned HTTP 503 with `AUTH_NOT_CONFIGURED`; no project data was exposed without production authentication.
 
-Cloudflare did not present a paid-plan or purchase request. R2 account activation has not been attempted because Wrangler requires the Cloudflare Dashboard to enable it first.
+## Authentication and storage posture
 
-## Authentication state
+Production authentication remains intentionally unconfigured. The deployment does not switch `AUTH_MODE` to `development_header`, and protected application APIs remain unavailable until production authentication is configured.
 
-The deployed Worker is not configured or changed. The current repository configuration intentionally leaves protected application endpoints unavailable until production authentication is implemented. The public health endpoint will be verified only after deployment.
+R2 remains disabled. No `FILES` binding or R2 bucket exists, so upload endpoints intentionally return `503 OBJECT_STORAGE_NOT_CONFIGURED` until object storage is deliberately added later. No paid Cloudflare service, billing commitment, or purchase was accepted during this bootstrap.
 
-## Remaining Cloudflare work
-
-After R2 is enabled without purchasing or activating a paid service, resume in this order:
-
-1. Create or reuse the `methodome` D1 database and record its returned UUID in `wrangler.jsonc`.
-2. Create or reuse the private `methodome-files` R2 bucket.
-3. Create or reuse the `methodome-analysis` Queue.
-4. Apply `migrations/0001_initial.sql` through Wrangler.
-5. Run local checks and a dry-run deployment.
-6. Deploy `methodome-api` to its workers.dev address and verify `/api/health`.
-
-No API tokens, OAuth credentials, cookies, or secrets are recorded here.
+No OAuth credentials, tokens, cookies, or other secrets are recorded in this document.
