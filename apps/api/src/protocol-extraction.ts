@@ -249,11 +249,31 @@ function inferObjectiveType(
   return "exploratory";
 }
 
+function sanitizeSamplingDesign(value: string | null): string | null {
+  if (!value) return null;
+  const normalized = value.toLowerCase();
+
+  const looksLikeGeneralStudyDesign =
+    /mixed[ -]?methods?|triangulation|cross[- ]country|concurrent design|sequential design/.test(
+      normalized
+    );
+  const containsSamplingLanguage =
+    /sample|sampling|census|complete enumeration|random|systematic|stratif|cluster|multistage|multi-stage|purposive|convenience|consecutive|snowball|quota|probability/.test(
+      normalized
+    );
+
+  if (looksLikeGeneralStudyDesign && !containsSamplingLanguage) {
+    return null;
+  }
+  return value.trim() || null;
+}
+
 function enrichProtocolExtraction(
   extraction: ProtocolExtraction
 ): ProtocolExtraction {
   return {
     ...extraction,
+    samplingDesign: sanitizeSamplingDesign(extraction.samplingDesign),
     researchQuestions: extraction.researchQuestions.map((question) => ({
       ...question,
       objectiveType:
