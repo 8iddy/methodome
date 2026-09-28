@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Badge, Button, PageHeader } from "@/components/ui";
+import { Badge, Button, PageHeader, ThemeToggle } from "@/components/ui";
 import { ProjectPage as PrototypeProjectPage } from "@/components/workspace";
 import {
   MethodomeApiError,
@@ -211,6 +211,7 @@ export function LiveAuthPage({ signup }: { signup: boolean }) {
 
   return (
     <main className="auth">
+      <div className="auth-theme"><ThemeToggle /></div>
       <a href="/" className="auth-brand">
         <span className="brand"><span className="mark">M</span><span>Methodome</span></span>
       </a>
