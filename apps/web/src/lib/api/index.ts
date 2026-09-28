@@ -135,6 +135,7 @@ export interface StudySpecification {
       | "causal"
       | "diagnostic"
       | "prognostic"
+      | "qualitative"
       | "exploratory"
       | null;
     outcomes: StudyVariable[];
