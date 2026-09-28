@@ -15,6 +15,9 @@ import {
   getAnalysisJob,
   getAnalysisPlan,
   getAnalysisResult,
+  getVariableMappingSuggestions,
+  getProtocolExtraction,
+  extractProtocol,
   getAuditTrail,
   getDatasets,
   getDatasetProfile,
@@ -43,6 +46,8 @@ import {
   type CandidateSelection,
   type DatasetVersion,
   type ProjectFile,
+  type ProtocolExtraction,
+  type VariableMapping,
   type SchemaComparison,
   type StudySpecification
 } from "@/lib/api";
