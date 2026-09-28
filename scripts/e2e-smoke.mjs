@@ -150,6 +150,12 @@ async function main() {
   console.log(`API: ${API}`);
 
   try {
+    const unauthenticated = await request("/projects", {}, [401]);
+    if (unauthenticated.payload?.error?.code !== "UNAUTHENTICATED") {
+      throw new Error("Protected projects endpoint did not reject an unauthenticated request.");
+    }
+    console.log("PASS unauthenticated protection");
+
     await request(
       "/auth/sign-up/email",
       {
@@ -457,7 +463,13 @@ async function main() {
     projectId = null;
     await request("/account", { method: "DELETE" }, [204]);
     cookies.clear();
-    console.log("PASS cleanup");
+
+    const protectedAfterCleanup = await request("/projects", {}, [401]);
+    if (protectedAfterCleanup.payload?.error?.code !== "UNAUTHENTICATED") {
+      throw new Error("Deleted smoke session still had access to protected project data.");
+    }
+
+    console.log("PASS cleanup and session invalidation");
     console.log("METHODOME E2E PASS");
   } catch (error) {
     console.error("METHODOME E2E FAIL");
