@@ -12,7 +12,8 @@
     "AUTH_MODE": "disabled",
     "ALLOWED_ORIGINS": "https://methodome.com,http://localhost:3000",
     "MAX_DIRECT_UPLOAD_BYTES": "26214400",
-    "STORAGE_MODE": "disabled"
+    "STORAGE_MODE": "disabled",
+    "BETTER_AUTH_URL": "https://methodome-api.abakogideon.workers.dev"
   },
   "d1_databases": [
     {
@@ -29,5 +30,8 @@
         "queue": "methodome-analysis"
       }
     ]
-  }
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
 }
