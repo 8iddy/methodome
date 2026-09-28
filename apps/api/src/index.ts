@@ -19,6 +19,7 @@ import {
 } from "@methodome/analysis-plan";
 import type { Project } from "@methodome/domain";
 import type { ProjectProcessingPolicy } from "@methodome/policy-engine";
+import { compareDatasetSchemas } from "@methodome/schema-harmonisation";
 import { requireAuth } from "./auth";
 import { createAuth } from "./better-auth";
 import type { Env, Variables } from "./env";
@@ -303,6 +304,92 @@ app.post("/projects/:projectId/datasets", async (c) => {
   });
 
   return c.json({ datasetVersionId: datasetId }, 201);
+});
+
+
+const variableSchemaInput = z.object({
+  variableName: z.string().min(1),
+  label: z.string().optional(),
+  dataType: z.string().min(1),
+  responseChoices: z
+    .array(
+      z.object({
+        value: z.union([z.string(), z.number()]),
+        label: z.string()
+      })
+    )
+    .optional()
+});
+
+const schemaComparisonInput = z.object({
+  leftDatasetVersionId: z.string().min(1),
+  rightDatasetVersionId: z.string().min(1),
+  leftVariables: z.array(variableSchemaInput),
+  rightVariables: z.array(variableSchemaInput)
+});
+
+app.post("/projects/:projectId/schema-comparison", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const parsed = schemaComparisonInput.safeParse(
+    await c.req.json().catch(() => null)
+  );
+
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_SCHEMA_COMPARISON",
+          message: "Dataset schema comparison input is invalid.",
+          details: parsed.error.flatten()
+        }
+      },
+      400
+    );
+  }
+
+  const [leftExists, rightExists] = await Promise.all([
+    datasetBelongsToProject(
+      c.env.DB,
+      parsed.data.leftDatasetVersionId,
+      projectId
+    ),
+    datasetBelongsToProject(
+      c.env.DB,
+      parsed.data.rightDatasetVersionId,
+      projectId
+    )
+  ]);
+
+  if (!leftExists || !rightExists) {
+    return c.json(
+      {
+        error: {
+          code: "DATASET_NOT_FOUND",
+          message:
+            "Both dataset versions must belong to this project before schemas can be compared."
+        }
+      },
+      404
+    );
+  }
+
+  const comparison = compareDatasetSchemas(
+    parsed.data.leftDatasetVersionId,
+    parsed.data.leftVariables.map((variable) => ({
+      sourceDatasetVersionId: parsed.data.leftDatasetVersionId,
+      ...variable
+    })),
+    parsed.data.rightDatasetVersionId,
+    parsed.data.rightVariables.map((variable) => ({
+      sourceDatasetVersionId: parsed.data.rightDatasetVersionId,
+      ...variable
+    }))
+  );
+
+  return c.json({ comparison });
 });
 
 app.get("/projects/:projectId/study-specification", async (c) => {
