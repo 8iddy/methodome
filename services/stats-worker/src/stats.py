@@ -6,6 +6,7 @@ import math
 from typing import Any
 
 import numpy as np
+import scipy
 from scipy import optimize, stats
 
 ENGINE_VERSION = "python-worker-0.1.0"
@@ -85,7 +86,6 @@ def _design_matrix(
                 np.array([1.0 if str(v).strip() == level else 0.0 for v in values], dtype=float)
             )
             terms.append(f"{variable}[{level}]")
-        terms.append(f"{variable}[reference={reference}]")
 
     return np.column_stack(columns), terms, usable
 
@@ -117,7 +117,7 @@ def _result(
             "engine": "python",
             "engineVersion": ENGINE_VERSION,
             "package": package,
-            "packageVersion": getattr(stats, "__version__", "scipy"),
+            "packageVersion": scipy.__version__,
         },
     }
 
