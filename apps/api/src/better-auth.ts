@@ -6,7 +6,7 @@ export function emailVerificationEnabled(env: Env): boolean {
   return Boolean(env.EMAIL) && env.EMAIL_VERIFICATION_REQUIRED === "true";
 }
 
-export function createAuth(env: Env) {
+export function createAuth(env: Env): ReturnType<typeof betterAuth> {
   if (!env.BETTER_AUTH_SECRET) {
     throw new Error("BETTER_AUTH_SECRET is required when Better Auth is enabled.");
   }
