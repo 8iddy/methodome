@@ -1852,104 +1852,280 @@ function simpleHash(value: string): string {
 function LiveAnalysisPlan({ projectId }: { projectId: string }) {
   const [selections, setSelections] = useState<CandidateSelection[]>([]);
   const [datasets, setDatasets] = useState<DatasetVersion[]>([]);
+  const [spec, setSpec] = useState<StudySpecification | null>(null);
+  const [mappings, setMappings] = useState<VariableMapping[]>([]);
   const [plan, setPlan] = useState<AnalysisPlan | null>(null);
-  const [selectedMethod, setSelectedMethod] = useState("");
+  const [selectedMethods, setSelectedMethods] = useState<Record<string, string>>({});
+  const [selectedDatasetId, setSelectedDatasetId] = useState("");
   const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
 
   async function refresh() {
-    const [candidateResponse, ds, existing] = await Promise.all([
-      getMethodCandidates(projectId),
-      getDatasets(projectId),
-      getAnalysisPlan(projectId)
-    ]);
+    const [candidateResponse, ds, existing, specification, savedMappings] =
+      await Promise.all([
+        getMethodCandidates(projectId),
+        getDatasets(projectId),
+        getAnalysisPlan(projectId),
+        getStudySpecification(projectId),
+        getVariableMappings(projectId)
+      ]);
+
     setSelections(candidateResponse.selections);
     setDatasets(ds);
     setPlan(existing);
-    const first = candidateResponse.selections[0]?.candidates.find((candidate) => candidate.executable)?.methodId;
-    if (first) setSelectedMethod((current) => current || first);
+    setSpec(specification);
+    setMappings(savedMappings);
+
+    const preferred =
+      existing?.datasetVersionId ??
+      ds.find((dataset) => dataset.sourceKind === "derived")?.id ??
+      ds[0]?.id ??
+      "";
+    setSelectedDatasetId(preferred);
+
+    setSelectedMethods((current) => {
+      const next = { ...current };
+      for (const selection of candidateResponse.selections) {
+        if (!next[selection.questionId]) {
+          const executable = selection.candidates.find((candidate) => candidate.executable);
+          if (executable) next[selection.questionId] = executable.methodId;
+        }
+      }
+      return next;
+    });
   }
 
   useEffect(() => {
     void refresh().catch((err) => setStatus(message(err)));
   }, [projectId]);
 
+  function mappingFor(concept: string) {
+    const key = concept.trim().toLowerCase();
+    return mappings.find(
+      (mapping) =>
+        mapping.researchConcept.trim().toLowerCase() === key &&
+        Boolean(mapping.confirmedBy)
+    );
+  }
+
+  function resolvedVariables(question: StudySpecification["researchQuestions"][number]) {
+    const outcome = question.outcomes
+      .map((item) => mappingFor(item.concept)?.datasetVariable)
+      .find(Boolean);
+    const predictors = question.predictors.flatMap((item) => {
+      const value = mappingFor(item.concept)?.datasetVariable;
+      return value ? [value] : [];
+    });
+    const covariates = question.covariates.flatMap((item) => {
+      const value = mappingFor(item.concept)?.datasetVariable;
+      return value ? [value] : [];
+    });
+    return { outcome, predictors, covariates };
+  }
+
   async function createPlan() {
-    const spec = await getStudySpecification(projectId);
-    const selection = selections[0];
-    const question = spec?.researchQuestions.find((item) => item.id === selection?.questionId);
-    const outcome = question?.outcomes[0]?.datasetVariable;
-    if (!selection || !question || !outcome || !selectedMethod || datasets.length === 0) {
-      setStatus("A study specification, dataset and method candidate are required.");
+    if (!spec) {
+      setStatus("Confirm the study specification before creating an analysis plan.");
       return;
     }
-    const candidate = selection.candidates.find((item) => item.methodId === selectedMethod);
+    if (!selectedDatasetId) {
+      setStatus("Upload and select a dataset before creating an analysis plan.");
+      return;
+    }
+
+    const analyses = selections.flatMap((selection, index) => {
+      const question = spec.researchQuestions.find(
+        (item) => item.id === selection.questionId
+      );
+      const selectedMethodId = selectedMethods[selection.questionId];
+      const candidate = selection.candidates.find(
+        (item) => item.methodId === selectedMethodId
+      );
+      if (!question || !selectedMethodId || !candidate?.executable) return [];
+      const resolved = resolvedVariables(question);
+      if (!resolved.outcome) return [];
+
+      return [
+        {
+          id: `analysis-${index + 1}`,
+          researchQuestionId: question.id,
+          outcome: resolved.outcome,
+          predictors: resolved.predictors,
+          covariates: resolved.covariates,
+          candidateMethodIds: selection.candidates.map((item) => item.methodId),
+          selectedMethodId,
+          requiredDecisions: candidate.decisionRequired
+            ? [candidate.decisionRequired]
+            : [],
+          warnings: selection.warnings,
+          diagnostics: candidate.requiredChecks,
+          addedAfterLock: false
+        }
+      ];
+    });
+
+    if (analyses.length === 0) {
+      setStatus(
+        "No research question is ready for an executable analysis. Review mappings and method blockers below."
+      );
+      return;
+    }
+
+    setBusy(true);
+    setStatus("");
     try {
       const created = await createAnalysisPlan(projectId, {
         versionId: `plan-${Date.now()}`,
-        datasetVersionId: datasets[0].id,
+        datasetVersionId: selectedDatasetId,
         status: "planned_before_analysis",
-        analyses: [
-          {
-            id: "analysis-1",
-            researchQuestionId: question.id,
-            outcome,
-            predictors: question.predictors.flatMap((item) => item.datasetVariable ? [item.datasetVariable] : []),
-            covariates: question.covariates.flatMap((item) => item.datasetVariable ? [item.datasetVariable] : []),
-            candidateMethodIds: selection.candidates.map((item) => item.methodId),
-            selectedMethodId: selectedMethod,
-            requiredDecisions: candidate?.decisionRequired ? [candidate.decisionRequired] : [],
-            warnings: selection.warnings,
-            diagnostics: candidate?.requiredChecks ?? [],
-            addedAfterLock: false
-          }
-        ]
+        analyses
       });
       setPlan(created);
-      setStatus("Analysis plan created.");
+      setStatus(
+        `Analysis plan created with ${created.analyses.length} planned analysis${created.analyses.length === 1 ? "" : "es"}.`
+      );
     } catch (err) {
       setStatus(message(err));
+    } finally {
+      setBusy(false);
     }
   }
 
   async function lock() {
     if (!plan) return;
+    setBusy(true);
     try {
       const locked = await lockAnalysisPlan(projectId, plan.id);
       setPlan(locked);
-      setStatus("Analysis plan locked.");
+      setStatus("Analysis plan locked. Planned analyses are now distinguished from later exploratory work.");
     } catch (err) {
       setStatus(message(err));
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <section className="panel">
-      <h2>Method candidates</h2>
-      {selections.map((selection) => (
-        <div key={selection.questionId} className="method-list">
-          {selection.candidates.map((candidate) => (
-            <label className="method-card" key={candidate.methodId}>
-              <input
-                type="radio"
-                name="candidate"
-                checked={selectedMethod === candidate.methodId}
-                disabled={!candidate.executable}
-                onChange={() => setSelectedMethod(candidate.methodId)}
-              />
-              <strong>{candidate.displayName}</strong>
-              {!candidate.executable && <Badge kind="warning">Execution pending</Badge>}
-              <p>{candidate.rationale}</p>
-              {candidate.decisionRequired && <small>{candidate.decisionRequired}</small>}
-            </label>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">ANALYSIS DATASET</p>
+          <h2>Build analysis plan</h2>
+        </div>
+        {plan && (
+          <Badge kind={plan.lockedAt ? "success" : "blue"}>
+            {plan.lockedAt ? "Locked" : "Draft"}
+          </Badge>
+        )}
+      </div>
+
+      <label>
+        Dataset version
+        <select
+          value={selectedDatasetId}
+          disabled={Boolean(plan)}
+          onChange={(event) => setSelectedDatasetId(event.target.value)}
+        >
+          <option value="">Select dataset</option>
+          {datasets.map((dataset) => (
+            <option key={dataset.id} value={dataset.id}>
+              {dataset.label} · {dataset.sourceKind}
+            </option>
           ))}
-          {selection.blockedReason && <p className="confirmation">{selection.blockedReason}</p>}
-        </div>
-      ))}
-      {!plan ? <Button onClick={() => void createPlan()}>Create analysis plan</Button> : (
+        </select>
+      </label>
+      <p className="muted">
+        Methodome prefers the newest derived dataset when one exists. You can change the selection before the plan is created.
+      </p>
+
+      <div className="method-list">
+        {selections.map((selection, index) => {
+          const question = spec?.researchQuestions.find(
+            (item) => item.id === selection.questionId
+          );
+          const resolved = question ? resolvedVariables(question) : null;
+          const mappingBlocker =
+            question && !resolved?.outcome
+              ? "The outcome concept does not have a confirmed dataset mapping."
+              : null;
+          return (
+            <article className="method-card" key={selection.questionId}>
+              <p className="eyebrow">RESEARCH QUESTION {index + 1}</p>
+              <h3>{question?.text ?? selection.questionId}</h3>
+              {resolved?.outcome && (
+                <p>
+                  <b>Outcome:</b> <code>{resolved.outcome}</code>
+                  {resolved.predictors.length > 0 && (
+                    <> · <b>Predictors:</b> <code>{resolved.predictors.join(", ")}</code></>
+                  )}
+                </p>
+              )}
+
+              {(mappingBlocker || selection.blockedReason) && (
+                <div className="warning-panel">
+                  <b>Needs review</b>
+                  <p>{mappingBlocker ?? selection.blockedReason}</p>
+                </div>
+              )}
+
+              {selection.warnings.map((warning) => (
+                <p className="muted" key={warning}>{warning}</p>
+              ))}
+
+              {selection.candidates.map((candidate) => (
+                <label className="candidate" key={candidate.methodId}>
+                  <input
+                    type="radio"
+                    name={`candidate-${selection.questionId}`}
+                    checked={selectedMethods[selection.questionId] === candidate.methodId}
+                    disabled={!candidate.executable || Boolean(plan)}
+                    onChange={() =>
+                      setSelectedMethods((current) => ({
+                        ...current,
+                        [selection.questionId]: candidate.methodId
+                      }))
+                    }
+                  />
+                  <span>
+                    <b>{candidate.displayName}</b>
+                    <small>{candidate.rationale}</small>
+                    {candidate.decisionRequired && <small>{candidate.decisionRequired}</small>}
+                  </span>
+                  <Badge kind={candidate.executable ? "success" : "warning"}>
+                    {candidate.executable ? candidate.maturity : "Execution pending"}
+                  </Badge>
+                </label>
+              ))}
+            </article>
+          );
+        })}
+      </div>
+
+      {!plan ? (
+        <Button onClick={() => void createPlan()}>
+          {busy ? "Creating…" : "Create analysis plan"}
+        </Button>
+      ) : (
         <div className="action-row">
-          <Badge kind={plan.lockedAt ? "success" : "blue"}>{plan.lockedAt ? "Locked" : "Draft"}</Badge>
-          {!plan.lockedAt && <Button onClick={() => void lock()}>Lock analysis plan</Button>}
+          <span>
+            {plan.analyses.length} planned analysis{plan.analyses.length === 1 ? "" : "es"}
+          </span>
+          {!plan.lockedAt && (
+            <Button onClick={() => void lock()}>
+              {busy ? "Locking…" : "Lock analysis plan"}
+            </Button>
+          )}
+          {plan.lockedAt && (
+            <Button href={`/app/projects/${projectId}/analysis`}>
+              Run analyses
+            </Button>
+          )}
         </div>
+      )}
+      {plan?.lockHash && (
+        <p className="muted">
+          SHA-256 plan hash: <code>{plan.lockHash}</code>
+        </p>
       )}
       {status && <p className="confirmation" role="status">{status}</p>}
     </section>
