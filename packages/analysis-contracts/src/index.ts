@@ -85,3 +85,5 @@ export interface AnalysisRunner {
   getStatus(jobId: AnalysisJobId): Promise<JobState>;
   cancel(jobId: AnalysisJobId): Promise<void>;
 }
+
+export * from "./plan";
