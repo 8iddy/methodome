@@ -41,6 +41,7 @@ import {
   updateProjectPolicy,
   uploadFile,
   type AnalysisPlan,
+  type MethodRegistryEntry,
   type AnalysisResult,
   type BackendProject,
   type CandidateSelection,
@@ -2801,15 +2802,21 @@ export async function performSignOut() {
 
 
 export function LiveMethodsPage() {
-  const [methods, setMethods] = useState<Array<Record<string, unknown>>>([]);
+  const [methods, setMethods] = useState<MethodRegistryEntry[]>([]);
   const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("Loading method registry…");
 
   useEffect(() => {
-    getMethods().then((response) => setMethods(response.methods)).catch(() => setMethods([]));
+    getMethods()
+      .then((response) => {
+        setMethods(response.methods);
+        setStatus("");
+      })
+      .catch(() => setStatus("Methodome could not load the method registry."));
   }, []);
 
   const visible = methods.filter((method) =>
-    String(method.displayName ?? "").toLowerCase().includes(query.toLowerCase())
+    method.displayName.toLowerCase().includes(query.toLowerCase())
   );
 
   return (
@@ -2817,20 +2824,43 @@ export function LiveMethodsPage() {
       <PageHeader
         eyebrow="METHODS LIBRARY"
         title="Methods library"
-        description="The live registry controls analytical eligibility and execution maturity."
+        description="The live registry shows method maturity, execution status and required diagnostics."
       />
       <div className="catalogue-tools">
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search methods" />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search methods"
+          aria-label="Search methods"
+        />
       </div>
+      {status && <p className="muted">{status}</p>}
       <div className="method-list">
         {visible.map((method) => (
-          <article className="method-card" key={String(method.id)}>
-            <Badge kind={String(method.maturity) === "validated" ? "success" : String(method.maturity) === "supported" ? "blue" : "warning"}>
-              {String(method.maturity)}
-            </Badge>
-            <h3>{String(method.displayName)}</h3>
-            <p>{String(method.family)}</p>
-            <small>{Array.isArray(method.diagnostics) ? method.diagnostics.join(", ") : ""}</small>
+          <article className="method-card" key={method.id}>
+            <div>
+              <div className="action-row method-badges">
+                <Badge
+                  kind={
+                    method.maturity === "validated"
+                      ? "success"
+                      : method.maturity === "supported"
+                        ? "blue"
+                        : "warning"
+                  }
+                >
+                  {method.maturity.replace(/^./, (character) => character.toUpperCase())}
+                </Badge>
+                <Badge kind={method.executable ? "teal" : "neutral"}>
+                  {method.executable ? "Executable" : "Execution pending"}
+                </Badge>
+              </div>
+              <h3>{method.displayName}</h3>
+              <p className="muted">{method.family.replaceAll("_", " ")}</p>
+              <small>
+                Diagnostics: {method.diagnostics.length ? method.diagnostics.join(", ") : "None listed"}
+              </small>
+            </div>
           </article>
         ))}
       </div>
