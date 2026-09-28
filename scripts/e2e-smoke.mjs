@@ -196,10 +196,19 @@ async function main() {
     projectId = project.payload.project.id;
     console.log("PASS project creation");
 
-    await uploadResearchFile(
+    const protocolFileId = await uploadResearchFile(
       "protocol",
       "smoke-protocol.txt",
-      "Objective: assess whether x is associated with y. Design: cross sectional."
+      [
+        "Study title: Synthetic association study.",
+        "Objective: assess whether x is associated with y.",
+        "Research question: Is x associated with y?",
+        "Primary outcome: y.",
+        "Primary predictor: x.",
+        "Study design: cross sectional.",
+        "Unit of analysis: observation.",
+        "There are no repeated measures, clusters, survey weights, or strata."
+      ].join("\n")
     );
     await uploadResearchFile(
       "instrument",
@@ -213,6 +222,27 @@ async function main() {
       throw new Error("Protocol or instrument file was not persisted.");
     }
     console.log("PASS protocol and instrument storage");
+
+    const extractedProtocol = await request(
+      `/projects/${projectId}/protocol-extraction`,
+      {
+        method: "POST",
+        body: JSON.stringify({ fileId: protocolFileId })
+      },
+      [200]
+    );
+    const extractedQuestions =
+      extractedProtocol.payload?.extraction?.researchQuestions ?? [];
+    if (
+      extractedQuestions.length < 1 ||
+      !String(extractedQuestions[0]?.text ?? "").toLowerCase().includes("x") ||
+      !String(extractedQuestions[0]?.text ?? "").toLowerCase().includes("y")
+    ) {
+      throw new Error(
+        `Protocol extraction did not return the expected research question: ${JSON.stringify(extractedProtocol.payload)}`
+      );
+    }
+    console.log("PASS protocol study-information extraction");
 
     const day1 = await uploadDataset(
       "Day 1 Form v1",
