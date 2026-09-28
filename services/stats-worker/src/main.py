@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
-from workers import asgi
+from workers import WorkerEntrypoint, asgi
 
+from queue_worker import PermanentAnalysisError, mark_failed, process_analysis_message
 from stats import harmonise_append, profile_csv, run_analysis
 
 app = FastAPI(title="Methodome Statistics Worker", docs_url=None, redoc_url=None)
@@ -47,4 +48,18 @@ async def run(request: Request):
         raise HTTPException(status_code=500, detail="Statistical execution failed.") from exc
 
 
-Default = asgi.entrypoint(app)
+class Default(WorkerEntrypoint):
+    async def fetch(self, request):
+        return await asgi.fetch(app, request, self.env)
+
+    async def queue(self, batch):
+        for message in batch.messages:
+            try:
+                await process_analysis_message(message.body, self.env)
+                message.ack()
+            except PermanentAnalysisError as exc:
+                await mark_failed(message.body, self.env, str(exc))
+                message.ack()
+            except Exception as exc:
+                print(f"Transient analysis queue failure: {exc}")
+                message.retry()
