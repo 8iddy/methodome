@@ -43,6 +43,9 @@
       ],
       "@methodome/benchmark": [
         "packages/benchmark/src/index.ts"
+      ],
+      "@methodome/analysis-plan": [
+        "packages/analysis-plan/src/index.ts"
       ]
     },
     "types": [
