@@ -1754,7 +1754,7 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
           </Button>
         )}
       </div>
-      {status && <p className="confirmation" role="status">{status}</p>
+      {status && <p className="confirmation" role="status">{status}</p>}
     </section>
   );
 }
