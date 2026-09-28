@@ -18,7 +18,7 @@ import {
   lockAnalysisPlan
 } from "@methodome/analysis-plan";
 import type { Project } from "@methodome/domain";
-import type { ProjectProcessingPolicy } from "@methodome/policy-engine";
+import { assertModelRequestAllowed, type ProjectProcessingPolicy } from "@methodome/policy-engine";
 import { compareDatasetSchemas } from "@methodome/schema-harmonisation";
 import { requireAuth } from "./auth";
 import { consumeAnalysisQueue } from "./analysis-worker";
@@ -894,6 +894,31 @@ app.post("/projects/:projectId/protocol-extraction", async (c) => {
     );
   }
 
+  const policy = await getProjectPolicy(c.env.DB, projectId);
+  if (policy) {
+    try {
+      assertModelRequestAllowed(policy, {
+        processorId: "workers-ai",
+        providerKind: "internal",
+        payloadKind: "document_text",
+        containsIdentifiers: policy.containsIdentifiableData
+      });
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "MODEL_PROCESSING_BLOCKED",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Project processing policy blocks protocol extraction."
+          }
+        },
+        409
+      );
+    }
+  }
+
   const body = await c.req.json().catch(() => ({})) as { fileId?: string };
   const protocolFiles = await listProjectFiles(c.env.DB, projectId, "protocol");
   const fileId = body.fileId ?? protocolFiles[0]?.id;
@@ -1089,6 +1114,31 @@ app.get("/projects/:projectId/variable-mapping-suggestions", async (c) => {
       } catch {
         // Instrument text is helpful evidence but is not required for mapping.
       }
+    }
+  }
+
+  const policy = await getProjectPolicy(c.env.DB, projectId);
+  if (policy) {
+    try {
+      assertModelRequestAllowed(policy, {
+        processorId: "workers-ai",
+        providerKind: "internal",
+        payloadKind: instrumentText ? "document_text" : "metadata",
+        containsIdentifiers: policy.containsIdentifiableData
+      });
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "MODEL_PROCESSING_BLOCKED",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Project processing policy blocks model-assisted variable mapping."
+          }
+        },
+        409
+      );
     }
   }
 
