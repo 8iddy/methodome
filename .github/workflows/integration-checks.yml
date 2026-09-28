@@ -33,6 +33,11 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Validate deployment scripts
+        run: |
+          bash -n scripts/deploy-production.sh
+          node --check scripts/e2e-smoke.mjs
+
       - name: Backend TypeScript
         run: npm run typecheck
 
