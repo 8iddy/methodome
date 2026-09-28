@@ -58,6 +58,20 @@ describe("deterministic method registry", () => {
     expect(selection.blockedReason).toContain("causal");
   });
 
+  it("returns descriptive statistics for descriptive questions", () => {
+    const study = clusteredBinaryStudy();
+    study.clustered = false;
+    study.clusterVariable = null;
+    study.researchQuestions[0]!.objectiveType = "descriptive";
+
+    const selection = selectCandidateMethods(study, "rq1");
+
+    expect(selection.candidates.map((item) => item.methodId)).toEqual([
+      "descriptive_statistics"
+    ]);
+    expect(selection.candidates[0]?.executable).toBe(true);
+  });
+
   it("returns Poisson and negative binomial for count outcomes", () => {
     const study = clusteredBinaryStudy();
     study.clustered = false;
