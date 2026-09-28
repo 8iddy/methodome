@@ -148,6 +148,24 @@ describe("protocol extraction runtime", () => {
     expect(result.researchQuestions[0]?.objectiveType).toBe("descriptive");
   });
 
+  it("does not mistake mixed-methods design language for sampling design", async () => {
+    const env = {
+      AI: {
+        run: async () => ({
+          response: {
+            ...validExtraction,
+            samplingDesign:
+              "The study employs a cross-country mixed-methods concurrent triangulation design."
+          }
+        })
+      }
+    } as never;
+
+    const result = await extractProtocolWithAi(env, "# Protocol\nResearch question present.");
+
+    expect(result.samplingDesign).toBeNull();
+  });
+
   it("retries once when the first response contains incomplete JSON", async () => {
     let call = 0;
     const env = {
