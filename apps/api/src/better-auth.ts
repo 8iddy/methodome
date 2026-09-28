@@ -6,7 +6,11 @@ export function emailVerificationEnabled(env: Env): boolean {
   return Boolean(env.EMAIL) && env.EMAIL_VERIFICATION_REQUIRED === "true";
 }
 
-export interface MethodomeAuthHandler {\n  handler(request: Request): Promise<Response>;\n}\n\nexport function createAuth(env: Env): MethodomeAuthHandler {
+export interface MethodomeAuthHandler {
+  handler(request: Request): Promise<Response>;
+}
+
+export function createAuth(env: Env): MethodomeAuthHandler {
   if (!env.BETTER_AUTH_SECRET) {
     throw new Error("BETTER_AUTH_SECRET is required when Better Auth is enabled.");
   }
