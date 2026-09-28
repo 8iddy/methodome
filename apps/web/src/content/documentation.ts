@@ -205,11 +205,11 @@ export const documentationSections: DocumentationSection[] = [
     summary:
       "The v0.1.0 MVP is a working quantitative release, not the full long-term product.",
     points: [
-      "Email verification and password-reset delivery are not yet part of the released MVP.",
+      "Email verification and password-reset delivery still require production email configuration.",
       "Qualitative and mixed-methods workflows are not yet implemented.",
       "Bayesian and structural equation modelling workflows are not yet implemented.",
       "General interactive data cleaning is still limited.",
-      "The current production dataset upload path supports CSV. Additional formats belong to later product work unless added in a later release.",
+      "The current production dataset upload path supports CSV. Protocol and research-document text extraction supports text-based PDF, DOCX, TXT and Markdown through Workers AI document conversion.",
       "Full DOCX, PDF, HTML, LaTeX and Quarto reporting remains post-MVP work."
     ]
   }
