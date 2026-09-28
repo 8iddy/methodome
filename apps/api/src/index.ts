@@ -1930,6 +1930,74 @@ app.post("/projects/:projectId/analysis-jobs", async (c) => {
     );
   }
 
+  if (parsed.data.analysisPlanId) {
+    const referencedPlan = await getAnalysisPlanById(
+      c.env.DB,
+      projectId,
+      parsed.data.analysisPlanId
+    );
+
+    if (!referencedPlan) {
+      return c.json(
+        {
+          error: {
+            code: "ANALYSIS_PLAN_NOT_FOUND",
+            message: "The analysis plan referenced by this job was not found."
+          }
+        },
+        404
+      );
+    }
+
+    if (!referencedPlan.lockedAt || !referencedPlan.lockHash) {
+      return c.json(
+        {
+          error: {
+            code: "ANALYSIS_PLAN_NOT_LOCKED",
+            message: "Lock the analysis plan before running it as planned analysis."
+          }
+        },
+        409
+      );
+    }
+
+    if (
+      referencedPlan.datasetVersionId &&
+      referencedPlan.datasetVersionId !== parsed.data.datasetVersionId
+    ) {
+      return c.json(
+        {
+          error: {
+            code: "ANALYSIS_PLAN_DATASET_MISMATCH",
+            message: "The requested dataset does not match the locked analysis plan."
+          }
+        },
+        409
+      );
+    }
+
+    const inPlan = referencedPlan.analyses.some(
+      (analysis) =>
+        analysis.selectedMethodId === parsed.data.methodId &&
+        analysis.outcome === parsed.data.outcome &&
+        JSON.stringify(analysis.predictors) === JSON.stringify(parsed.data.predictors) &&
+        JSON.stringify(analysis.covariates) === JSON.stringify(parsed.data.covariates)
+    );
+
+    if (!inPlan) {
+      return c.json(
+        {
+          error: {
+            code: "ANALYSIS_JOB_NOT_IN_LOCKED_PLAN",
+            message:
+              "The requested analysis does not match an analysis recorded in the locked plan."
+          }
+        },
+        409
+      );
+    }
+  }
+
   const specification = await getStudySpecification(c.env.DB, projectId);
   const resolvedForJob = specification
     ? await resolveStudySpecificationForMethods(
