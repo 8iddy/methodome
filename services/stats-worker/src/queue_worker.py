@@ -178,12 +178,12 @@ async def process_analysis_message(body: Any, env: Any) -> None:
 
     existing_result = await first_row(
         env.DB,
-        "SELECT id FROM analysis_results WHERE analysis_job_id = ? LIMIT 1",
+        """SELECT id, result_json
+           FROM analysis_results
+           WHERE analysis_job_id = ?
+           LIMIT 1""",
         job_id,
     )
-    if existing_result:
-        await mark_state(env.DB, job_id, "complete", completed_at=utc_now())
-        return
 
     try:
         job = json.loads(str(job_row["job_specification_json"]))
@@ -209,6 +209,52 @@ async def process_analysis_message(body: Any, env: Any) -> None:
     for name, value in required_strings.items():
         if not isinstance(value, str) or not value:
             raise PermanentAnalysisError(f"Stored analysis job is missing {name}.")
+
+    if existing_result:
+        completion_audit = await first_row(
+            env.DB,
+            """SELECT id
+               FROM audit_events
+               WHERE project_id = ?
+                 AND object_type = 'analysis_job'
+                 AND object_id = ?
+                 AND action = 'analysis_completed'
+               LIMIT 1""",
+            project_id,
+            job_id,
+        )
+        if not completion_audit:
+            dataset = await first_row(
+                env.DB,
+                """SELECT checksum_sha256
+                   FROM dataset_versions
+                   WHERE id = ? AND project_id = ?
+                   LIMIT 1""",
+                dataset_version_id,
+                project_id,
+            )
+            try:
+                existing_payload = json.loads(str(existing_result["result_json"]))
+            except Exception:
+                existing_payload = {}
+            await append_audit_event(
+                env.DB,
+                project_id=project_id,
+                user_id=requested_by,
+                action="analysis_completed",
+                object_type="analysis_job",
+                object_id=job_id,
+                after={
+                    "methodId": method_id,
+                    "datasetVersionId": dataset_version_id,
+                    "datasetChecksumSha256": str(
+                        dataset.get("checksum_sha256", "") if dataset else ""
+                    ),
+                    "n": existing_payload.get("n"),
+                },
+            )
+        await mark_state(env.DB, job_id, "complete", completed_at=utc_now())
+        return
 
     started_at = utc_now()
     await mark_state(env.DB, job_id, "preparing_data", started_at=started_at)
