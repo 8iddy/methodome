@@ -1797,6 +1797,7 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
                   <option value="causal">Causal</option>
                   <option value="diagnostic">Diagnostic</option>
                   <option value="prognostic">Prognostic</option>
+                  <option value="qualitative">Qualitative</option>
                   <option value="exploratory">Exploratory</option>
                 </select>
                 <small className="field-hint">
