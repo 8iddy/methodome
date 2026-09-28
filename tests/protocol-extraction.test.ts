@@ -122,6 +122,32 @@ describe("protocol extraction runtime", () => {
     expect(calls[0]?.max_tokens).toBe(4096);
   });
 
+  it("classifies an unlabelled descriptive research question from its wording", async () => {
+    const env = {
+      AI: {
+        run: async () => ({
+          response: {
+            ...validExtraction,
+            researchQuestions: [
+              {
+                text: "What are the current functionality levels and data use patterns of the eLMIS?",
+                objectiveType: null,
+                outcomes: ["eLMIS functionality levels", "data use patterns"],
+                predictors: [],
+                covariates: [],
+                estimand: null
+              }
+            ]
+          }
+        })
+      }
+    } as never;
+
+    const result = await extractProtocolWithAi(env, "# Protocol\nResearch question present.");
+
+    expect(result.researchQuestions[0]?.objectiveType).toBe("descriptive");
+  });
+
   it("retries once when the first response contains incomplete JSON", async () => {
     let call = 0;
     const env = {
