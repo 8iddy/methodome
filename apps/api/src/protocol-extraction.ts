@@ -337,7 +337,7 @@ export async function suggestMappingsWithAi(input: {
     .filter((concept) => exact.has(concept))
     .map((researchConcept) => ({
       researchConcept,
-      datasetVariable: exact.get(researchConcept),
+      datasetVariable: exact.get(researchConcept)!,
       mappingStatus: "direct_match",
       evidence: [
         "Exact normalized match to a dataset variable name or dataset label."
