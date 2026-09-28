@@ -31,16 +31,15 @@ else
   npx wrangler r2 bucket create methodome-files
 fi
 
+echo "-- Ensure analysis queue exists"
+if npx wrangler queues list | grep -q "methodome-analysis"; then
+  echo "methodome-analysis already exists"
+else
+  npx wrangler queues create methodome-analysis
+fi
+
 echo "-- Apply remote D1 migrations"
 npx wrangler d1 migrations apply DB --remote --config wrangler.jsonc
-
-echo "-- Ensure Better Auth secret exists"
-if npx wrangler secret list --config wrangler.jsonc 2>/dev/null | grep -q "BETTER_AUTH_SECRET"; then
-  echo "BETTER_AUTH_SECRET already configured"
-else
-  printf "%s" "$(openssl rand -base64 48)" | npx wrangler secret put BETTER_AUTH_SECRET --config wrangler.jsonc
-  echo "BETTER_AUTH_SECRET configured"
-fi
 
 echo "-- Prepare Python deployment tooling"
 UV_BIN="$(command -v uv || true)"
@@ -66,6 +65,14 @@ echo "-- Deploy internal Python statistics Worker"
 
 echo "-- Deploy Methodome API Worker"
 npx wrangler deploy --config wrangler.jsonc
+
+echo "-- Ensure Better Auth secret exists"
+if npx wrangler secret list --config wrangler.jsonc 2>/dev/null | grep -q "BETTER_AUTH_SECRET"; then
+  echo "BETTER_AUTH_SECRET already configured"
+else
+  printf "%s" "$(openssl rand -base64 48)" | npx wrangler secret put BETTER_AUTH_SECRET --config wrangler.jsonc
+  echo "BETTER_AUTH_SECRET configured"
+fi
 
 echo "-- Deploy Methodome web Worker"
 npm --workspace @methodome/web run deploy:cloudflare
