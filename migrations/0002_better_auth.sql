@@ -55,3 +55,12 @@ CREATE UNIQUE INDEX idx_auth_account_provider_identity
   ON auth_account(providerId, accountId);
 CREATE INDEX idx_auth_verification_identifier
   ON auth_verification(identifier);
+
+CREATE TABLE auth_rate_limit (
+  id TEXT NOT NULL PRIMARY KEY,
+  key TEXT NOT NULL UNIQUE,
+  count INTEGER NOT NULL,
+  lastRequest INTEGER NOT NULL
+);
+
+CREATE INDEX idx_auth_rate_limit_key ON auth_rate_limit(key);
