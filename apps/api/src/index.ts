@@ -1533,9 +1533,15 @@ app.post("/projects/:projectId/analysis-plan", async (c) => {
     );
   }
 
+  const resolvedForPlan = await resolveStudySpecificationForMethods(
+    c,
+    projectId,
+    specification
+  );
+
   for (const analysis of parsed.data.analyses) {
     const selection = selectCandidateMethods(
-      specification,
+      resolvedForPlan.specification,
       analysis.researchQuestionId
     );
     const allowed = new Set(
@@ -1856,10 +1862,13 @@ app.post("/projects/:projectId/analysis-jobs", async (c) => {
   }
 
   const specification = await getStudySpecification(c.env.DB, projectId);
-  const eligible = specification
+  const resolvedForJob = specification
+    ? await resolveStudySpecificationForMethods(c, projectId, specification)
+    : null;
+  const eligible = resolvedForJob
     ? new Set(
-        specification.researchQuestions.flatMap((question) =>
-          selectCandidateMethods(specification, question.id).candidates.map(
+        resolvedForJob.specification.researchQuestions.flatMap((question) =>
+          selectCandidateMethods(resolvedForJob.specification, question.id).candidates.map(
             (candidate) => candidate.methodId
           )
         )
