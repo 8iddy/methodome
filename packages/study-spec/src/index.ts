@@ -35,6 +35,7 @@ export const researchQuestionSchema = z.object({
       "causal",
       "diagnostic",
       "prognostic",
+      "qualitative",
       "exploratory"
     ])
     .nullable()

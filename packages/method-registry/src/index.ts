@@ -225,6 +225,18 @@ export function selectCandidateMethods(
     };
   }
 
+  if (question.objectiveType === "qualitative") {
+    return {
+      questionId,
+      candidates: [],
+      warnings: [
+        "Methodome recognised this as a qualitative research question. Qualitative coding and synthesis are not yet executable in the current release."
+      ],
+      blockedReason:
+        "This question should not be forced into the quantitative statistical pipeline."
+    };
+  }
+
   if (question.objectiveType === "causal") {
     return {
       questionId,

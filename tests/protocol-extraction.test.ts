@@ -122,6 +122,139 @@ describe("protocol extraction runtime", () => {
     expect(calls[0]?.max_tokens).toBe(4096);
   });
 
+  it("classifies an unlabelled descriptive research question from its wording", async () => {
+    const env = {
+      AI: {
+        run: async () => ({
+          response: {
+            ...validExtraction,
+            researchQuestions: [
+              {
+                text: "What are the current functionality levels and data use patterns of the eLMIS?",
+                objectiveType: null,
+                outcomes: ["eLMIS functionality levels", "data use patterns"],
+                predictors: [],
+                covariates: [],
+                estimand: null
+              }
+            ]
+          }
+        })
+      }
+    } as never;
+
+    const result = await extractProtocolWithAi(env, "# Protocol\nResearch question present.");
+
+    expect(result.researchQuestions[0]?.objectiveType).toBe("descriptive");
+  });
+
+  it("classifies qualitative intent without forcing statistical analysis", async () => {
+    const env = {
+      AI: {
+        run: async () => ({
+          response: {
+            ...validExtraction,
+            researchQuestions: [
+              {
+                text: "What barriers and facilitator experiences shape eLMIS data use among health workers?",
+                objectiveType: null,
+                outcomes: [],
+                predictors: [],
+                covariates: [],
+                estimand: null
+              }
+            ]
+          }
+        })
+      }
+    } as never;
+
+    const result = await extractProtocolWithAi(env, "# Protocol\nResearch question present.");
+
+    expect(result.researchQuestions[0]?.objectiveType).toBe("qualitative");
+  });
+
+  it("does not mistake mixed-methods design language for sampling design", async () => {
+    const env = {
+      AI: {
+        run: async () => ({
+          response: {
+            ...validExtraction,
+            samplingDesign:
+              "The study employs a cross-country mixed-methods concurrent triangulation design."
+          }
+        })
+      }
+    } as never;
+
+    const result = await extractProtocolWithAi(env, "# Protocol\nResearch question present.");
+
+    expect(result.samplingDesign).toBeNull();
+  });
+
+  it("reviews multiple questions independently to prevent outcome leakage", async () => {
+    let call = 0;
+    const firstPass = {
+      ...validExtraction,
+      researchQuestions: [
+        {
+          text: "What are the current eLMIS functionality levels and data use patterns?",
+          objectiveType: "descriptive",
+          outcomes: ["medicine stockout status"],
+          predictors: [],
+          covariates: [],
+          estimand: null
+        },
+        {
+          text: "Is reporting completeness associated with medicine stockout status?",
+          objectiveType: "association",
+          outcomes: ["medicine stockout status"],
+          predictors: ["reporting completeness"],
+          covariates: [],
+          estimand: null
+        }
+      ]
+    };
+
+    const env = {
+      AI: {
+        run: async () => {
+          call += 1;
+          if (call === 1) return { response: firstPass };
+          return {
+            response: {
+              researchQuestions: [
+                {
+                  text: firstPass.researchQuestions[0]!.text,
+                  objectiveType: "descriptive",
+                  outcomes: ["eLMIS functionality levels", "data use patterns"],
+                  predictors: [],
+                  covariates: [],
+                  estimand: null
+                },
+                firstPass.researchQuestions[1]!
+              ]
+            }
+          };
+        }
+      }
+    } as never;
+
+    const result = await extractProtocolWithAi(
+      env,
+      "# Protocol\nFour research questions are described in the study."
+    );
+
+    expect(call).toBe(2);
+    expect(result.researchQuestions[0]?.outcomes).toEqual([
+      "eLMIS functionality levels",
+      "data use patterns"
+    ]);
+    expect(result.researchQuestions[1]?.outcomes).toEqual([
+      "medicine stockout status"
+    ]);
+  });
+
   it("retries once when the first response contains incomplete JSON", async () => {
     let call = 0;
     const env = {
