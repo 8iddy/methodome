@@ -380,12 +380,22 @@ app.post("/projects/:projectId/schema-comparison", async (c) => {
     parsed.data.leftDatasetVersionId,
     parsed.data.leftVariables.map((variable) => ({
       sourceDatasetVersionId: parsed.data.leftDatasetVersionId,
-      ...variable
+      variableName: variable.variableName,
+      dataType: variable.dataType,
+      ...(variable.label ? { label: variable.label } : {}),
+      ...(variable.responseChoices
+        ? { responseChoices: variable.responseChoices }
+        : {})
     })),
     parsed.data.rightDatasetVersionId,
     parsed.data.rightVariables.map((variable) => ({
       sourceDatasetVersionId: parsed.data.rightDatasetVersionId,
-      ...variable
+      variableName: variable.variableName,
+      dataType: variable.dataType,
+      ...(variable.label ? { label: variable.label } : {}),
+      ...(variable.responseChoices
+        ? { responseChoices: variable.responseChoices }
+        : {})
     }))
   );
 
