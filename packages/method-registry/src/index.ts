@@ -11,6 +11,7 @@ export interface MethodDefinition {
   displayName: string;
   family: string;
   maturity: MethodMaturity;
+  executable: boolean;
   outcomeTypes: string[];
   supportsClustering: boolean;
   supportsRepeatedMeasures: boolean;
@@ -23,6 +24,7 @@ export interface CandidateMethod {
   methodId: string;
   displayName: string;
   maturity: MethodMaturity;
+  executable: boolean;
   rationale: string;
   requiredChecks: string[];
   decisionRequired?: string;
@@ -43,6 +45,7 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     displayName: "Pearson correlation",
     family: "association",
     maturity: "validated",
+    executable: true,
     outcomeTypes: ["continuous"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -55,6 +58,7 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     displayName: "Spearman correlation",
     family: "association",
     maturity: "validated",
+    executable: true,
     outcomeTypes: ["continuous", "categorical_ordinal"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -67,6 +71,7 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     displayName: "Linear regression",
     family: "regression",
     maturity: "validated",
+    executable: true,
     outcomeTypes: ["continuous"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -79,6 +84,7 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     displayName: "Binary logistic regression",
     family: "regression",
     maturity: "validated",
+    executable: true,
     outcomeTypes: ["binary"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -91,6 +97,7 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     displayName: "Mixed effects logistic regression",
     family: "multilevel",
     maturity: "supported",
+    executable: false,
     outcomeTypes: ["binary"],
     supportsClustering: true,
     supportsRepeatedMeasures: true,
@@ -103,6 +110,7 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     displayName: "GEE logistic regression",
     family: "multilevel",
     maturity: "supported",
+    executable: false,
     outcomeTypes: ["binary"],
     supportsClustering: true,
     supportsRepeatedMeasures: true,
@@ -115,6 +123,7 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     displayName: "Poisson regression",
     family: "count_regression",
     maturity: "validated",
+    executable: false,
     outcomeTypes: ["count"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -127,6 +136,7 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     displayName: "Negative binomial regression",
     family: "count_regression",
     maturity: "validated",
+    executable: false,
     outcomeTypes: ["count"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -139,6 +149,7 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     displayName: "Chi square test",
     family: "association",
     maturity: "validated",
+    executable: true,
     outcomeTypes: ["binary", "categorical_nominal", "categorical_ordinal"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -151,6 +162,7 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     displayName: "Fisher exact test",
     family: "association",
     maturity: "validated",
+    executable: true,
     outcomeTypes: ["binary", "categorical_nominal"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -172,6 +184,7 @@ function candidate(id: string, rationale: string, decisionRequired?: string): Ca
     methodId: method.id,
     displayName: method.displayName,
     maturity: method.maturity,
+    executable: method.executable,
     rationale,
     requiredChecks: method.diagnostics,
     ...(decisionRequired ? { decisionRequired } : {})
