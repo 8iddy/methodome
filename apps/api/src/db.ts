@@ -339,10 +339,19 @@ export async function getFileRecord(
   db: D1Database,
   fileId: string,
   userId: string
-): Promise<{ id: string; projectId: string; objectKey: string; filename: string } | null> {
+): Promise<{
+  id: string;
+  projectId: string;
+  objectKey: string;
+  filename: string;
+  fileKind: string;
+  mediaType?: string;
+  checksumSha256: string;
+} | null> {
   const row = await db
     .prepare(
-      `SELECT f.id, f.project_id, f.object_key, f.filename
+      `SELECT f.id, f.project_id, f.object_key, f.filename,
+              f.file_kind, f.media_type, f.checksum_sha256
        FROM files f
        JOIN projects p ON p.id = f.project_id
        LEFT JOIN project_members pm ON pm.project_id = p.id
@@ -357,9 +366,87 @@ export async function getFileRecord(
         id: String(row.id),
         projectId: String(row.project_id),
         objectKey: String(row.object_key),
-        filename: String(row.filename)
+        filename: String(row.filename),
+        fileKind: String(row.file_kind),
+        ...(row.media_type ? { mediaType: String(row.media_type) } : {}),
+        checksumSha256: String(row.checksum_sha256)
       }
     : null;
+}
+
+export async function saveProtocolExtraction(
+  db: D1Database,
+  input: {
+    id: string;
+    projectId: string;
+    protocolFileId: string;
+    protocolChecksum: string;
+    extraction: unknown;
+    provider: string;
+    model: string;
+    promptVersion: string;
+  }
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO protocol_extractions
+       (id, project_id, protocol_file_id, protocol_checksum,
+        extraction_json, provider, model, prompt_version, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      input.id,
+      input.projectId,
+      input.protocolFileId,
+      input.protocolChecksum,
+      JSON.stringify(input.extraction),
+      input.provider,
+      input.model,
+      input.promptVersion,
+      new Date().toISOString()
+    )
+    .run();
+}
+
+export async function getLatestProtocolExtraction(
+  db: D1Database,
+  projectId: string
+): Promise<{
+  id: string;
+  projectId: string;
+  protocolFileId: string;
+  protocolChecksum: string;
+  extraction: unknown;
+  provider: string;
+  model: string;
+  promptVersion: string;
+  createdAt: string;
+} | null> {
+  const row = await db
+    .prepare(
+      `SELECT id, project_id, protocol_file_id, protocol_checksum,
+              extraction_json, provider, model, prompt_version, created_at
+       FROM protocol_extractions
+       WHERE project_id = ?
+       ORDER BY created_at DESC
+       LIMIT 1`
+    )
+    .bind(projectId)
+    .first<Record<string, unknown>>();
+
+  if (!row) return null;
+
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    protocolFileId: String(row.protocol_file_id),
+    protocolChecksum: String(row.protocol_checksum),
+    extraction: JSON.parse(String(row.extraction_json)),
+    provider: String(row.provider),
+    model: String(row.model),
+    promptVersion: String(row.prompt_version),
+    createdAt: String(row.created_at)
+  };
 }
 
 export async function createFileRecord(
