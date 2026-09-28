@@ -622,7 +622,7 @@ function LiveAnalysisPlan({ projectId }: { projectId: string }) {
     setSelections(candidateResponse.selections);
     setDatasets(ds);
     setPlan(existing);
-    const first = candidateResponse.selections[0]?.candidates[0]?.methodId;
+    const first = candidateResponse.selections[0]?.candidates.find((candidate) => candidate.executable)?.methodId;
     if (first) setSelectedMethod((current) => current || first);
   }
 
@@ -690,9 +690,11 @@ function LiveAnalysisPlan({ projectId }: { projectId: string }) {
                 type="radio"
                 name="candidate"
                 checked={selectedMethod === candidate.methodId}
+                disabled={!candidate.executable}
                 onChange={() => setSelectedMethod(candidate.methodId)}
               />
               <strong>{candidate.displayName}</strong>
+              {!candidate.executable && <Badge kind="warning">Execution pending</Badge>}
               <p>{candidate.rationale}</p>
               {candidate.decisionRequired && <small>{candidate.decisionRequired}</small>}
             </label>
