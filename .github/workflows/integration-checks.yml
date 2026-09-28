@@ -47,8 +47,18 @@ jobs:
           python -m pip install -e services/stats-worker pytest
           pytest services/stats-worker/tests -q
 
+      - name: Package Python Worker
+        run: |
+          python -m pip install uv
+          cd services/stats-worker
+          uv sync --group dev
+          uv run --group dev pywrangler deploy --dry-run --config wrangler.jsonc
+
       - name: Frontend TypeScript
         run: npm run web:typecheck
 
       - name: Build frontend
         run: npm run web:build
+
+      - name: Package frontend for Cloudflare
+        run: npm --workspace @methodome/web run build:cloudflare
