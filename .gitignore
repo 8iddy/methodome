@@ -1,11 +1,14 @@
 node_modules/
+.next/
+out/
+dist/
+.wrangler/
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
 .env
 .env.*
 !.env.example
-.wrangler/
-dist/
-.next/
 .DS_Store
+*.tsbuildinfo
+/stitch_methodome_research_analysis_platform/
