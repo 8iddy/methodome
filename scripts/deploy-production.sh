@@ -70,9 +70,11 @@ npx wrangler deploy --config wrangler.jsonc
 echo "-- Deploy Methodome web Worker"
 npm --workspace @methodome/web run deploy:cloudflare
 
-echo "-- Verify public health endpoints"
+echo "-- Verify public endpoints"
 curl --fail --silent --show-error https://api.methodome.com/api/health
 echo
+curl --fail --silent --show-error --output /dev/null https://methodome.com/
+echo "methodome.com responded successfully"
 
 echo "-- Run complete research workflow"
 METHODOME_API_URL=https://api.methodome.com/api node scripts/e2e-smoke.mjs
