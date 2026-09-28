@@ -68,3 +68,51 @@ def test_chi_square_flags_expected_counts():
     )
     assert result["n"] == 6
     assert result["estimates"][0]["pValue"] >= 0
+
+
+def test_harmonised_append_maps_form_versions():
+    from stats import harmonise_append
+
+    result = harmonise_append(
+        {
+            "sources": [
+                {
+                    "datasetVersionId": "day1",
+                    "csv": "facility_type,stockout\nHC III,Yes\nHC II,No\n",
+                },
+                {
+                    "datasetVersionId": "day2",
+                    "csv": "facility_level,stockout_30_days\nHealth Centre III,No\nHCII,Yes\n",
+                },
+            ],
+            "mappings": [
+                {
+                    "sourceDatasetVersionId": "day1",
+                    "sourceVariable": "facility_type",
+                    "targetVariable": "facility_level",
+                    "categoryMap": {"HC III": "HCIII", "HC II": "HCII"},
+                },
+                {
+                    "sourceDatasetVersionId": "day1",
+                    "sourceVariable": "stockout",
+                    "targetVariable": "stockout_status",
+                },
+                {
+                    "sourceDatasetVersionId": "day2",
+                    "sourceVariable": "facility_level",
+                    "targetVariable": "facility_level",
+                    "categoryMap": {"Health Centre III": "HCIII"},
+                },
+                {
+                    "sourceDatasetVersionId": "day2",
+                    "sourceVariable": "stockout_30_days",
+                    "targetVariable": "stockout_status",
+                },
+            ],
+        }
+    )
+
+    assert result["rowCount"] == 4
+    assert result["columnCount"] == 2
+    assert "facility_level,stockout_status" in result["csv"]
+    assert "HCIII,No" in result["csv"]
