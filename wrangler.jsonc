@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "methodome-api",
+  "main": "apps/api/src/index.ts",
+  "compatibility_date": "2026-09-28",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "APP_ENV": "development",
+    "AUTH_MODE": "disabled"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "methodome",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "ANALYSIS_QUEUE",
+        "queue": "methodome-analysis"
+      }
+    ]
+  }
+}
