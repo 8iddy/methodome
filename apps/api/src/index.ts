@@ -22,7 +22,8 @@ import { assertModelRequestAllowed, type ProjectProcessingPolicy } from "@method
 import { compareDatasetSchemas } from "@methodome/schema-harmonisation";
 import { requireAuth } from "./auth";
 import { consumeAnalysisQueue } from "./analysis-worker";
-import { createAuth } from "./better-auth";
+import { createAuth, emailVerificationEnabled } from "./better-auth";
+import { turnstileConfigurationIncomplete, turnstileEnabled, validateTurnstile } from "./auth-security";
 import type { Env, Variables } from "./env";
 import { makeId } from "./id";
 import {
@@ -109,6 +110,106 @@ app.get("/health", (c) =>
   })
 );
 
+app.get("/auth-config", (c) => {
+  return c.json({
+    turnstileRequired: turnstileEnabled(c.env),
+    turnstileSiteKey: c.env.TURNSTILE_SITE_KEY ?? null,
+    emailVerificationRequired: emailVerificationEnabled(c.env)
+  });
+});
+
+app.post("/auth/sign-up/email", async (c) => {
+  if (c.env.AUTH_MODE !== "better_auth" || !c.env.BETTER_AUTH_SECRET) {
+    return c.json(
+      {
+        error: {
+          code: "AUTH_NOT_CONFIGURED",
+          message: "Production authentication has not been enabled."
+        }
+      },
+      503
+    );
+  }
+
+  if (turnstileConfigurationIncomplete(c.env)) {
+    return c.json(
+      {
+        error: {
+          code: "TURNSTILE_CONFIG_INCOMPLETE",
+          message: "Account bot protection is not completely configured."
+        }
+      },
+      503
+    );
+  }
+
+  const body = await c.req.json().catch(() => null) as
+    | {
+        name?: string;
+        email?: string;
+        password?: string;
+        turnstileToken?: string;
+      }
+    | null;
+
+  if (!body) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_SIGN_UP",
+          message: "Account details are invalid."
+        }
+      },
+      400
+    );
+  }
+
+  if (turnstileEnabled(c.env)) {
+    const token = body.turnstileToken?.trim();
+    if (!token) {
+      return c.json(
+        {
+          error: {
+            code: "TURNSTILE_REQUIRED",
+            message: "Complete the bot check before creating an account."
+          }
+        },
+        400
+      );
+    }
+
+    const result = await validateTurnstile(
+      c.env,
+      token,
+      c.req.header("cf-connecting-ip")
+    );
+    if (!result.success) {
+      return c.json(
+        {
+          error: {
+            code: "TURNSTILE_FAILED",
+            message: "The bot check could not be verified. Try again.",
+            details: result["error-codes"] ?? []
+          }
+        },
+        400
+      );
+    }
+  }
+
+  const { turnstileToken: _turnstileToken, ...authBody } = body;
+  const headers = new Headers(c.req.raw.headers);
+  headers.set("content-type", "application/json");
+
+  return createAuth(c.env).handler(
+    new Request(c.req.raw.url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(authBody)
+    })
+  );
+});
+
 app.all("/auth/*", async (c) => {
   if (c.env.AUTH_MODE !== "better_auth" || !c.env.BETTER_AUTH_SECRET) {
     return c.json(
@@ -129,6 +230,7 @@ app.use("*", async (c, next) => {
   if (
     c.req.path === "/api/health" ||
     c.req.path === "/api/methods" ||
+    c.req.path === "/api/auth-config" ||
     c.req.path.startsWith("/api/auth/")
   ) {
     return next();
