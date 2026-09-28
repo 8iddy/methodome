@@ -13,6 +13,9 @@ import {
   createProject,
   createUpload,
   getAnalysisJob,
+  verifyEmailOtp,
+  resendEmailVerificationOtp,
+  getAuthConfig,
   getAnalysisPlan,
   getAnalysisResult,
   getVariableMappingSuggestions,
@@ -104,20 +107,101 @@ export function LiveAuthPage({ signup }: { signup: boolean }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [verificationPending, setVerificationPending] = useState(false);
+  const [authConfig, setAuthConfig] = useState({
+    turnstileRequired: false,
+    turnstileSiteKey: null as string | null,
+    emailVerificationRequired: false
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
-  async function submit(event: React.FormEvent) {
+  useEffect(() => {
+    getAuthConfig()
+      .then(setAuthConfig)
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!signup || !authConfig.turnstileRequired || !authConfig.turnstileSiteKey) {
+      return;
+    }
+    if (document.querySelector('script[data-methodome-turnstile="true"]')) {
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    script.async = true;
+    script.defer = true;
+    script.dataset.methodomeTurnstile = "true";
+    document.head.appendChild(script);
+  }, [signup, authConfig.turnstileRequired, authConfig.turnstileSiteKey]);
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError("");
+    setNotice("");
     try {
       if (signup) {
-        await signUp({ name, email, password });
+        const formData = new FormData(event.currentTarget);
+        const turnstileToken = String(
+          formData.get("cf-turnstile-response") ?? ""
+        ).trim();
+
+        if (authConfig.turnstileRequired && !turnstileToken) {
+          setError("Complete the bot check before creating an account.");
+          return;
+        }
+
+        await signUp({
+          name,
+          email,
+          password,
+          ...(turnstileToken ? { turnstileToken } : {})
+        });
+
+        if (authConfig.emailVerificationRequired) {
+          setVerificationPending(true);
+          setNotice("We sent a six-digit verification code to your email.");
+          return;
+        }
       } else {
         await signIn({ email, password });
       }
       router.push(destination);
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verify(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await verifyEmailOtp({ email, otp });
+      await signIn({ email, password });
+      router.push(destination);
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resend() {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await resendEmailVerificationOtp(email);
+      setNotice("A new verification code was sent.");
     } catch (err) {
       setError(message(err));
     } finally {
@@ -130,51 +214,94 @@ export function LiveAuthPage({ signup }: { signup: boolean }) {
       <a href="/" className="auth-brand">
         <span className="brand"><span className="mark">M</span><span>Methodome</span></span>
       </a>
-      <form onSubmit={submit}>
-        <p className="eyebrow">METHODOME ACCOUNT</p>
-        <h1>{signup ? "Create your account" : "Sign in to Methodome"}</h1>
-        <p>{signup ? "Start a structured research workspace." : "Continue to your research workspace."}</p>
-        {signup && (
+
+      {verificationPending ? (
+        <form onSubmit={verify}>
+          <p className="eyebrow">VERIFY EMAIL</p>
+          <h1>Check your email</h1>
+          <p>
+            Enter the six-digit code sent to <strong>{email}</strong>.
+          </p>
           <label>
-            Full name
+            Verification code
             <input
               required
-              autoComplete="name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              value={otp}
+              onChange={(event) =>
+                setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))
+              }
+              placeholder="000000"
             />
           </label>
-        )}
-        <label>
-          Email
-          <input
-            required
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            required
-            minLength={10}
-            type="password"
-            autoComplete={signup ? "new-password" : "current-password"}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
-        <Button type="submit">{busy ? "Working…" : signup ? "Create account" : "Sign in"}</Button>
-        {error && <p className="confirmation" role="alert">{error}</p>}
-        <p className="muted">
-          {signup ? "Already have an account? " : "Need an account? "}
-          <a href={`${signup ? "/sign-in" : "/sign-up"}?next=${encodeURIComponent(destination)}`}>
-            {signup ? "Sign in" : "Create one"}
-          </a>
-        </p>
-      </form>
+          <Button type="submit">{busy ? "Verifying…" : "Verify email"}</Button>
+          <Button variant="quiet" onClick={() => void resend()}>
+            Send another code
+          </Button>
+          {notice && <p className="confirmation" role="status">{notice}</p>}
+          {error && <p className="confirmation" role="alert">{error}</p>}
+        </form>
+      ) : (
+        <form onSubmit={submit}>
+          <p className="eyebrow">METHODOME ACCOUNT</p>
+          <h1>{signup ? "Create your account" : "Sign in to Methodome"}</h1>
+          <p>{signup ? "Start a structured research workspace." : "Continue to your research workspace."}</p>
+          {signup && (
+            <label>
+              Full name
+              <input
+                required
+                autoComplete="name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </label>
+          )}
+          <label>
+            Email
+            <input
+              required
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
+          <label>
+            Password
+            <input
+              required
+              minLength={10}
+              type="password"
+              autoComplete={signup ? "new-password" : "current-password"}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+
+          {signup && authConfig.turnstileRequired && authConfig.turnstileSiteKey && (
+            <div
+              className="cf-turnstile"
+              data-sitekey={authConfig.turnstileSiteKey}
+              data-theme="light"
+              data-size="flexible"
+            />
+          )}
+
+          <Button type="submit">{busy ? "Working…" : signup ? "Create account" : "Sign in"}</Button>
+          {notice && <p className="confirmation" role="status">{notice}</p>}
+          {error && <p className="confirmation" role="alert">{error}</p>}
+          <p className="muted">
+            {signup ? "Already have an account? " : "Need an account? "}
+            <a href={`${signup ? "/sign-in" : "/sign-up"}?next=${encodeURIComponent(destination)}`}>
+              {signup ? "Sign in" : "Create one"}
+            </a>
+          </p>
+        </form>
+      )}
     </main>
   );
 }
