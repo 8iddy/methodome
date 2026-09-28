@@ -50,6 +50,8 @@ if [[ -z "$UV_BIN" ]]; then
   UV_BIN="$DEPLOY_VENV/bin/uv"
 fi
 
+export PATH="$(dirname "$UV_BIN"):$PATH"
+
 echo "-- Test Python statistics engine"
 (
   cd services/stats-worker
