@@ -1,6 +1,5 @@
 import type {
   AnalysisJobId,
-  AnalysisPlanVersionId,
   DatasetVersionId,
   ProjectId,
   UserId
@@ -10,7 +9,7 @@ export interface AnalysisJob {
   jobId: AnalysisJobId;
   projectId: ProjectId;
   datasetVersionId: DatasetVersionId;
-  analysisPlanVersionId?: AnalysisPlanVersionId;
+  analysisPlanId?: string;
   methodId: string;
   outcome?: string;
   predictors: string[];
