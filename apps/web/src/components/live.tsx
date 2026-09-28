@@ -16,6 +16,8 @@ import {
   getAuditTrail,
   getDatasets,
   getMethodCandidates,
+  getMethods,
+  getAnalysisHistory,
   getProject,
   getProjects,
   getSession,
@@ -843,4 +845,77 @@ function LiveAudit({ projectId }: { projectId: string }) {
 export async function performSignOut() {
   await signOut();
   window.location.href = "/sign-in";
+}
+
+
+export function LiveMethodsPage() {
+  const [methods, setMethods] = useState<Array<Record<string, unknown>>>([]);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    getMethods().then((response) => setMethods(response.methods)).catch(() => setMethods([]));
+  }, []);
+
+  const visible = methods.filter((method) =>
+    String(method.displayName ?? "").toLowerCase().includes(query.toLowerCase())
+  );
+
+  return (
+    <main className="app-content">
+      <PageHeader
+        eyebrow="METHODS LIBRARY"
+        title="Methods library"
+        description="The live registry controls analytical eligibility and execution maturity."
+      />
+      <div className="catalogue-tools">
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search methods" />
+      </div>
+      <div className="method-list">
+        {visible.map((method) => (
+          <article className="method-card" key={String(method.id)}>
+            <Badge kind={String(method.maturity) === "validated" ? "success" : String(method.maturity) === "supported" ? "blue" : "warning"}>
+              {String(method.maturity)}
+            </Badge>
+            <h3>{String(method.displayName)}</h3>
+            <p>{String(method.family)}</p>
+            <small>{Array.isArray(method.diagnostics) ? method.diagnostics.join(", ") : ""}</small>
+          </article>
+        ))}
+      </div>
+    </main>
+  );
+}
+
+export function LiveHistoryPage() {
+  const [analyses, setAnalyses] = useState<Array<Record<string, unknown>>>([]);
+
+  useEffect(() => {
+    getAnalysisHistory().then(setAnalyses).catch(() => setAnalyses([]));
+  }, []);
+
+  return (
+    <main className="app-content">
+      <PageHeader
+        eyebrow="ANALYSIS HISTORY"
+        title="Analysis history"
+        description="Every submitted analysis job is tied to a project and dataset version."
+      />
+      <section className="panel table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Project</th><th>Method</th><th>Dataset</th><th>Status</th></tr></thead>
+          <tbody>
+            {analyses.map((analysis, index) => (
+              <tr key={String(analysis.jobId ?? index)}>
+                <td>{String(analysis.createdAt ?? "")}</td>
+                <td>{String(analysis.projectName ?? "")}</td>
+                <td>{String(analysis.methodId ?? "").replaceAll("_", " ")}</td>
+                <td><code>{String(analysis.datasetVersionId ?? "")}</code></td>
+                <td>{String(analysis.state ?? "")}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </main>
+  );
 }
