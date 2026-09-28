@@ -22,6 +22,7 @@ import {
   getMethods,
   getAnalysisHistory,
   getProject,
+  getProjectPolicy,
   getProjects,
   getSession,
   getStudySpecification,
@@ -33,6 +34,7 @@ import {
   signIn,
   signOut,
   signUp,
+  updateProjectPolicy,
   uploadFile,
   type AnalysisPlan,
   type AnalysisResult,
@@ -319,6 +321,7 @@ export function LiveProjectPage({
       {section === "analysis" && <LiveAnalysis projectId={projectId} />}
       {section === "results" && <LiveResults projectId={projectId} />}
       {section === "audit-trail" && <LiveAudit projectId={projectId} />}
+      {section === "settings" && <LiveProjectSettings projectId={projectId} />}
       {![
         "overview",
         "data",
@@ -327,7 +330,8 @@ export function LiveProjectPage({
         "analysis-plan",
         "analysis",
         "results",
-        "audit-trail"
+        "audit-trail",
+        "settings"
       ].includes(section) && <PrototypeProjectPage section={section} />}
     </main>
   );
@@ -1013,6 +1017,86 @@ function LiveResults({ projectId }: { projectId: string }) {
         ))}
       </div>
       <p className="muted">Executed with {result.software.package} {result.software.packageVersion} on {result.software.engine}.</p>
+    </section>
+  );
+}
+
+function LiveProjectSettings({ projectId }: { projectId: string }) {
+  const [dataClass, setDataClass] = useState<"public" | "restricted" | "identifiable">("restricted");
+  const [identifiable, setIdentifiable] = useState(false);
+  const [ethicsReference, setEthicsReference] = useState("");
+  const [externalModelAllowed, setExternalModelAllowed] = useState(false);
+  const [qualitativeExternalAllowed, setQualitativeExternalAllowed] = useState(false);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    getProjectPolicy(projectId)
+      .then((policy) => {
+        if (!policy) return;
+        const nextClass = String(policy.dataClass ?? "restricted");
+        if (nextClass === "public" || nextClass === "restricted" || nextClass === "identifiable") {
+          setDataClass(nextClass);
+        }
+        setIdentifiable(Boolean(policy.containsIdentifiableData));
+        setEthicsReference(String(policy.ethicsApprovalReference ?? ""));
+        setExternalModelAllowed(Boolean(policy.externalModelAllowed));
+        setQualitativeExternalAllowed(Boolean(policy.qualitativeTextExternalAllowed));
+      })
+      .catch((err) => setStatus(message(err)));
+  }, [projectId]);
+
+  async function save() {
+    setStatus("");
+    try {
+      await updateProjectPolicy(projectId, {
+        dataClass,
+        containsIdentifiableData: identifiable,
+        ...(ethicsReference ? { ethicsApprovalReference: ethicsReference } : {}),
+        allowedProcessors: [],
+        externalModelAllowed,
+        qualitativeTextExternalAllowed: qualitativeExternalAllowed,
+        rowLevelQuantitativeExternalAllowed: false,
+        exportRestrictions: []
+      });
+      setStatus("Project processing policy saved.");
+    } catch (err) {
+      setStatus(message(err));
+    }
+  }
+
+  return (
+    <section className="form-panel">
+      <p className="eyebrow">PROCESSING POLICY</p>
+      <h2>Project data controls</h2>
+      <p className="muted">These settings are enforced by the backend before model processing is allowed.</p>
+      <div className="form-grid">
+        <label>
+          Data class
+          <select value={dataClass} onChange={(event) => setDataClass(event.target.value as typeof dataClass)}>
+            <option value="public">Public</option>
+            <option value="restricted">Restricted</option>
+            <option value="identifiable">Identifiable</option>
+          </select>
+        </label>
+        <label>
+          Ethics approval reference
+          <input value={ethicsReference} onChange={(event) => setEthicsReference(event.target.value)} />
+        </label>
+      </div>
+      <label>
+        <input type="checkbox" checked={identifiable} onChange={(event) => setIdentifiable(event.target.checked)} />
+        Project contains identifiable data
+      </label>
+      <label>
+        <input type="checkbox" checked={externalModelAllowed} onChange={(event) => setExternalModelAllowed(event.target.checked)} />
+        Allow approved external model processing
+      </label>
+      <label>
+        <input type="checkbox" checked={qualitativeExternalAllowed} onChange={(event) => setQualitativeExternalAllowed(event.target.checked)} />
+        Allow approved external processing of qualitative text
+      </label>
+      <Button onClick={() => void save()}>Save project policy</Button>
+      {status && <p className="confirmation" role="status">{status}</p>}
     </section>
   );
 }
