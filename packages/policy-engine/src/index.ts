@@ -49,8 +49,12 @@ export function evaluateModelRequest(
     reasons.push("The selected processor is not approved for this project.");
   }
 
-  if (context.containsIdentifiers && policy.dataClass === "identifiable") {
-    reasons.push("Identifiable content cannot be sent to this model request.");
+  if (
+    context.containsIdentifiers &&
+    policy.dataClass === "identifiable" &&
+    context.providerKind === "external"
+  ) {
+    reasons.push("Identifiable content cannot be sent to an external model processor.");
   }
 
   if (
