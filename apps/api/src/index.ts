@@ -33,6 +33,8 @@ import {
   createTransformationEvent,
   createProject,
   datasetBelongsToProject,
+  deleteApplicationAndAuthUser,
+  deleteProjectRecord,
   finaliseFileChecksum,
   getAnalysisJob,
   getAnalysisPlanById,
@@ -55,7 +57,8 @@ import {
   saveStudySpecification,
   saveVariableMappings,
   updateProjectPolicy,
-  updateStoredAnalysisPlan
+  updateStoredAnalysisPlan,
+  userOwnsProjects
 } from "./db";
 
 type AppBindings = { Bindings: Env; Variables: Variables };
@@ -217,6 +220,52 @@ app.post("/projects", async (c) => {
   });
 
   return c.json({ project }, 201);
+});
+
+app.delete("/projects/:projectId", async (c) => {
+  const projectId = c.req.param("projectId");
+  const project = await getProject(c.env.DB, projectId, getUserId(c));
+  if (!project || project.ownerId !== getUserId(c)) {
+    return c.json(
+      { error: { code: "PROJECT_NOT_FOUND", message: "Project was not found." } },
+      404
+    );
+  }
+
+  if (c.env.FILES) {
+    const prefix = `projects/${projectId}/`;
+    let cursor: string | undefined;
+    do {
+      const listed = await c.env.FILES.list({
+        prefix,
+        ...(cursor ? { cursor } : {})
+      });
+      const keys = listed.objects.map((object) => object.key);
+      if (keys.length > 0) await c.env.FILES.delete(keys);
+      cursor = listed.truncated ? listed.cursor : undefined;
+    } while (cursor);
+  }
+
+  await deleteProjectRecord(c.env.DB, projectId, getUserId(c));
+  return c.body(null, 204);
+});
+
+app.delete("/account", async (c) => {
+  const userId = getUserId(c);
+  if (await userOwnsProjects(c.env.DB, userId)) {
+    return c.json(
+      {
+        error: {
+          code: "PROJECTS_REMAIN",
+          message: "Delete owned research projects before deleting the account."
+        }
+      },
+      409
+    );
+  }
+
+  await deleteApplicationAndAuthUser(c.env.DB, userId);
+  return c.body(null, 204);
 });
 
 app.get("/projects/:projectId", async (c) => {
