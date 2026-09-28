@@ -319,11 +319,13 @@ export function LiveProjectPage({
       {section === "protocol" && <LiveProjectFiles projectId={projectId} mode="protocol" />}
       {section === "instruments" && <LiveProjectFiles projectId={projectId} mode="instruments" />}
       {section === "data" && <LiveData projectId={projectId} />}
+      {section === "data-preparation" && <LiveDataPreparation projectId={projectId} />}
       {section === "study-design" && <LiveStudyDesign projectId={projectId} />}
       {section === "variables" && <LiveVariables projectId={projectId} />}
       {section === "analysis-plan" && <LiveAnalysisPlan projectId={projectId} />}
       {section === "analysis" && <LiveAnalysis projectId={projectId} />}
       {section === "results" && <LiveResults projectId={projectId} />}
+      {section === "reports" && <LiveReports projectId={projectId} />}
       {section === "audit-trail" && <LiveAudit projectId={projectId} />}
       {section === "settings" && <LiveProjectSettings projectId={projectId} />}
       {![
@@ -331,11 +333,13 @@ export function LiveProjectPage({
         "protocol",
         "instruments",
         "data",
+        "data-preparation",
         "study-design",
         "variables",
         "analysis-plan",
         "analysis",
         "results",
+        "reports",
         "audit-trail",
         "settings"
       ].includes(section) && <PrototypeProjectPage section={section} />}
@@ -751,6 +755,114 @@ function LiveData({ projectId }: { projectId: string }) {
               <Button onClick={() => void harmonise()}>Create harmonised dataset</Button>
             </>
           )}
+        </section>
+      )}
+    </>
+  );
+}
+
+function LiveDataPreparation({ projectId }: { projectId: string }) {
+  const [datasets, setDatasets] = useState<DatasetVersion[]>([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [profile, setProfile] = useState<Awaited<ReturnType<typeof getDatasetProfile>> | null>(null);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    getDatasets(projectId)
+      .then((items) => {
+        setDatasets(items);
+        const preferred =
+          items.find((item) => item.sourceKind === "derived")?.id ??
+          items[0]?.id ??
+          "";
+        setSelectedId(preferred);
+      })
+      .catch((err) => setStatus(message(err)));
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setProfile(null);
+      return;
+    }
+    setStatus("");
+    getDatasetProfile(projectId, selectedId)
+      .then(setProfile)
+      .catch((err) => {
+        setProfile(null);
+        setStatus(message(err));
+      });
+  }, [projectId, selectedId]);
+
+  const selected = datasets.find((item) => item.id === selectedId) ?? null;
+
+  return (
+    <>
+      <section className="form-panel">
+        <p className="eyebrow">DATASET VERSION</p>
+        <h2>Inspect prepared data</h2>
+        <label>
+          Dataset version
+          <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
+            {datasets.map((dataset) => (
+              <option key={dataset.id} value={dataset.id}>
+                {dataset.label} · {dataset.sourceKind}
+              </option>
+            ))}
+          </select>
+        </label>
+        {selected && (
+          <div className="spec-grid">
+            <div><span>Records</span><strong>{selected.rowCount ?? "—"}</strong></div>
+            <div><span>Variables</span><strong>{selected.columnCount ?? "—"}</strong></div>
+            <div><span>Source</span><strong>{selected.sourceKind}</strong></div>
+            <div>
+              <span>Parents</span>
+              <code>{selected.parentVersionIds.length ? selected.parentVersionIds.join(", ") : "Original upload"}</code>
+            </div>
+          </div>
+        )}
+        <p className="muted">
+          Source uploads remain immutable. Harmonised data is stored as a new derived dataset with parent lineage and a transformation record.
+        </p>
+        {status && <p className="confirmation" role="status">{status}</p>}
+      </section>
+
+      {profile && (
+        <section className="panel table-wrap">
+          <div className="panel-heading">
+            <h2>Dataset profile</h2>
+            <Badge kind="neutral">{profile.rowCount} rows · {profile.columnCount} columns</Badge>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Type</th>
+                <th>Missing</th>
+                <th>Unique</th>
+                <th>Range or categories</th>
+              </tr>
+            </thead>
+            <tbody>
+              {profile.variables.map((variable) => (
+                <tr key={variable.variableName}>
+                  <td><code>{variable.variableName}</code></td>
+                  <td>{variable.dataType.replaceAll("_", " ")}</td>
+                  <td>{variable.missingCount}</td>
+                  <td>{variable.uniqueCount}</td>
+                  <td>
+                    {variable.range
+                      ? `${variable.range.min} to ${variable.range.max}`
+                      : variable.responseChoices?.map((choice) => choice.label).join(", ") ?? "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="muted">
+            Form-version field harmonisation is available on the Data page. General interactive cleaning rules will be added as versioned transformations in a later release.
+          </p>
         </section>
       )}
     </>
@@ -1208,6 +1320,77 @@ function LiveProjectSettings({ projectId }: { projectId: string }) {
       <Button onClick={() => void save()}>Save project policy</Button>
       {status && <p className="confirmation" role="status">{status}</p>}
     </section>
+  );
+}
+
+function downloadJson(filename: string, value: unknown) {
+  const blob = new Blob([JSON.stringify(value, null, 2)], {
+    type: "application/json"
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function LiveReports({ projectId }: { projectId: string }) {
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [audit, setAudit] = useState<Array<Record<string, unknown>>>([]);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    const jobId = localStorage.getItem(`methodome:last-job:${projectId}`);
+    const requests: Promise<unknown>[] = [
+      getAuditTrail(projectId).then(setAudit)
+    ];
+    if (jobId) {
+      requests.push(
+        getAnalysisResult(jobId)
+          .then(setResult)
+          .catch(() => undefined)
+      );
+    }
+    Promise.all(requests).catch((err) => setStatus(message(err)));
+  }, [projectId]);
+
+  return (
+    <>
+      <section className="panel">
+        <p className="eyebrow">REPRODUCIBILITY EXPORTS</p>
+        <h2>Current project evidence</h2>
+        <p>
+          Export the structured statistical result and audit trail exactly as stored by Methodome.
+        </p>
+        <div className="action-row">
+          <Button
+            variant="secondary"
+            onClick={() => result && downloadJson(`methodome-${projectId}-result.json`, result)}
+          >
+            Download result JSON
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => downloadJson(`methodome-${projectId}-audit.json`, audit)}
+          >
+            Download audit JSON
+          </Button>
+        </div>
+        {!result && <p className="muted">Run an analysis before exporting a result.</p>}
+        {status && <p className="confirmation" role="status">{status}</p>}
+      </section>
+
+      <section className="panel">
+        <p className="eyebrow">REPORT GENERATION</p>
+        <h2>Publication formats</h2>
+        <p className="muted">
+          DOCX, PDF, HTML, LaTeX, publication tables and figure bundles remain outside the current executable release. Methodome will not fabricate those exports until the report builder is implemented and validated.
+        </p>
+      </section>
+    </>
   );
 }
 
