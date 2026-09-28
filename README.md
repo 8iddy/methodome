@@ -1,13 +1,13 @@
-# Methodom
+# Methodome
 
-Methodom is a research analysis platform that brings data preparation, study specification, statistical methods, diagnostics, reproducibility, qualitative analysis, mixed methods, and reporting into one research workspace.
+Methodome is a research analysis platform that brings data preparation, study specification, statistical methods, diagnostics, reproducibility, qualitative analysis, mixed methods, and reporting into one research workspace.
 
-**Public domain:** methodom.com  
+**Public domain:** methodome.com  
 **Repository:** `8iddy/methodome`
 
 ## Core technical principle
 
-Methodom separates research language, analytical decision rules, and statistical computation.
+Methodome separates research language, analytical decision rules, and statistical computation.
 
 ```
 Protocol + instruments + study information
@@ -82,7 +82,7 @@ The execution interface must remain portable so larger jobs can run on another c
 
 ## Design direction
 
-Methodom should feel like serious research software that is easy to use.
+Methodome should feel like serious research software that is easy to use.
 
 Visual direction:
 
