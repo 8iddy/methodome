@@ -307,7 +307,7 @@ html[data-theme="dark"] .sidebar{background:#07131e;box-shadow:8px 0 28px rgba(0
 html[data-theme="dark"] .sidebar .nav-item.active{background:rgba(111,208,197,.14)}
 html[data-theme="dark"] .button{color:#06131d;background:#8dbce7;border-color:#8dbce7}
 html[data-theme="dark"] .button:hover{background:#a7cff2;border-color:#a7cff2}
-html[data-theme="dark"] .button.secondary{color:var(--ink);background:var(--surface);border-color:var(--line-strong)}
+html[data-theme="dark"] .button.secondary{color:var(--ink);background:var(--surface);border-color:var(--line-strong)}\nhtml[data-theme="dark"] .button.quiet{background:transparent;border-color:transparent;color:var(--muted);box-shadow:none}\nhtml[data-theme="dark"] .button.quiet:hover{background:var(--surface-subtle);color:var(--ink)}
 html[data-theme="dark"] .mark{background:#8dbce7;color:#07131e}
 html[data-theme="dark"] .sidebar .mark{background:#dcebf7;color:#07131e}
 html[data-theme="dark"] .badge.success{background:var(--green-bg);border-color:#245c3b;color:var(--green)}
