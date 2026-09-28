@@ -546,26 +546,161 @@ function LiveOverview({
   projectId: string;
   project: BackendProject | null;
 }) {
+  const [files, setFiles] = useState<ProjectFile[]>([]);
   const [datasets, setDatasets] = useState<DatasetVersion[]>([]);
   const [specification, setSpecification] = useState<StudySpecification | null>(null);
+  const [mappings, setMappings] = useState<VariableMapping[]>([]);
   const [plan, setPlan] = useState<AnalysisPlan | null>(null);
+  const [history, setHistory] = useState<Array<Record<string, unknown>>>([]);
+  const [extraction, setExtraction] = useState<ProtocolExtraction | null>(null);
+  const [status, setStatus] = useState("");
 
   useEffect(() => {
     void Promise.all([
-      getDatasets(projectId).then(setDatasets),
-      getStudySpecification(projectId).then(setSpecification),
-      getAnalysisPlan(projectId).then(setPlan)
-    ]);
+      getProjectFiles(projectId),
+      getDatasets(projectId),
+      getStudySpecification(projectId),
+      getVariableMappings(projectId),
+      getAnalysisPlan(projectId),
+      getAnalysisHistory(),
+      getProtocolExtraction(projectId)
+    ])
+      .then(([sourceFiles, dataVersions, spec, savedMappings, savedPlan, analyses, extracted]) => {
+        setFiles(sourceFiles);
+        setDatasets(dataVersions);
+        setSpecification(spec);
+        setMappings(savedMappings);
+        setPlan(savedPlan);
+        setHistory(
+          analyses.filter((item) => String(item.projectId ?? "") === projectId)
+        );
+        setExtraction(extracted);
+      })
+      .catch((err) => setStatus(message(err)));
   }, [projectId]);
 
+  const hasProtocol = files.some((file) => file.fileKind === "protocol");
+  const instrumentCount = files.filter(
+    (file) => file.fileKind === "instrument" || file.fileKind === "codebook"
+  ).length;
+  const confirmedMappings =
+    mappings.length > 0 && mappings.every((mapping) => Boolean(mapping.confirmedBy));
+  const completedAnalyses = history.filter(
+    (item) => String(item.state ?? "") === "complete"
+  ).length;
+
+  const items: Array<{
+    title: string;
+    detail: string;
+    status: string;
+    kind: "success" | "warning" | "blue" | "neutral";
+    href: string;
+  }> = [
+    {
+      title: "Protocol",
+      detail: hasProtocol
+        ? extraction
+          ? `${extraction.researchQuestions.length} research question${extraction.researchQuestions.length === 1 ? "" : "s"} extracted for review`
+          : "Uploaded; study extraction has not been completed"
+        : "No protocol uploaded",
+      status: hasProtocol ? (extraction ? "Extracted" : "Uploaded") : "Required",
+      kind: hasProtocol ? (extraction ? "success" : "blue") : "warning",
+      href: `/app/projects/${projectId}/protocol`
+    },
+    {
+      title: "Instruments",
+      detail:
+        instrumentCount > 0
+          ? `${instrumentCount} instrument or codebook file${instrumentCount === 1 ? "" : "s"}`
+          : "Optional supporting metadata has not been added",
+      status: instrumentCount > 0 ? "Available" : "Optional",
+      kind: instrumentCount > 0 ? "success" : "neutral",
+      href: `/app/projects/${projectId}/instruments`
+    },
+    {
+      title: "Data",
+      detail:
+        datasets.length > 0
+          ? `${datasets.length} dataset version${datasets.length === 1 ? "" : "s"} registered`
+          : "No dataset uploaded",
+      status: datasets.length > 0 ? "Available" : "Required",
+      kind: datasets.length > 0 ? "success" : "warning",
+      href: `/app/projects/${projectId}/data`
+    },
+    {
+      title: "Study specification",
+      detail: specification
+        ? `${specification.researchQuestions.length} research question${specification.researchQuestions.length === 1 ? "" : "s"} confirmed`
+        : "Research design has not been confirmed",
+      status: specification ? "Confirmed" : "Required",
+      kind: specification ? "success" : "warning",
+      href: `/app/projects/${projectId}/study-design`
+    },
+    {
+      title: "Variable mapping",
+      detail:
+        mappings.length === 0
+          ? "No research concepts have been mapped"
+          : `${mappings.filter((mapping) => mapping.confirmedBy).length} of ${mappings.length} mappings confirmed`,
+      status: confirmedMappings ? "Confirmed" : mappings.length ? "Review" : "Required",
+      kind: confirmedMappings ? "success" : "warning",
+      href: `/app/projects/${projectId}/variables`
+    },
+    {
+      title: "Analysis plan",
+      detail: plan
+        ? `${plan.analyses.length} planned analysis${plan.analyses.length === 1 ? "" : "es"}`
+        : "No analysis plan created",
+      status: plan?.lockedAt ? "Locked" : plan ? "Draft" : "Required",
+      kind: plan?.lockedAt ? "success" : plan ? "blue" : "warning",
+      href: `/app/projects/${projectId}/analysis-plan`
+    },
+    {
+      title: "Analysis",
+      detail:
+        completedAnalyses > 0
+          ? `${completedAnalyses} completed analysis run${completedAnalyses === 1 ? "" : "s"}`
+          : "No completed analysis runs",
+      status: completedAnalyses > 0 ? "Results available" : "Not complete",
+      kind: completedAnalyses > 0 ? "success" : "neutral",
+      href:
+        completedAnalyses > 0
+          ? `/app/projects/${projectId}/results`
+          : `/app/projects/${projectId}/analysis`
+    }
+  ];
+
   return (
-    <section className="panel summary-card">
-      <div><span>Research type</span><strong>{project?.researchType.replaceAll("_", " ") ?? "Loading"}</strong></div>
-      <div><span>Current stage</span><strong>{project?.state.replaceAll("_", " ") ?? "Loading"}</strong></div>
-      <div><span>Dataset versions</span><strong>{datasets.length}</strong></div>
-      <div><span>Study design</span>{specification ? <Badge kind="success">Confirmed</Badge> : <Badge kind="warning">Required</Badge>}</div>
-      <div><span>Analysis plan</span>{plan ? <Badge kind={plan.lockedAt ? "success" : "blue"}>{plan.lockedAt ? "Locked" : "Draft"}</Badge> : <Badge kind="warning">Required</Badge>}</div>
-    </section>
+    <>
+      <section className="panel overview-intro">
+        <div>
+          <p className="eyebrow">PROJECT CONTROL</p>
+          <h2>{project?.name ?? "Research project"}</h2>
+          <p>
+            {project?.description ||
+              "Review source material, research decisions and analysis progress from one place."}
+          </p>
+        </div>
+        <div className="overview-meta">
+          <span>Research type</span>
+          <strong>{project?.researchType.replaceAll("_", " ") ?? "Loading"}</strong>
+        </div>
+      </section>
+
+      <div className="overview-status-grid">
+        {items.map((item) => (
+          <a className="overview-status-card" href={item.href} key={item.title}>
+            <div className="panel-heading">
+              <h2>{item.title}</h2>
+              <Badge kind={item.kind}>{item.status}</Badge>
+            </div>
+            <p>{item.detail}</p>
+            <span className="text-button">Open</span>
+          </a>
+        ))}
+      </div>
+      {status && <p className="confirmation" role="alert">{status}</p>}
+    </>
   );
 }
 
