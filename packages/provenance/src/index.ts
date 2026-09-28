@@ -36,12 +36,21 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(canonicalise(value));
 }
 
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export async function sha256Hex(value: string): Promise<string> {
   const bytes = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
+  return bytesToHex(new Uint8Array(digest));
+}
+
+export async function sha256BytesHex(value: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", value);
+  return bytesToHex(new Uint8Array(digest));
 }
 
 export async function hashAuditEvent(
