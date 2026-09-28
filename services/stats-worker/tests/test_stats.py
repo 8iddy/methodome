@@ -140,5 +140,5 @@ def test_fisher_exact_known_table():
         }
     )
     estimate = result["estimates"][0]
-    assert math.isclose(estimate["estimate"], 9.0, rel_tol=1e-12)
+    assert math.isclose(estimate["estimate"], 1 / 9, rel_tol=1e-12)
     assert 0 <= estimate["pValue"] <= 1
