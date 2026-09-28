@@ -65,11 +65,11 @@ Machine-readable planning artefacts live under `spec/`.
 
 ## Current stage
 
-Integrated MVP implementation.
+Integrated MVP deployed and production validated.
 
-The `integration` branch contains the working full-stack implementation: authenticated research projects, R2-backed research files and datasets, form-version profiling and harmonisation, structured study specifications, deterministic method selection, locked analysis plans, queued Python statistical execution, structured results, provenance, audit history, and the Next.js research workspace.
+Methodome now has a working full-stack quantitative research workflow: authenticated research projects, private R2-backed research files and datasets, form-version profiling and harmonisation, structured study specifications, deterministic method selection, locked analysis plans, queued statistical execution, structured results, provenance, audit history, and the Next.js research workspace.
 
-Production deployment remains gated on the automated integration checks and the complete deployed smoke workflow.
+The deployed production workflow passed the complete end-to-end smoke test on 28 September 2026.
 
 ## Initial infrastructure direction
 
@@ -80,7 +80,7 @@ Cloudflare-first:
 - Cloudflare D1
 - Cloudflare R2
 - Cloudflare Queues and Workflows
-- Cloudflare Containers for R/Python execution
+- Cloudflare Python Worker for the initial statistical execution engine
 - Cloudflare Workers AI or another provider behind a model adapter
 - Quarto for reproducible reporting
 
