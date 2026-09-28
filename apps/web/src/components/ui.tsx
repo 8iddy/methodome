@@ -60,7 +60,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Nav href="/app/projects" label="Projects" active={path.startsWith("/app/projects")} />
             <Nav href="/app/methods" label="Methods" active={path === "/app/methods"} />
             <Nav href="/app/history" label="Analysis History" active={path === "/app/history"} />
-            <Nav href="/documentation" label="Documentation" active={false} />
+            <Nav href="/app/documentation" label="Documentation" active={path === "/app/documentation"} />
           </nav>
           {projectId && projectId !== "new" && (
             <>

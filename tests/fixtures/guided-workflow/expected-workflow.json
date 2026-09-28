@@ -1,0 +1,59 @@
+{
+  "studyTitle": "Association between reporting completeness and medicine stockouts in health facilities",
+  "studyDesign": "cross_sectional",
+  "unitOfAnalysis": "health facility",
+  "repeatedMeasures": false,
+  "clustered": false,
+  "surveyWeights": false,
+  "stratified": false,
+  "samplingDesign": null,
+  "missingDataPlan": "Complete-case analysis for affected models if missing values are present.",
+  "researchQuestions": [
+    {
+      "id": "rq1",
+      "text": "What proportion of health facilities experienced a medicine stockout during the previous 30 days?",
+      "objectiveType": "descriptive",
+      "outcomeConcepts": ["medicine stockout status"],
+      "predictorConcepts": [],
+      "covariateConcepts": []
+    },
+    {
+      "id": "rq2",
+      "text": "Is reporting completeness associated with medicine stockout status?",
+      "objectiveType": "association",
+      "outcomeConcepts": ["medicine stockout status"],
+      "predictorConcepts": ["reporting completeness"],
+      "covariateConcepts": []
+    },
+    {
+      "id": "rq3",
+      "text": "Is reporting completeness associated with the number of days out of stock?",
+      "objectiveType": "association",
+      "outcomeConcepts": ["number of days out of stock"],
+      "predictorConcepts": ["reporting completeness"],
+      "covariateConcepts": []
+    }
+  ],
+  "expectedVariableMappings": [
+    {
+      "concept": "medicine stockout status",
+      "datasetVariable": "stockout_status",
+      "expectedType": "binary"
+    },
+    {
+      "concept": "number of days out of stock",
+      "datasetVariable": "days_out_of_stock",
+      "expectedType": "continuous"
+    },
+    {
+      "concept": "reporting completeness",
+      "datasetVariable": "reporting_completeness",
+      "expectedType": "continuous"
+    }
+  ],
+  "expectedExecutableMethods": {
+    "rq1": ["descriptive"],
+    "rq2": ["binary_logistic_regression"],
+    "rq3": ["linear_regression"]
+  }
+}

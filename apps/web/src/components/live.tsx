@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Button, PageHeader } from "@/components/ui";
 import { ProjectPage as PrototypeProjectPage } from "@/components/workspace";
 import {
@@ -13,8 +13,14 @@ import {
   createProject,
   createUpload,
   getAnalysisJob,
+  verifyEmailOtp,
+  resendEmailVerificationOtp,
+  getAuthConfig,
   getAnalysisPlan,
   getAnalysisResult,
+  getVariableMappingSuggestions,
+  getProtocolExtraction,
+  extractProtocol,
   getAuditTrail,
   getDatasets,
   getDatasetProfile,
@@ -38,11 +44,14 @@ import {
   updateProjectPolicy,
   uploadFile,
   type AnalysisPlan,
+  type MethodRegistryEntry,
   type AnalysisResult,
   type BackendProject,
   type CandidateSelection,
   type DatasetVersion,
   type ProjectFile,
+  type ProtocolExtraction,
+  type VariableMapping,
   type SchemaComparison,
   type StudySpecification
 } from "@/lib/api";
@@ -66,13 +75,13 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
           setState("ready");
         } else {
           setState("blocked");
-          router.replace("/sign-in");
+          router.replace(`/sign-in?next=${encodeURIComponent(window.location.pathname)}`);
         }
       })
       .catch(() => {
         if (!active) return;
         setState("blocked");
-        router.replace("/sign-in");
+        router.replace(`/sign-in?next=${encodeURIComponent(window.location.pathname)}`);
       });
     return () => {
       active = false;
@@ -92,23 +101,107 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
 
 export function LiveAuthPage({ signup }: { signup: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
+  const destination = next?.startsWith("/") ? next : "/app/projects";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [verificationPending, setVerificationPending] = useState(false);
+  const [authConfig, setAuthConfig] = useState({
+    turnstileRequired: false,
+    turnstileSiteKey: null as string | null,
+    emailVerificationRequired: false
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
-  async function submit(event: React.FormEvent) {
+  useEffect(() => {
+    getAuthConfig()
+      .then(setAuthConfig)
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!signup || !authConfig.turnstileRequired || !authConfig.turnstileSiteKey) {
+      return;
+    }
+    if (document.querySelector('script[data-methodome-turnstile="true"]')) {
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    script.async = true;
+    script.defer = true;
+    script.dataset.methodomeTurnstile = "true";
+    document.head.appendChild(script);
+  }, [signup, authConfig.turnstileRequired, authConfig.turnstileSiteKey]);
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError("");
+    setNotice("");
     try {
       if (signup) {
-        await signUp({ name, email, password });
+        const formData = new FormData(event.currentTarget);
+        const turnstileToken = String(
+          formData.get("cf-turnstile-response") ?? ""
+        ).trim();
+
+        if (authConfig.turnstileRequired && !turnstileToken) {
+          setError("Complete the bot check before creating an account.");
+          return;
+        }
+
+        await signUp({
+          name,
+          email,
+          password,
+          ...(turnstileToken ? { turnstileToken } : {})
+        });
+
+        if (authConfig.emailVerificationRequired) {
+          setVerificationPending(true);
+          setNotice("We sent a six-digit verification code to your email.");
+          return;
+        }
       } else {
         await signIn({ email, password });
       }
-      router.push("/app/projects");
+      router.push(destination);
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verify(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await verifyEmailOtp({ email, otp });
+      await signIn({ email, password });
+      router.push(destination);
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resend() {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await resendEmailVerificationOtp(email);
+      setNotice("A new verification code was sent.");
     } catch (err) {
       setError(message(err));
     } finally {
@@ -121,51 +214,94 @@ export function LiveAuthPage({ signup }: { signup: boolean }) {
       <a href="/" className="auth-brand">
         <span className="brand"><span className="mark">M</span><span>Methodome</span></span>
       </a>
-      <form onSubmit={submit}>
-        <p className="eyebrow">METHODOME ACCOUNT</p>
-        <h1>{signup ? "Create your account" : "Sign in to Methodome"}</h1>
-        <p>{signup ? "Start a structured research workspace." : "Continue to your research workspace."}</p>
-        {signup && (
+
+      {verificationPending ? (
+        <form onSubmit={verify}>
+          <p className="eyebrow">VERIFY EMAIL</p>
+          <h1>Check your email</h1>
+          <p>
+            Enter the six-digit code sent to <strong>{email}</strong>.
+          </p>
           <label>
-            Full name
+            Verification code
             <input
               required
-              autoComplete="name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              value={otp}
+              onChange={(event) =>
+                setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))
+              }
+              placeholder="000000"
             />
           </label>
-        )}
-        <label>
-          Email
-          <input
-            required
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            required
-            minLength={10}
-            type="password"
-            autoComplete={signup ? "new-password" : "current-password"}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
-        <Button type="submit">{busy ? "Working…" : signup ? "Create account" : "Sign in"}</Button>
-        {error && <p className="confirmation" role="alert">{error}</p>}
-        <p className="muted">
-          {signup ? "Already have an account? " : "Need an account? "}
-          <a href={signup ? "/sign-in" : "/sign-up"}>
-            {signup ? "Sign in" : "Create one"}
-          </a>
-        </p>
-      </form>
+          <Button type="submit">{busy ? "Verifying…" : "Verify email"}</Button>
+          <Button variant="quiet" onClick={() => void resend()}>
+            Send another code
+          </Button>
+          {notice && <p className="confirmation" role="status">{notice}</p>}
+          {error && <p className="confirmation" role="alert">{error}</p>}
+        </form>
+      ) : (
+        <form onSubmit={submit}>
+          <p className="eyebrow">METHODOME ACCOUNT</p>
+          <h1>{signup ? "Create your account" : "Sign in to Methodome"}</h1>
+          <p>{signup ? "Start a structured research workspace." : "Continue to your research workspace."}</p>
+          {signup && (
+            <label>
+              Full name
+              <input
+                required
+                autoComplete="name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </label>
+          )}
+          <label>
+            Email
+            <input
+              required
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
+          <label>
+            Password
+            <input
+              required
+              minLength={10}
+              type="password"
+              autoComplete={signup ? "new-password" : "current-password"}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+
+          {signup && authConfig.turnstileRequired && authConfig.turnstileSiteKey && (
+            <div
+              className="cf-turnstile"
+              data-sitekey={authConfig.turnstileSiteKey}
+              data-theme="light"
+              data-size="flexible"
+            />
+          )}
+
+          <Button type="submit">{busy ? "Working…" : signup ? "Create account" : "Sign in"}</Button>
+          {notice && <p className="confirmation" role="status">{notice}</p>}
+          {error && <p className="confirmation" role="alert">{error}</p>}
+          <p className="muted">
+            {signup ? "Already have an account? " : "Need an account? "}
+            <a href={`${signup ? "/sign-in" : "/sign-up"}?next=${encodeURIComponent(destination)}`}>
+              {signup ? "Sign in" : "Create one"}
+            </a>
+          </p>
+        </form>
+      )}
     </main>
   );
 }
@@ -306,6 +442,21 @@ export function LiveProjectPage({
   }, [projectId]);
 
   const title = project?.name ?? "Methodome project";
+  const sectionDescriptions: Record<string, string> = {
+    overview: "Project sources, research decisions, analysis readiness and next actions.",
+    protocol: "Upload the study protocol and review the study information Methodome extracts from it.",
+    instruments: "Add questionnaires or codebooks that can provide evidence for variable mapping.",
+    data: "Upload source datasets, compare form versions and create harmonised dataset versions.",
+    "data-preparation": "Inspect dataset structure and derived versions before analysis planning.",
+    "study-design": "Review research questions and confirm the study design that constrains valid analyses.",
+    variables: "Connect confirmed research concepts to observed dataset variables using explicit evidence.",
+    "analysis-plan": "Review candidate methods for each research question and lock the approved plan.",
+    analysis: "Run the analyses recorded in the locked plan through deterministic statistical computation.",
+    results: "Review estimates, diagnostics, warnings and software details from completed analyses.",
+    reports: "Prepare research outputs from completed structured results.",
+    "audit-trail": "Inspect the record of project actions and versioned research decisions.",
+    settings: "Set the project data class, ethics reference and model-processing policy."
+  };
 
   return (
     <main className="app-content">
@@ -313,8 +464,12 @@ export function LiveProjectPage({
       <PageHeader
         eyebrow={section.replaceAll("-", " ").toUpperCase()}
         title={title}
-        description="This workspace is connected to the Methodome API."
+        description={
+          sectionDescriptions[section] ??
+          "Continue structured research work in this Methodome project."
+        }
       />
+      <LiveWorkflowGuide projectId={projectId} />
       {section === "overview" && <LiveOverview projectId={projectId} project={project} />}
       {section === "protocol" && <LiveProjectFiles projectId={projectId} mode="protocol" />}
       {section === "instruments" && <LiveProjectFiles projectId={projectId} mode="instruments" />}
@@ -351,8 +506,8 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
   const [state, setState] = useState({
     protocol: false,
     data: false,
-    cleaning: false,
     design: false,
+    mappings: false,
     plan: false,
     analysis: false
   });
@@ -363,27 +518,25 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
       getProjectFiles(projectId),
       getDatasets(projectId),
       getStudySpecification(projectId),
-      getAnalysisPlan(projectId)
+      getVariableMappings(projectId),
+      getAnalysisPlan(projectId),
+      getAnalysisHistory()
     ])
-      .then(async ([files, datasets, specification, plan]) => {
-        let analysis = false;
-        const jobId = localStorage.getItem(`methodome:last-job:${projectId}`);
-        if (jobId) {
-          try {
-            const job = await getAnalysisJob(jobId);
-            analysis = job.state === "complete";
-          } catch {
-            analysis = false;
-          }
-        }
+      .then(([files, datasets, specification, mappings, plan, history]) => {
         if (!active) return;
         setState({
           protocol: files.some((file) => file.fileKind === "protocol"),
           data: datasets.length > 0,
-          cleaning: datasets.some((dataset) => dataset.sourceKind === "derived"),
           design: Boolean(specification),
+          mappings:
+            mappings.length > 0 &&
+            mappings.every((mapping) => Boolean(mapping.confirmedBy)),
           plan: Boolean(plan?.lockedAt),
-          analysis
+          analysis: history.some(
+            (item) =>
+              String(item.projectId ?? "") === projectId &&
+              String(item.state ?? "") === "complete"
+          )
         });
       })
       .catch(() => undefined);
@@ -396,8 +549,8 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
   const stages = [
     ["Protocol", state.protocol],
     ["Data", state.data],
-    ["Preparation", state.cleaning],
     ["Design", state.design],
+    ["Mappings", state.mappings],
     ["Plan", state.plan],
     ["Analysis", state.analysis]
   ] as const;
@@ -418,6 +571,128 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
   );
 }
 
+function LiveWorkflowGuide({ projectId }: { projectId: string }) {
+  const [next, setNext] = useState({
+    label: "Loading project guidance",
+    detail: "Checking the research records in this project.",
+    href: ""
+  });
+
+  useEffect(() => {
+    Promise.all([
+      getProjectFiles(projectId),
+      getDatasets(projectId),
+      getStudySpecification(projectId),
+      getVariableMappings(projectId),
+      getAnalysisPlan(projectId),
+      getAnalysisHistory(),
+      getProtocolExtraction(projectId)
+    ])
+      .then(([files, datasets, specification, mappings, plan, history, extraction]) => {
+        const base = `/app/projects/${projectId}`;
+        if (!files.some((file) => file.fileKind === "protocol")) {
+          return setNext({
+            label: "Add a protocol",
+            detail: "Upload the research protocol so Methodome can extract and retain the study logic.",
+            href: `${base}/protocol`
+          });
+        }
+        if (!specification && !extraction) {
+          return setNext({
+            label: "Extract study information",
+            detail: "The protocol is uploaded. Extract its research questions and design before confirming the study specification.",
+            href: `${base}/protocol`
+          });
+        }
+        if (
+          datasets.length === 0 &&
+          !files.some(
+            (file) => file.fileKind === "instrument" || file.fileKind === "codebook"
+          )
+        ) {
+          return setNext({
+            label: "Add an instrument or continue to data",
+            detail: "Instrument or codebook metadata can improve variable mapping. If you do not have one, continue to Data and upload the dataset.",
+            href: `${base}/instruments`
+          });
+        }
+        if (datasets.length === 0) {
+          return setNext({
+            label: "Upload a dataset",
+            detail: "Upload a CSV dataset before Methodome can profile variables or map study concepts.",
+            href: `${base}/data`
+          });
+        }
+        if (!specification) {
+          return setNext({
+            label: "Review extracted study information",
+            detail: "Confirm the research questions and study design extracted from the protocol.",
+            href: `${base}/study-design`
+          });
+        }
+        if (
+          mappings.length === 0 ||
+          mappings.some((mapping) => !mapping.confirmedBy)
+        ) {
+          return setNext({
+            label: "Review variable mappings",
+            detail: "Confirm evidence-backed links between research concepts and dataset variables.",
+            href: `${base}/variables`
+          });
+        }
+        if (!plan) {
+          return setNext({
+            label: "Build an analysis plan",
+            detail: "Review deterministic method candidates for each research question that is ready.",
+            href: `${base}/analysis-plan`
+          });
+        }
+        if (!plan.lockedAt) {
+          return setNext({
+            label: "Approve and lock the plan",
+            detail: "Locking records the plan and its SHA-256 hash before planned analysis.",
+            href: `${base}/analysis-plan`
+          });
+        }
+
+        const complete = history.some(
+          (item) =>
+            String(item.projectId ?? "") === projectId &&
+            String(item.state ?? "") === "complete"
+        );
+        if (!complete) {
+          return setNext({
+            label: "Run approved analyses",
+            detail: "The locked plan is ready for deterministic statistical execution.",
+            href: `${base}/analysis`
+          });
+        }
+
+        return setNext({
+          label: "Review results",
+          detail: "At least one analysis is complete. Review estimates, diagnostics and execution details.",
+          href: `${base}/results`
+        });
+      })
+      .catch(() =>
+        setNext({
+          label: "Review project records",
+          detail: "Methodome could not determine the next step. Review the available project records.",
+          href: `/app/projects/${projectId}/overview`
+        })
+      );
+  }, [projectId]);
+
+  return (
+    <section className="panel workflow-guide">
+      <p className="eyebrow">NEXT RECOMMENDED ACTION</p>
+      <h2>{next.label}</h2>
+      <p>{next.detail}</p>
+      {next.href && <Button href={next.href}>Continue</Button>}
+    </section>
+  );
+}
+
 function LiveOverview({
   projectId,
   project
@@ -425,26 +700,161 @@ function LiveOverview({
   projectId: string;
   project: BackendProject | null;
 }) {
+  const [files, setFiles] = useState<ProjectFile[]>([]);
   const [datasets, setDatasets] = useState<DatasetVersion[]>([]);
   const [specification, setSpecification] = useState<StudySpecification | null>(null);
+  const [mappings, setMappings] = useState<VariableMapping[]>([]);
   const [plan, setPlan] = useState<AnalysisPlan | null>(null);
+  const [history, setHistory] = useState<Array<Record<string, unknown>>>([]);
+  const [extraction, setExtraction] = useState<ProtocolExtraction | null>(null);
+  const [status, setStatus] = useState("");
 
   useEffect(() => {
     void Promise.all([
-      getDatasets(projectId).then(setDatasets),
-      getStudySpecification(projectId).then(setSpecification),
-      getAnalysisPlan(projectId).then(setPlan)
-    ]);
+      getProjectFiles(projectId),
+      getDatasets(projectId),
+      getStudySpecification(projectId),
+      getVariableMappings(projectId),
+      getAnalysisPlan(projectId),
+      getAnalysisHistory(),
+      getProtocolExtraction(projectId)
+    ])
+      .then(([sourceFiles, dataVersions, spec, savedMappings, savedPlan, analyses, extracted]) => {
+        setFiles(sourceFiles);
+        setDatasets(dataVersions);
+        setSpecification(spec);
+        setMappings(savedMappings);
+        setPlan(savedPlan);
+        setHistory(
+          analyses.filter((item) => String(item.projectId ?? "") === projectId)
+        );
+        setExtraction(extracted);
+      })
+      .catch((err) => setStatus(message(err)));
   }, [projectId]);
 
+  const hasProtocol = files.some((file) => file.fileKind === "protocol");
+  const instrumentCount = files.filter(
+    (file) => file.fileKind === "instrument" || file.fileKind === "codebook"
+  ).length;
+  const confirmedMappings =
+    mappings.length > 0 && mappings.every((mapping) => Boolean(mapping.confirmedBy));
+  const completedAnalyses = history.filter(
+    (item) => String(item.state ?? "") === "complete"
+  ).length;
+
+  const items: Array<{
+    title: string;
+    detail: string;
+    status: string;
+    kind: "success" | "warning" | "blue" | "neutral";
+    href: string;
+  }> = [
+    {
+      title: "Protocol",
+      detail: hasProtocol
+        ? extraction
+          ? `${extraction.researchQuestions.length} research question${extraction.researchQuestions.length === 1 ? "" : "s"} extracted for review`
+          : "Uploaded; study extraction has not been completed"
+        : "No protocol uploaded",
+      status: hasProtocol ? (extraction ? "Extracted" : "Uploaded") : "Required",
+      kind: hasProtocol ? (extraction ? "success" : "blue") : "warning",
+      href: `/app/projects/${projectId}/protocol`
+    },
+    {
+      title: "Instruments",
+      detail:
+        instrumentCount > 0
+          ? `${instrumentCount} instrument or codebook file${instrumentCount === 1 ? "" : "s"}`
+          : "Optional supporting metadata has not been added",
+      status: instrumentCount > 0 ? "Available" : "Optional",
+      kind: instrumentCount > 0 ? "success" : "neutral",
+      href: `/app/projects/${projectId}/instruments`
+    },
+    {
+      title: "Data",
+      detail:
+        datasets.length > 0
+          ? `${datasets.length} dataset version${datasets.length === 1 ? "" : "s"} registered`
+          : "No dataset uploaded",
+      status: datasets.length > 0 ? "Available" : "Required",
+      kind: datasets.length > 0 ? "success" : "warning",
+      href: `/app/projects/${projectId}/data`
+    },
+    {
+      title: "Study specification",
+      detail: specification
+        ? `${specification.researchQuestions.length} research question${specification.researchQuestions.length === 1 ? "" : "s"} confirmed`
+        : "Research design has not been confirmed",
+      status: specification ? "Confirmed" : "Required",
+      kind: specification ? "success" : "warning",
+      href: `/app/projects/${projectId}/study-design`
+    },
+    {
+      title: "Variable mapping",
+      detail:
+        mappings.length === 0
+          ? "No research concepts have been mapped"
+          : `${mappings.filter((mapping) => mapping.confirmedBy).length} of ${mappings.length} mappings confirmed`,
+      status: confirmedMappings ? "Confirmed" : mappings.length ? "Review" : "Required",
+      kind: confirmedMappings ? "success" : "warning",
+      href: `/app/projects/${projectId}/variables`
+    },
+    {
+      title: "Analysis plan",
+      detail: plan
+        ? `${plan.analyses.length} planned analysis${plan.analyses.length === 1 ? "" : "es"}`
+        : "No analysis plan created",
+      status: plan?.lockedAt ? "Locked" : plan ? "Draft" : "Required",
+      kind: plan?.lockedAt ? "success" : plan ? "blue" : "warning",
+      href: `/app/projects/${projectId}/analysis-plan`
+    },
+    {
+      title: "Analysis",
+      detail:
+        completedAnalyses > 0
+          ? `${completedAnalyses} completed analysis run${completedAnalyses === 1 ? "" : "s"}`
+          : "No completed analysis runs",
+      status: completedAnalyses > 0 ? "Results available" : "Not complete",
+      kind: completedAnalyses > 0 ? "success" : "neutral",
+      href:
+        completedAnalyses > 0
+          ? `/app/projects/${projectId}/results`
+          : `/app/projects/${projectId}/analysis`
+    }
+  ];
+
   return (
-    <section className="panel summary-card">
-      <div><span>Research type</span><strong>{project?.researchType.replaceAll("_", " ") ?? "Loading"}</strong></div>
-      <div><span>Current stage</span><strong>{project?.state.replaceAll("_", " ") ?? "Loading"}</strong></div>
-      <div><span>Dataset versions</span><strong>{datasets.length}</strong></div>
-      <div><span>Study design</span>{specification ? <Badge kind="success">Confirmed</Badge> : <Badge kind="warning">Required</Badge>}</div>
-      <div><span>Analysis plan</span>{plan ? <Badge kind={plan.lockedAt ? "success" : "blue"}>{plan.lockedAt ? "Locked" : "Draft"}</Badge> : <Badge kind="warning">Required</Badge>}</div>
-    </section>
+    <>
+      <section className="panel overview-intro">
+        <div>
+          <p className="eyebrow">PROJECT CONTROL</p>
+          <h2>{project?.name ?? "Research project"}</h2>
+          <p>
+            {project?.description ||
+              "Review source material, research decisions and analysis progress from one place."}
+          </p>
+        </div>
+        <div className="overview-meta">
+          <span>Research type</span>
+          <strong>{project?.researchType.replaceAll("_", " ") ?? "Loading"}</strong>
+        </div>
+      </section>
+
+      <div className="overview-status-grid">
+        {items.map((item) => (
+          <a className="overview-status-card" href={item.href} key={item.title}>
+            <div className="panel-heading">
+              <h2>{item.title}</h2>
+              <Badge kind={item.kind}>{item.status}</Badge>
+            </div>
+            <p>{item.detail}</p>
+            <span className="text-button">Open</span>
+          </a>
+        ))}
+      </div>
+      {status && <p className="confirmation" role="alert">{status}</p>}
+    </>
   );
 }
 
@@ -462,6 +872,7 @@ function LiveProjectFiles({
   );
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [extraction, setExtraction] = useState<ProtocolExtraction | null>(null);
 
   async function refresh() {
     const current = await getProjectFiles(projectId);
@@ -472,6 +883,9 @@ function LiveProjectFiles({
           : item.fileKind === "instrument" || item.fileKind === "codebook"
       )
     );
+    if (mode === "protocol") {
+      setExtraction(await getProtocolExtraction(projectId));
+    }
   }
 
   useEffect(() => {
@@ -491,8 +905,40 @@ function LiveProjectFiles({
       });
       await uploadFile(intent.uploadPath, file, file.type || "application/octet-stream");
       setFile(null);
-      setStatus("Research file uploaded.");
+
+      if (mode === "protocol") {
+        setStatus("Protocol uploaded. Extracting study information…");
+        try {
+          const extracted = await extractProtocol(projectId, intent.fileId);
+          setExtraction(extracted);
+          setStatus(
+            `Protocol uploaded and study information extracted. Review ${extracted.researchQuestions.length} research question${extracted.researchQuestions.length === 1 ? "" : "s"} before analysis planning.`
+          );
+        } catch (err) {
+          setStatus(
+            `Protocol uploaded. Automatic extraction needs review: ${message(err)}`
+          );
+        }
+      } else {
+        setStatus("Research file uploaded.");
+      }
       await refresh();
+    } catch (err) {
+      setStatus(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reExtract() {
+    const latest = files[0];
+    if (!latest) return;
+    setBusy(true);
+    setStatus("Extracting study information…");
+    try {
+      const extracted = await extractProtocol(projectId, latest.id);
+      setExtraction(extracted);
+      setStatus("Study information extracted from the latest protocol.");
     } catch (err) {
       setStatus(message(err));
     } finally {
@@ -505,6 +951,15 @@ function LiveProjectFiles({
       <section className="form-panel">
         <p className="eyebrow">{mode === "protocol" ? "PROTOCOL SOURCE" : "RESEARCH INSTRUMENTS"}</p>
         <h2>{mode === "protocol" ? "Upload protocol" : "Upload instrument or codebook"}</h2>
+        {mode === "protocol" ? (
+          <p className="muted">
+            Text-based PDF, DOCX, TXT and Markdown protocols can be converted to text for study-information extraction.
+          </p>
+        ) : (
+          <p className="muted">
+            Instruments and codebooks provide question text and labels that Methodome can use as evidence during variable mapping.
+          </p>
+        )}
         {mode === "instruments" && (
           <label>
             File type
@@ -518,12 +973,68 @@ function LiveProjectFiles({
           Research file
           <input
             type="file"
+            accept={
+              mode === "protocol"
+                ? ".pdf,.docx,.txt,.md,.markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+                : undefined
+            }
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           />
         </label>
-        <Button onClick={() => void upload()}>{busy ? "Uploading…" : "Upload file"}</Button>
+        <Button onClick={() => void upload()}>{busy ? "Working…" : "Upload file"}</Button>
+        {mode === "protocol" && files.length > 0 && (
+          <Button variant="secondary" onClick={() => void reExtract()}>
+            Re-extract latest protocol
+          </Button>
+        )}
         {status && <p className="confirmation" role="status">{status}</p>}
+        {mode === "instruments" && (
+          <Button href={`/app/projects/${projectId}/data`} variant="quiet">
+            Continue without an instrument
+          </Button>
+        )}
       </section>
+
+      {mode === "protocol" && extraction && (
+        <section className="panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">EXTRACTED FROM PROTOCOL</p>
+              <h2>{extraction.studyTitle || "Study information"}</h2>
+            </div>
+            <Badge kind="blue">Needs researcher review</Badge>
+          </div>
+          <div className="spec-grid">
+            <div>
+              <span>Study design</span>
+              <strong>{extraction.studyDesign?.replaceAll("_", " ") || "Not stated"}</strong>
+            </div>
+            <div>
+              <span>Unit of analysis</span>
+              <strong>{extraction.unitOfAnalysis || "Not stated"}</strong>
+            </div>
+            <div>
+              <span>Research questions</span>
+              <strong>{extraction.researchQuestions.length}</strong>
+            </div>
+            <div>
+              <span>Sampling</span>
+              <strong>{extraction.samplingDesign || "Not stated"}</strong>
+            </div>
+          </div>
+          <ol>
+            {extraction.researchQuestions.map((question, index) => (
+              <li key={`${index}-${question.text}`}>{question.text}</li>
+            ))}
+          </ol>
+          <p className="muted">
+            Extraction is a proposal from the research layer. Confirm or correct it on Study Design before it becomes the project study specification.
+          </p>
+          <Button href={`/app/projects/${projectId}/study-design`} variant="secondary">
+            Review study information
+          </Button>
+        </section>
+      )}
 
       <section className="panel table-wrap">
         <div className="panel-heading">
@@ -546,7 +1057,13 @@ function LiveProjectFiles({
             ))}
           </tbody>
         </table>
-        {files.length === 0 && <p className="muted">No files uploaded yet.</p>}
+        {files.length === 0 && (
+          <p className="muted">
+            {mode === "protocol"
+              ? "No protocol uploaded yet."
+              : "No instrument or codebook uploaded yet. You can continue without one, but mappings may have less evidence."}
+          </p>
+        )}
       </section>
     </>
   );
@@ -717,6 +1234,9 @@ function LiveData({ projectId }: { projectId: string }) {
           Dataset label
           <input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Day 1 Kobo export" />
         </label>
+        <p className="muted">
+          Supported in this release: CSV. Excel workbooks are not accepted yet.
+        </p>
         <label>
           CSV file
           <input
@@ -744,6 +1264,14 @@ function LiveData({ projectId }: { projectId: string }) {
           </article>
         ))}
       </div>
+
+      {datasets.length > 0 && (
+        <div className="action-row">
+          <Button href={`/app/projects/${projectId}/data-preparation`}>
+            Review dataset profile
+          </Button>
+        </div>
+      )}
 
       {datasets.filter((dataset) => dataset.sourceKind === "original").length >= 2 && (
         <section className="form-panel">
@@ -936,272 +1464,994 @@ function LiveDataPreparation({ projectId }: { projectId: string }) {
           </p>
         </section>
       )}
+      {profile && (
+        <div className="action-row">
+          <Button href={`/app/projects/${projectId}/study-design`}>
+            Continue to study design
+          </Button>
+        </div>
+      )}
     </>
   );
 }
 
 function LiveStudyDesign({ projectId }: { projectId: string }) {
-  const [question, setQuestion] = useState("");
-  const [outcome, setOutcome] = useState("");
-  const [outcomeType, setOutcomeType] = useState<"binary" | "continuous" | "count">("binary");
-  const [predictor, setPredictor] = useState("");
-  const [predictorType, setPredictorType] = useState<"binary" | "categorical_nominal" | "continuous">("continuous");
+  type ObjectiveType = StudySpecification["researchQuestions"][number]["objectiveType"];
+  type QuestionDraft = {
+    id: string;
+    text: string;
+    objectiveType: ObjectiveType;
+    outcomes: string;
+    predictors: string;
+    covariates: string;
+    estimand: string;
+  };
+
+  const emptyQuestion = (): QuestionDraft => ({
+    id: `rq-${crypto.randomUUID()}`,
+    text: "",
+    objectiveType: null,
+    outcomes: "",
+    predictors: "",
+    covariates: "",
+    estimand: ""
+  });
+
+  const [questions, setQuestions] = useState<QuestionDraft[]>([emptyQuestion()]);
   const [design, setDesign] = useState<StudySpecification["studyDesign"]>("cross_sectional");
-  const [unit, setUnit] = useState("observation");
+  const [unit, setUnit] = useState("");
+  const [repeatedMeasures, setRepeatedMeasures] = useState(false);
   const [clustered, setClustered] = useState(false);
   const [clusterVariable, setClusterVariable] = useState("");
+  const [surveyWeights, setSurveyWeights] = useState(false);
+  const [weightVariable, setWeightVariable] = useState("");
+  const [stratified, setStratified] = useState(false);
+  const [strataVariable, setStrataVariable] = useState("");
+  const [samplingDesign, setSamplingDesign] = useState("");
+  const [missingDataPlan, setMissingDataPlan] = useState("");
+  const [statedAnalysisPlan, setStatedAnalysisPlan] = useState("");
+  const [source, setSource] = useState<"saved" | "protocol" | "manual">("manual");
   const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  function concepts(value: string): string[] {
+    return value
+      .split(/[,\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
 
   useEffect(() => {
-    getStudySpecification(projectId).then((spec) => {
-      if (!spec) return;
-      const rq = spec.researchQuestions[0];
-      setQuestion(rq?.text ?? "");
-      setOutcome(rq?.outcomes[0]?.datasetVariable ?? "");
-      if (rq?.outcomes[0]?.variableType === "continuous" || rq?.outcomes[0]?.variableType === "count" || rq?.outcomes[0]?.variableType === "binary") {
-        setOutcomeType(rq.outcomes[0].variableType);
-      }
-      setPredictor(rq?.predictors[0]?.datasetVariable ?? "");
-      if (rq?.predictors[0]?.variableType === "continuous" || rq?.predictors[0]?.variableType === "binary" || rq?.predictors[0]?.variableType === "categorical_nominal") {
-        setPredictorType(rq.predictors[0].variableType);
-      }
-      setDesign(spec.studyDesign);
-      setUnit(spec.unitOfAnalysis);
-      setClustered(spec.clustered);
-      setClusterVariable(spec.clusterVariable ?? "");
-    }).catch(() => undefined);
+    Promise.all([
+      getStudySpecification(projectId),
+      getProtocolExtraction(projectId)
+    ])
+      .then(([specification, extraction]) => {
+        if (specification) {
+          setQuestions(
+            specification.researchQuestions.map((question) => ({
+              id: question.id,
+              text: question.text,
+              objectiveType: question.objectiveType,
+              outcomes: question.outcomes.map((item) => item.concept).join(", "),
+              predictors: question.predictors.map((item) => item.concept).join(", "),
+              covariates: question.covariates.map((item) => item.concept).join(", "),
+              estimand: question.estimand ?? ""
+            }))
+          );
+          setDesign(specification.studyDesign);
+          setUnit(specification.unitOfAnalysis);
+          setRepeatedMeasures(specification.repeatedMeasures);
+          setClustered(specification.clustered);
+          setClusterVariable(specification.clusterVariable ?? "");
+          setSurveyWeights(specification.surveyWeights);
+          setWeightVariable(specification.weightVariable ?? "");
+          setStratified(specification.stratified);
+          setStrataVariable(specification.strataVariable ?? "");
+          setSamplingDesign(specification.samplingDesign ?? "");
+          setMissingDataPlan(specification.missingDataPlan ?? "");
+          setStatedAnalysisPlan(specification.statedAnalysisPlan ?? "");
+          setSource("saved");
+          return;
+        }
+
+        if (extraction) {
+          setQuestions(
+            extraction.researchQuestions.length
+              ? extraction.researchQuestions.map((question, index) => ({
+                  id: `rq${index + 1}`,
+                  text: question.text,
+                  objectiveType: question.objectiveType,
+                  outcomes: question.outcomes.join(", "),
+                  predictors: question.predictors.join(", "),
+                  covariates: question.covariates.join(", "),
+                  estimand: question.estimand ?? ""
+                }))
+              : [emptyQuestion()]
+          );
+          setDesign(extraction.studyDesign ?? "other");
+          setUnit(extraction.unitOfAnalysis ?? "");
+          setRepeatedMeasures(extraction.repeatedMeasures ?? false);
+          setClustered(extraction.clustered ?? false);
+          setClusterVariable(extraction.clusterConcept ?? "");
+          setSurveyWeights(extraction.surveyWeights ?? false);
+          setWeightVariable(extraction.weightConcept ?? "");
+          setStratified(extraction.stratified ?? false);
+          setStrataVariable(extraction.strataConcept ?? "");
+          setSamplingDesign(extraction.samplingDesign ?? "");
+          setMissingDataPlan(extraction.missingDataPlan ?? "");
+          setStatedAnalysisPlan(extraction.statedAnalysisPlan ?? "");
+          setSource("protocol");
+        }
+      })
+      .catch((err) => setStatus(message(err)));
   }, [projectId]);
 
+  function updateQuestion(index: number, patch: Partial<QuestionDraft>) {
+    setQuestions((current) =>
+      current.map((question, itemIndex) =>
+        itemIndex === index ? { ...question, ...patch } : question
+      )
+    );
+  }
+
   async function save() {
+    const validQuestions = questions.filter((question) => question.text.trim());
+    if (validQuestions.length === 0) {
+      setStatus("Add at least one research question.");
+      return;
+    }
+    if (!unit.trim()) {
+      setStatus("Confirm the unit of analysis before saving.");
+      return;
+    }
+
     const specification: StudySpecification = {
       version: `v-${Date.now()}`,
-      researchQuestions: [
-        {
-          id: "rq1",
-          text: question,
-          objectiveType: "association",
-          outcomes: [
-            {
-              concept: outcome || "Outcome",
-              datasetVariable: outcome,
-              variableType: outcomeType,
-              mappingStatus: "direct_match"
-            }
-          ],
-          predictors: [
-            {
-              concept: predictor || "Predictor",
-              datasetVariable: predictor,
-              variableType: predictorType,
-              mappingStatus: "direct_match"
-            }
-          ],
-          covariates: [],
-          estimand: null
-        }
-      ],
+      researchQuestions: validQuestions.map((question, index) => ({
+        id: question.id || `rq${index + 1}`,
+        text: question.text.trim(),
+        objectiveType: question.objectiveType,
+        outcomes: concepts(question.outcomes).map((concept) => ({
+          concept,
+          datasetVariable: null,
+          variableType: null,
+          mappingStatus: null
+        })),
+        predictors: concepts(question.predictors).map((concept) => ({
+          concept,
+          datasetVariable: null,
+          variableType: null,
+          mappingStatus: null
+        })),
+        covariates: concepts(question.covariates).map((concept) => ({
+          concept,
+          datasetVariable: null,
+          variableType: null,
+          mappingStatus: null
+        })),
+        estimand: question.estimand.trim() || null
+      })),
       studyDesign: design,
-      unitOfAnalysis: unit,
-      repeatedMeasures: false,
+      unitOfAnalysis: unit.trim(),
+      repeatedMeasures,
       clustered,
-      clusterVariable: clustered ? clusterVariable : null,
-      surveyWeights: false,
-      weightVariable: null,
-      stratified: false,
-      strataVariable: null,
-      samplingDesign: null,
-      missingDataPlan: "Complete case for the first executable analysis.",
-      statedAnalysisPlan: null
+      clusterVariable: clustered ? clusterVariable.trim() || null : null,
+      surveyWeights,
+      weightVariable: surveyWeights ? weightVariable.trim() || null : null,
+      stratified,
+      strataVariable: stratified ? strataVariable.trim() || null : null,
+      samplingDesign: samplingDesign.trim() || null,
+      missingDataPlan: missingDataPlan.trim() || null,
+      statedAnalysisPlan: statedAnalysisPlan.trim() || null
     };
+
+    setBusy(true);
+    setStatus("");
     try {
       await saveStudySpecification(projectId, specification);
-      setStatus("Study specification saved.");
+      setSource("saved");
+      setStatus(
+        `Study specification saved with ${specification.researchQuestions.length} research question${specification.researchQuestions.length === 1 ? "" : "s"}.`
+      );
     } catch (err) {
       setStatus(message(err));
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <section className="form-panel study-form">
-      <label>Research question<input value={question} onChange={(e) => setQuestion(e.target.value)} /></label>
-      <div className="form-grid">
-        <label>Outcome variable<input value={outcome} onChange={(e) => setOutcome(e.target.value)} /></label>
-        <label>Outcome type<select value={outcomeType} onChange={(e) => setOutcomeType(e.target.value as typeof outcomeType)}><option value="binary">Binary</option><option value="continuous">Continuous</option><option value="count">Count</option></select></label>
-        <label>Primary predictor<input value={predictor} onChange={(e) => setPredictor(e.target.value)} /></label>
-        <label>Predictor type<select value={predictorType} onChange={(e) => setPredictorType(e.target.value as typeof predictorType)}><option value="continuous">Continuous</option><option value="binary">Binary</option><option value="categorical_nominal">Categorical</option></select></label>
-        <label>Study design<select value={design} onChange={(e) => setDesign(e.target.value as StudySpecification["studyDesign"])}><option value="cross_sectional">Cross sectional</option><option value="cohort">Cohort</option><option value="case_control">Case control</option><option value="trial">Trial</option><option value="longitudinal">Longitudinal</option></select></label>
-        <label>Unit of analysis<input value={unit} onChange={(e) => setUnit(e.target.value)} /></label>
+      <div className="source-note">
+        <Badge kind={source === "protocol" ? "blue" : source === "saved" ? "success" : "neutral"}>
+          {source === "protocol"
+            ? "Extracted from protocol"
+            : source === "saved"
+              ? "Saved study specification"
+              : "Manual study review"}
+        </Badge>
+        <span>
+          Review the research logic here. Dataset field names are assigned later in Variable Mapping.
+        </span>
       </div>
-      <label><input type="checkbox" checked={clustered} onChange={(e) => setClustered(e.target.checked)} /> Observations are clustered</label>
-      {clustered && <label>Cluster variable<input value={clusterVariable} onChange={(e) => setClusterVariable(e.target.value)} /></label>}
-      <Button onClick={() => void save()}>Save study specification</Button>
+
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">RESEARCH QUESTIONS</p>
+          <h2>{questions.length} question{questions.length === 1 ? "" : "s"}</h2>
+        </div>
+        <Button
+          variant="secondary"
+          onClick={() => setQuestions((current) => [...current, emptyQuestion()])}
+        >
+          Add research question
+        </Button>
+      </div>
+
+      <div className="method-list">
+        {questions.map((question, index) => (
+          <article className="method-card" key={question.id}>
+            <div className="panel-heading">
+              <strong>Research question {index + 1}</strong>
+              {questions.length > 1 && (
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() =>
+                    setQuestions((current) =>
+                      current.filter((_, itemIndex) => itemIndex !== index)
+                    )
+                  }
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            <label>
+              Question
+              <textarea
+                value={question.text}
+                onChange={(event) => updateQuestion(index, { text: event.target.value })}
+              />
+            </label>
+            <div className="form-grid">
+              <label>
+                Objective type
+                <select
+                  value={question.objectiveType ?? ""}
+                  onChange={(event) =>
+                    updateQuestion(index, {
+                      objectiveType: (event.target.value || null) as ObjectiveType
+                    })
+                  }
+                >
+                  <option value="">Not confirmed</option>
+                  <option value="descriptive">Descriptive</option>
+                  <option value="association">Association</option>
+                  <option value="prediction">Prediction</option>
+                  <option value="causal">Causal</option>
+                  <option value="diagnostic">Diagnostic</option>
+                  <option value="prognostic">Prognostic</option>
+                  <option value="exploratory">Exploratory</option>
+                </select>
+              </label>
+              <label>
+                Estimand, if stated
+                <input
+                  value={question.estimand}
+                  onChange={(event) => updateQuestion(index, { estimand: event.target.value })}
+                />
+              </label>
+            </div>
+            <label>
+              Outcome concepts
+              <input
+                value={question.outcomes}
+                onChange={(event) => updateQuestion(index, { outcomes: event.target.value })}
+                placeholder="medicine stockout status, days out of stock"
+              />
+            </label>
+            <label>
+              Predictor or exposure concepts
+              <input
+                value={question.predictors}
+                onChange={(event) => updateQuestion(index, { predictors: event.target.value })}
+                placeholder="reporting completeness"
+              />
+            </label>
+            <label>
+              Covariate concepts
+              <input
+                value={question.covariates}
+                onChange={(event) => updateQuestion(index, { covariates: event.target.value })}
+                placeholder="facility level, patient volume"
+              />
+            </label>
+          </article>
+        ))}
+      </div>
+
+      <p className="eyebrow">STUDY LEVEL DESIGN</p>
+      <div className="form-grid">
+        <label>
+          Study design
+          <select
+            value={design}
+            onChange={(event) =>
+              setDesign(event.target.value as StudySpecification["studyDesign"])
+            }
+          >
+            <option value="cross_sectional">Cross sectional</option>
+            <option value="cohort">Cohort</option>
+            <option value="case_control">Case control</option>
+            <option value="trial">Trial</option>
+            <option value="longitudinal">Longitudinal</option>
+            <option value="time_series">Time series</option>
+            <option value="ecological">Ecological</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          Unit of analysis
+          <input value={unit} onChange={(event) => setUnit(event.target.value)} />
+        </label>
+        <label>
+          Sampling design
+          <input
+            value={samplingDesign}
+            onChange={(event) => setSamplingDesign(event.target.value)}
+          />
+        </label>
+        <label>
+          Missing data plan
+          <input
+            value={missingDataPlan}
+            onChange={(event) => setMissingDataPlan(event.target.value)}
+          />
+        </label>
+      </div>
+
+      <div className="form-grid">
+        <label>
+          <input
+            type="checkbox"
+            checked={repeatedMeasures}
+            onChange={(event) => setRepeatedMeasures(event.target.checked)}
+          />
+          Repeated observations
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={clustered}
+            onChange={(event) => setClustered(event.target.checked)}
+          />
+          Clustered observations
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={surveyWeights}
+            onChange={(event) => setSurveyWeights(event.target.checked)}
+          />
+          Survey weights
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={stratified}
+            onChange={(event) => setStratified(event.target.checked)}
+          />
+          Stratification
+        </label>
+      </div>
+
+      {clustered && (
+        <label>
+          Cluster variable or concept
+          <input value={clusterVariable} onChange={(event) => setClusterVariable(event.target.value)} />
+        </label>
+      )}
+      {surveyWeights && (
+        <label>
+          Weight variable or concept
+          <input value={weightVariable} onChange={(event) => setWeightVariable(event.target.value)} />
+        </label>
+      )}
+      {stratified && (
+        <label>
+          Strata variable or concept
+          <input value={strataVariable} onChange={(event) => setStrataVariable(event.target.value)} />
+        </label>
+      )}
+
+      <label>
+        Analysis plan stated in protocol
+        <textarea
+          value={statedAnalysisPlan}
+          onChange={(event) => setStatedAnalysisPlan(event.target.value)}
+        />
+      </label>
+
+      <div className="action-row">
+        <Button onClick={() => void save()}>{busy ? "Saving…" : "Confirm study specification"}</Button>
+        {source === "saved" && (
+          <Button href={`/app/projects/${projectId}/variables`} variant="secondary">
+            Continue to variable mapping
+          </Button>
+        )}
+      </div>
       {status && <p className="confirmation" role="status">{status}</p>}
     </section>
   );
 }
 
 function LiveVariables({ projectId }: { projectId: string }) {
-  const [spec, setSpec] = useState<StudySpecification | null>(null);
-  const [mappings, setMappings] = useState<Array<Record<string, unknown>>>([]);
-  const [status, setStatus] = useState("");
+  type MappingRow = {
+    researchConcept: string;
+    usages: string[];
+    datasetVariable?: string;
+    mappingStatus: "direct_match" | "probable_match" | "uncertain" | "no_match";
+    evidence: string[];
+    confirmed: boolean;
+  };
 
-  async function refresh() {
-    const [s, m] = await Promise.all([
-      getStudySpecification(projectId),
-      getVariableMappings(projectId)
-    ]);
-    setSpec(s);
-    setMappings(m);
+  const [spec, setSpec] = useState<StudySpecification | null>(null);
+  const [rows, setRows] = useState<MappingRow[]>([]);
+  const [variables, setVariables] = useState<Awaited<ReturnType<typeof getVariableMappingSuggestions>>["variables"]>([]);
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  function conceptKey(value: string) {
+    return value.trim().toLowerCase();
+  }
+
+  function usagesForSpecification(specification: StudySpecification) {
+    const map = new Map<string, { concept: string; usages: string[] }>();
+    specification.researchQuestions.forEach((question, index) => {
+      const roles: Array<[string, StudySpecification["researchQuestions"][number]["outcomes"]]> = [
+        ["Outcome", question.outcomes],
+        ["Predictor", question.predictors],
+        ["Covariate", question.covariates]
+      ];
+      for (const [role, concepts] of roles) {
+        for (const variable of concepts) {
+          const key = conceptKey(variable.concept);
+          const existing = map.get(key) ?? { concept: variable.concept, usages: [] };
+          existing.usages.push(`RQ${index + 1} · ${role}`);
+          map.set(key, existing);
+        }
+      }
+    });
+    return map;
+  }
+
+  async function loadSuggestions(specification: StudySpecification, saved: VariableMapping[]) {
+    const usageMap = usagesForSpecification(specification);
+    if (usageMap.size === 0) {
+      setRows([]);
+      setStatus("No outcome, predictor or covariate concepts are defined in the study specification.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const response = await getVariableMappingSuggestions(projectId);
+      setVariables(response.variables);
+      const suggested = new Map(
+        response.suggestions.map((item) => [conceptKey(item.researchConcept), item])
+      );
+      const existing = new Map(saved.map((item) => [conceptKey(item.researchConcept), item]));
+
+      setRows(
+        Array.from(usageMap.values()).map(({ concept, usages }) => {
+          const stored = existing.get(conceptKey(concept));
+          if (stored) {
+            return {
+              researchConcept: concept,
+              usages,
+              ...(stored.datasetVariable ? { datasetVariable: stored.datasetVariable } : {}),
+              mappingStatus: stored.mappingStatus,
+              evidence: stored.evidence,
+              confirmed: Boolean(stored.confirmedBy)
+            };
+          }
+          const candidate = suggested.get(conceptKey(concept));
+          return {
+            researchConcept: concept,
+            usages,
+            ...(candidate?.datasetVariable ? { datasetVariable: candidate.datasetVariable } : {}),
+            mappingStatus: candidate?.mappingStatus ?? "no_match",
+            evidence: candidate?.evidence ?? ["No mapping suggestion is available."],
+            confirmed: false
+          };
+        })
+      );
+      setStatus(
+        saved.length
+          ? "Saved mappings loaded. Review any unconfirmed mappings."
+          : "Mapping suggestions are ready. Confirm, change, or mark each concept as not represented."
+      );
+    } catch (err) {
+      setStatus(message(err));
+    } finally {
+      setBusy(false);
+    }
   }
 
   useEffect(() => {
-    void refresh().catch((err) => setStatus(message(err)));
+    Promise.all([getStudySpecification(projectId), getVariableMappings(projectId)])
+      .then(([specification, saved]) => {
+        setSpec(specification);
+        if (!specification) {
+          setStatus("Confirm the study specification before mapping variables.");
+          return;
+        }
+        void loadSuggestions(specification, saved);
+      })
+      .catch((err) => setStatus(message(err)));
   }, [projectId]);
 
-  async function confirmFromSpecification() {
-    if (!spec) return;
-    const question = spec.researchQuestions[0];
-    const variables = [...(question?.outcomes ?? []), ...(question?.predictors ?? []), ...(question?.covariates ?? [])];
+  function updateRow(index: number, patch: Partial<MappingRow>) {
+    setRows((current) =>
+      current.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, ...patch } : row
+      )
+    );
+  }
+
+  async function confirmMappings() {
+    if (!spec || rows.length === 0) return;
+    setBusy(true);
+    setStatus("");
     try {
       await saveVariableMappings(
         projectId,
-        variables.map((variable) => ({
-          id: `map_${crypto.randomUUID().replaceAll("-", "")}`,
-          researchConcept: variable.concept,
-          ...(variable.datasetVariable ? { datasetVariable: variable.datasetVariable } : {}),
-          mappingStatus: variable.datasetVariable ? "direct_match" : "no_match",
-          evidence: ["Confirmed from the current study specification."],
+        rows.map((row) => ({
+          id: `map_${simpleHash(conceptKey(row.researchConcept))}`,
+          researchConcept: row.researchConcept,
+          ...(row.datasetVariable ? { datasetVariable: row.datasetVariable } : {}),
+          mappingStatus: row.datasetVariable ? row.mappingStatus : "no_match",
+          evidence: row.evidence,
           confirmed: true
         }))
       );
-      setStatus("Variable mappings confirmed.");
-      await refresh();
+      setRows((current) => current.map((row) => ({ ...row, confirmed: true })));
+      setStatus("Reviewed variable mappings saved and confirmed.");
     } catch (err) {
       setStatus(message(err));
+    } finally {
+      setBusy(false);
     }
+  }
+
+  function variableSummary(variableName?: string) {
+    if (!variableName) return "Not represented";
+    const variable = variables.find((item) => item.variableName === variableName);
+    if (!variable) return variableName;
+    const range = variable.range
+      ? ` · ${variable.range.min} to ${variable.range.max}`
+      : variable.responseChoices?.length
+        ? ` · ${variable.responseChoices.map((choice) => choice.label).join(", ")}`
+        : "";
+    return `${variable.dataType.replaceAll("_", " ")}${range}`;
+  }
+
+  function humanStatus(value: MappingRow["mappingStatus"]) {
+    return value.replaceAll("_", " ").replace(/^./, (character) => character.toUpperCase());
   }
 
   return (
     <section className="panel table-wrap">
-      <div className="panel-heading"><h2>Variable mappings</h2><Button onClick={() => void confirmFromSpecification()}>Confirm current mappings</Button></div>
-      <table>
-        <thead><tr><th>Research concept</th><th>Dataset variable</th><th>Status</th></tr></thead>
-        <tbody>
-          {mappings.map((mapping, index) => (
-            <tr key={String(mapping.id ?? index)}>
-              <td>{String(mapping.researchConcept ?? "")}</td>
-              <td><code>{String(mapping.datasetVariable ?? "Not represented")}</code></td>
-              <td>{String(mapping.mappingStatus ?? "")}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="panel-heading">
+        <div>
+          <h2>Variable mappings</h2>
+          <p className="muted">
+            Research concepts come from the study specification. Dataset variables come from the profiled analysis data.
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            spec
+              ? void Promise.all([getVariableMappings(projectId)]).then(([saved]) =>
+                  loadSuggestions(spec, saved)
+                )
+              : undefined
+          }
+        >
+          Refresh suggestions
+        </Button>
+      </div>
+
+      {rows.length > 0 ? (
+        <>
+          <table>
+            <thead>
+              <tr>
+                <th>Research concept</th>
+                <th>Used in</th>
+                <th>Dataset variable</th>
+                <th>Observed metadata</th>
+                <th>Status</th>
+                <th>Evidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={row.researchConcept}>
+                  <td>
+                    <strong>{row.researchConcept}</strong>
+                    {row.confirmed && <><br /><Badge kind="success">Confirmed</Badge></>}
+                  </td>
+                  <td>{row.usages.join("; ")}</td>
+                  <td>
+                    <select
+                      value={row.datasetVariable ?? ""}
+                      onChange={(event) => {
+                        const selected = event.target.value;
+                        updateRow(index, selected
+                          ? {
+                              datasetVariable: selected,
+                              mappingStatus:
+                                row.datasetVariable === selected
+                                  ? row.mappingStatus
+                                  : "uncertain",
+                              evidence:
+                                row.datasetVariable === selected
+                                  ? row.evidence
+                                  : ["Researcher selected this dataset variable during mapping review."],
+                              confirmed: false
+                            }
+                          : {
+                              datasetVariable: undefined,
+                              mappingStatus: "no_match",
+                              evidence: ["Researcher marked this concept as not represented in the dataset."],
+                              confirmed: false
+                            });
+                      }}
+                    >
+                      <option value="">Not represented</option>
+                      {variables.map((variable) => (
+                        <option key={variable.variableName} value={variable.variableName}>
+                          {variable.variableName}
+                          {variable.label && variable.label !== variable.variableName
+                            ? ` · ${variable.label}`
+                            : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>{variableSummary(row.datasetVariable)}</td>
+                  <td>
+                    <Badge
+                      kind={
+                        row.mappingStatus === "direct_match"
+                          ? "success"
+                          : row.mappingStatus === "probable_match"
+                            ? "blue"
+                            : "warning"
+                      }
+                    >
+                      {humanStatus(row.mappingStatus)}
+                    </Badge>
+                  </td>
+                  <td>{row.evidence.join(" ")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="muted">
+            Direct match is reserved for exact metadata evidence. Semantic suggestions remain probable or uncertain until you confirm them.
+          </p>
+          <Button onClick={() => void confirmMappings()}>
+            {busy ? "Working…" : "Confirm reviewed mappings"}
+          </Button>
+        </>
+      ) : (
+        <p className="muted">
+          {busy ? "Preparing mapping suggestions…" : "No mappings are available yet."}
+        </p>
+      )}
+      {rows.length > 0 && rows.every((row) => row.confirmed) && (
+        <div className="action-row">
+          <Button href={`/app/projects/${projectId}/analysis-plan`}>
+            Continue to analysis plan
+          </Button>
+        </div>
+      )}
       {status && <p className="confirmation" role="status">{status}</p>}
     </section>
   );
 }
 
+function simpleHash(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
+
 function LiveAnalysisPlan({ projectId }: { projectId: string }) {
   const [selections, setSelections] = useState<CandidateSelection[]>([]);
   const [datasets, setDatasets] = useState<DatasetVersion[]>([]);
+  const [spec, setSpec] = useState<StudySpecification | null>(null);
+  const [mappings, setMappings] = useState<VariableMapping[]>([]);
   const [plan, setPlan] = useState<AnalysisPlan | null>(null);
-  const [selectedMethod, setSelectedMethod] = useState("");
+  const [selectedMethods, setSelectedMethods] = useState<Record<string, string>>({});
+  const [selectedDatasetId, setSelectedDatasetId] = useState("");
   const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
 
   async function refresh() {
-    const [candidateResponse, ds, existing] = await Promise.all([
-      getMethodCandidates(projectId),
-      getDatasets(projectId),
-      getAnalysisPlan(projectId)
-    ]);
+    const [candidateResponse, ds, existing, specification, savedMappings] =
+      await Promise.all([
+        getMethodCandidates(projectId),
+        getDatasets(projectId),
+        getAnalysisPlan(projectId),
+        getStudySpecification(projectId),
+        getVariableMappings(projectId)
+      ]);
+
     setSelections(candidateResponse.selections);
     setDatasets(ds);
     setPlan(existing);
-    const first = candidateResponse.selections[0]?.candidates.find((candidate) => candidate.executable)?.methodId;
-    if (first) setSelectedMethod((current) => current || first);
+    setSpec(specification);
+    setMappings(savedMappings);
+
+    const preferred =
+      existing?.datasetVersionId ??
+      ds.find((dataset) => dataset.sourceKind === "derived")?.id ??
+      ds[0]?.id ??
+      "";
+    setSelectedDatasetId(preferred);
+
+    setSelectedMethods((current) => {
+      const next = { ...current };
+      for (const selection of candidateResponse.selections) {
+        if (!next[selection.questionId]) {
+          const executable = selection.candidates.find((candidate) => candidate.executable);
+          if (executable) next[selection.questionId] = executable.methodId;
+        }
+      }
+      return next;
+    });
   }
 
   useEffect(() => {
     void refresh().catch((err) => setStatus(message(err)));
   }, [projectId]);
 
+  function mappingFor(concept: string) {
+    const key = concept.trim().toLowerCase();
+    return mappings.find(
+      (mapping) =>
+        mapping.researchConcept.trim().toLowerCase() === key &&
+        Boolean(mapping.confirmedBy)
+    );
+  }
+
+  function resolvedVariables(question: StudySpecification["researchQuestions"][number]) {
+    const outcome = question.outcomes
+      .map((item) => mappingFor(item.concept)?.datasetVariable)
+      .find(Boolean);
+    const predictors = question.predictors.flatMap((item) => {
+      const value = mappingFor(item.concept)?.datasetVariable;
+      return value ? [value] : [];
+    });
+    const covariates = question.covariates.flatMap((item) => {
+      const value = mappingFor(item.concept)?.datasetVariable;
+      return value ? [value] : [];
+    });
+    return { outcome, predictors, covariates };
+  }
+
   async function createPlan() {
-    const spec = await getStudySpecification(projectId);
-    const selection = selections[0];
-    const question = spec?.researchQuestions.find((item) => item.id === selection?.questionId);
-    const outcome = question?.outcomes[0]?.datasetVariable;
-    if (!selection || !question || !outcome || !selectedMethod || datasets.length === 0) {
-      setStatus("A study specification, dataset and method candidate are required.");
+    if (!spec) {
+      setStatus("Confirm the study specification before creating an analysis plan.");
       return;
     }
-    const candidate = selection.candidates.find((item) => item.methodId === selectedMethod);
+    if (!selectedDatasetId) {
+      setStatus("Upload and select a dataset before creating an analysis plan.");
+      return;
+    }
+
+    const analyses = selections.flatMap((selection, index) => {
+      const question = spec.researchQuestions.find(
+        (item) => item.id === selection.questionId
+      );
+      const selectedMethodId = selectedMethods[selection.questionId];
+      const candidate = selection.candidates.find(
+        (item) => item.methodId === selectedMethodId
+      );
+      if (!question || !selectedMethodId || !candidate?.executable) return [];
+      const resolved = resolvedVariables(question);
+      if (!resolved.outcome) return [];
+
+      return [
+        {
+          id: `analysis-${index + 1}`,
+          researchQuestionId: question.id,
+          outcome: resolved.outcome,
+          predictors: resolved.predictors,
+          covariates: resolved.covariates,
+          candidateMethodIds: selection.candidates.map((item) => item.methodId),
+          selectedMethodId,
+          requiredDecisions: candidate.decisionRequired
+            ? [candidate.decisionRequired]
+            : [],
+          warnings: selection.warnings,
+          diagnostics: candidate.requiredChecks,
+          addedAfterLock: false
+        }
+      ];
+    });
+
+    if (analyses.length === 0) {
+      setStatus(
+        "No research question is ready for an executable analysis. Review mappings and method blockers below."
+      );
+      return;
+    }
+
+    setBusy(true);
+    setStatus("");
     try {
       const created = await createAnalysisPlan(projectId, {
         versionId: `plan-${Date.now()}`,
-        datasetVersionId: datasets[0].id,
+        datasetVersionId: selectedDatasetId,
         status: "planned_before_analysis",
-        analyses: [
-          {
-            id: "analysis-1",
-            researchQuestionId: question.id,
-            outcome,
-            predictors: question.predictors.flatMap((item) => item.datasetVariable ? [item.datasetVariable] : []),
-            covariates: question.covariates.flatMap((item) => item.datasetVariable ? [item.datasetVariable] : []),
-            candidateMethodIds: selection.candidates.map((item) => item.methodId),
-            selectedMethodId: selectedMethod,
-            requiredDecisions: candidate?.decisionRequired ? [candidate.decisionRequired] : [],
-            warnings: selection.warnings,
-            diagnostics: candidate?.requiredChecks ?? [],
-            addedAfterLock: false
-          }
-        ]
+        analyses
       });
       setPlan(created);
-      setStatus("Analysis plan created.");
+      setStatus(
+        `Analysis plan created with ${created.analyses.length} planned analysis${created.analyses.length === 1 ? "" : "es"}.`
+      );
     } catch (err) {
       setStatus(message(err));
+    } finally {
+      setBusy(false);
     }
   }
 
   async function lock() {
     if (!plan) return;
+    setBusy(true);
     try {
       const locked = await lockAnalysisPlan(projectId, plan.id);
       setPlan(locked);
-      setStatus("Analysis plan locked.");
+      setStatus("Analysis plan locked. Planned analyses are now distinguished from later exploratory work.");
     } catch (err) {
       setStatus(message(err));
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <section className="panel">
-      <h2>Method candidates</h2>
-      {selections.map((selection) => (
-        <div key={selection.questionId} className="method-list">
-          {selection.candidates.map((candidate) => (
-            <label className="method-card" key={candidate.methodId}>
-              <input
-                type="radio"
-                name="candidate"
-                checked={selectedMethod === candidate.methodId}
-                disabled={!candidate.executable}
-                onChange={() => setSelectedMethod(candidate.methodId)}
-              />
-              <strong>{candidate.displayName}</strong>
-              {!candidate.executable && <Badge kind="warning">Execution pending</Badge>}
-              <p>{candidate.rationale}</p>
-              {candidate.decisionRequired && <small>{candidate.decisionRequired}</small>}
-            </label>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">ANALYSIS DATASET</p>
+          <h2>Build analysis plan</h2>
+        </div>
+        {plan && (
+          <Badge kind={plan.lockedAt ? "success" : "blue"}>
+            {plan.lockedAt ? "Locked" : "Draft"}
+          </Badge>
+        )}
+      </div>
+
+      <label>
+        Dataset version
+        <select
+          value={selectedDatasetId}
+          disabled={Boolean(plan)}
+          onChange={(event) => setSelectedDatasetId(event.target.value)}
+        >
+          <option value="">Select dataset</option>
+          {datasets.map((dataset) => (
+            <option key={dataset.id} value={dataset.id}>
+              {dataset.label} · {dataset.sourceKind}
+            </option>
           ))}
-          {selection.blockedReason && <p className="confirmation">{selection.blockedReason}</p>}
-        </div>
-      ))}
-      {!plan ? <Button onClick={() => void createPlan()}>Create analysis plan</Button> : (
+        </select>
+      </label>
+      <p className="muted">
+        Methodome prefers the newest derived dataset when one exists. You can change the selection before the plan is created.
+      </p>
+
+      <div className="method-list">
+        {selections.map((selection, index) => {
+          const question = spec?.researchQuestions.find(
+            (item) => item.id === selection.questionId
+          );
+          const resolved = question ? resolvedVariables(question) : null;
+          const mappingBlocker =
+            question && !resolved?.outcome
+              ? "The outcome concept does not have a confirmed dataset mapping."
+              : null;
+          return (
+            <article className="method-card" key={selection.questionId}>
+              <p className="eyebrow">RESEARCH QUESTION {index + 1}</p>
+              <h3>{question?.text ?? selection.questionId}</h3>
+              {resolved?.outcome && (
+                <p>
+                  <b>Outcome:</b> <code>{resolved.outcome}</code>
+                  {resolved.predictors.length > 0 && (
+                    <> · <b>Predictors:</b> <code>{resolved.predictors.join(", ")}</code></>
+                  )}
+                </p>
+              )}
+
+              {(mappingBlocker || selection.blockedReason) && (
+                <div className="warning-panel">
+                  <b>Needs review</b>
+                  <p>{mappingBlocker ?? selection.blockedReason}</p>
+                </div>
+              )}
+
+              {selection.warnings.map((warning) => (
+                <p className="muted" key={warning}>{warning}</p>
+              ))}
+
+              {selection.candidates.map((candidate) => (
+                <label className="candidate" key={candidate.methodId}>
+                  <input
+                    type="radio"
+                    name={`candidate-${selection.questionId}`}
+                    checked={selectedMethods[selection.questionId] === candidate.methodId}
+                    disabled={!candidate.executable || Boolean(plan)}
+                    onChange={() =>
+                      setSelectedMethods((current) => ({
+                        ...current,
+                        [selection.questionId]: candidate.methodId
+                      }))
+                    }
+                  />
+                  <span>
+                    <b>{candidate.displayName}</b>
+                    <small>{candidate.rationale}</small>
+                    {candidate.decisionRequired && <small>{candidate.decisionRequired}</small>}
+                  </span>
+                  <Badge kind={candidate.executable ? "success" : "warning"}>
+                    {candidate.executable ? candidate.maturity : "Execution pending"}
+                  </Badge>
+                </label>
+              ))}
+            </article>
+          );
+        })}
+      </div>
+
+      {!plan ? (
+        <Button onClick={() => void createPlan()}>
+          {busy ? "Creating…" : "Create analysis plan"}
+        </Button>
+      ) : (
         <div className="action-row">
-          <Badge kind={plan.lockedAt ? "success" : "blue"}>{plan.lockedAt ? "Locked" : "Draft"}</Badge>
-          {!plan.lockedAt && <Button onClick={() => void lock()}>Lock analysis plan</Button>}
+          <span>
+            {plan.analyses.length} planned analysis{plan.analyses.length === 1 ? "" : "es"}
+          </span>
+          {!plan.lockedAt && (
+            <Button onClick={() => void lock()}>
+              {busy ? "Locking…" : "Lock analysis plan"}
+            </Button>
+          )}
+          {plan.lockedAt && (
+            <Button href={`/app/projects/${projectId}/analysis`}>
+              Run analyses
+            </Button>
+          )}
         </div>
+      )}
+      {plan?.lockHash && (
+        <p className="muted">
+          SHA-256 plan hash: <code>{plan.lockHash}</code>
+        </p>
       )}
       {status && <p className="confirmation" role="status">{status}</p>}
     </section>
@@ -1210,19 +2460,35 @@ function LiveAnalysisPlan({ projectId }: { projectId: string }) {
 
 function LiveAnalysis({ projectId }: { projectId: string }) {
   const [plan, setPlan] = useState<AnalysisPlan | null>(null);
-  const [state, setState] = useState("");
-  const [jobId, setJobId] = useState("");
+  const [jobs, setJobs] = useState<Record<string, { jobId: string; state: string }>>({});
+  const [status, setStatus] = useState("");
 
   useEffect(() => {
-    getAnalysisPlan(projectId).then(setPlan).catch((err) => setState(message(err)));
+    getAnalysisPlan(projectId).then(setPlan).catch((err) => setStatus(message(err)));
+    try {
+      const stored = localStorage.getItem(`methodome:jobs:${projectId}`);
+      if (stored) setJobs(JSON.parse(stored));
+    } catch {
+      // Ignore invalid local job cache.
+    }
   }, [projectId]);
 
-  async function run() {
-    const analysis = plan?.analyses[0];
-    if (!plan?.datasetVersionId || !analysis?.selectedMethodId) {
-      setState("A dataset and selected method are required in the analysis plan.");
+  function persist(next: Record<string, { jobId: string; state: string }>) {
+    setJobs(next);
+    localStorage.setItem(`methodome:jobs:${projectId}`, JSON.stringify(next));
+  }
+
+  async function run(analysis: AnalysisPlan["analyses"][number]) {
+    if (!plan?.datasetVersionId || !analysis.selectedMethodId) {
+      setStatus("A dataset and selected method are required in the analysis plan.");
       return;
     }
+    if (!plan.lockedAt) {
+      setStatus("Lock the analysis plan before running planned analyses.");
+      return;
+    }
+
+    setStatus("");
     try {
       const created = await createAnalysisJob(projectId, {
         datasetVersionId: plan.datasetVersionId,
@@ -1232,85 +2498,251 @@ function LiveAnalysis({ projectId }: { projectId: string }) {
         predictors: analysis.predictors,
         covariates: analysis.covariates
       });
-      setJobId(created.jobId);
+      let next = {
+        ...jobs,
+        [analysis.id]: { jobId: created.jobId, state: created.state }
+      };
+      persist(next);
       localStorage.setItem(`methodome:last-job:${projectId}`, created.jobId);
-      setState(created.state);
 
       for (let attempt = 0; attempt < 60; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1500));
         const current = await getAnalysisJob(created.jobId);
-        setState(current.state);
-        if (current.state === "complete" || current.state === "failed" || current.state === "cancelled") break;
+        next = {
+          ...next,
+          [analysis.id]: { jobId: created.jobId, state: current.state }
+        };
+        persist(next);
+        if (
+          current.state === "complete" ||
+          current.state === "failed" ||
+          current.state === "cancelled"
+        ) {
+          break;
+        }
       }
     } catch (err) {
-      setState(message(err));
+      setStatus(message(err));
     }
+  }
+
+  if (!plan) {
+    return (
+      <section className="panel">
+        <h2>No analysis plan yet</h2>
+        <p>Build and lock an analysis plan before running guided analyses.</p>
+        <Button href={`/app/projects/${projectId}/analysis-plan`}>Build analysis plan</Button>
+        {status && <p className="confirmation" role="status">{status}</p>}
+      </section>
+    );
   }
 
   return (
     <section className="panel">
-      <h2>Execute approved analysis</h2>
-      <p>{plan?.lockedAt ? "The current analysis plan is locked." : "Lock the analysis plan before treating this run as planned analysis."}</p>
-      <Button onClick={() => void run()}>Run analysis</Button>
-      {jobId && <p><code>{jobId}</code></p>}
-      {state && <p className="confirmation" role="status">Job state: {state}</p>}
-      {state === "complete" && <Button href={`/app/projects/${projectId}/results`} variant="secondary">View results</Button>}
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">DETERMINISTIC EXECUTION</p>
+          <h2>Run approved analyses</h2>
+        </div>
+        <Badge kind={plan.lockedAt ? "success" : "warning"}>
+          {plan.lockedAt ? "Plan locked" : "Plan not locked"}
+        </Badge>
+      </div>
+      <p>
+        Each analysis below comes from the current analysis plan. Statistical values are calculated by the statistical Worker, not by the language model.
+      </p>
+
+      <div className="method-list">
+        {plan.analyses.map((analysis, index) => {
+          const job = jobs[analysis.id];
+          const running =
+            job &&
+            !["complete", "failed", "cancelled"].includes(job.state);
+          return (
+            <article className="method-card" key={analysis.id}>
+              <p className="eyebrow">PLANNED ANALYSIS {index + 1}</p>
+              <h3>{analysis.selectedMethodId?.replaceAll("_", " ") ?? "Method not selected"}</h3>
+              <p>
+                <b>Outcome:</b> <code>{analysis.outcome}</code>
+              </p>
+              {analysis.predictors.length > 0 && (
+                <p>
+                  <b>Predictors:</b> <code>{analysis.predictors.join(", ")}</code>
+                </p>
+              )}
+              {analysis.covariates.length > 0 && (
+                <p>
+                  <b>Covariates:</b> <code>{analysis.covariates.join(", ")}</code>
+                </p>
+              )}
+              {analysis.warnings.map((warning) => (
+                <p className="muted" key={warning}>{warning}</p>
+              ))}
+              <div className="action-row">
+                <Button
+                  onClick={() => void run(analysis)}
+                >
+                  {running
+                    ? "Running…"
+                    : job?.state === "complete"
+                      ? "Run again"
+                      : "Run analysis"}
+                </Button>
+                {job && (
+                  <Badge
+                    kind={
+                      job.state === "complete"
+                        ? "success"
+                        : job.state === "failed"
+                          ? "danger"
+                          : "blue"
+                    }
+                  >
+                    {job.state.replaceAll("_", " ")}
+                  </Badge>
+                )}
+              </div>
+              {job?.jobId && <code>{job.jobId}</code>}
+            </article>
+          );
+        })}
+      </div>
+
+      {Object.values(jobs).some((job) => job.state === "complete") && (
+        <Button href={`/app/projects/${projectId}/results`} variant="secondary">
+          View results
+        </Button>
+      )}
+      {status && <p className="confirmation" role="status">{status}</p>}
     </section>
   );
 }
 
 function LiveResults({ projectId }: { projectId: string }) {
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [status, setStatus] = useState("");
+  const [results, setResults] = useState<AnalysisResult[]>([]);
+  const [status, setStatus] = useState("Loading results…");
 
   useEffect(() => {
-    const jobId = localStorage.getItem(`methodome:last-job:${projectId}`);
-    if (!jobId) {
-      setStatus("Run an analysis first.");
-      return;
-    }
-    getAnalysisResult(jobId).then(setResult).catch((err) => setStatus(message(err)));
+    getAnalysisHistory()
+      .then(async (history) => {
+        const completeJobs = history.filter(
+          (item) =>
+            String(item.projectId ?? "") === projectId &&
+            String(item.state ?? "") === "complete"
+        );
+        if (completeJobs.length === 0) {
+          setResults([]);
+          setStatus("No completed analyses are available for this project.");
+          return;
+        }
+        const loaded = await Promise.all(
+          completeJobs.map((item) => getAnalysisResult(String(item.jobId)))
+        );
+        setResults(loaded);
+        setStatus("");
+      })
+      .catch((err) => setStatus(message(err)));
   }, [projectId]);
 
-  if (!result) return <section className="panel"><p>{status || "Loading result…"}</p></section>;
+  if (results.length === 0) {
+    return (
+      <section className="panel">
+        <h2>Analysis results</h2>
+        <p>{status}</p>
+        <Button href={`/app/projects/${projectId}/analysis`} variant="secondary">
+          Go to analysis
+        </Button>
+      </section>
+    );
+  }
 
   return (
-    <section className="panel">
-      <div className="panel-heading">
-        <div><p className="eyebrow">STRUCTURED RESULT</p><h2>{result.methodId.replaceAll("_", " ")}</h2></div>
-        <Badge kind="success">{result.software.engine}</Badge>
-      </div>
-      <p><b>N:</b> {result.n}</p>
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>Term</th><th>Estimate</th><th>SE</th><th>95% CI</th><th>p</th><th>Exp.</th></tr></thead>
-          <tbody>
-            {result.estimates.map((estimate) => (
-              <tr key={estimate.term}>
-                <td>{estimate.term}</td>
-                <td>{estimate.estimate.toPrecision(5)}</td>
-                <td>{estimate.standardError?.toPrecision(5) ?? "—"}</td>
-                <td>{estimate.confidenceInterval ? `${estimate.confidenceInterval.lower.toPrecision(4)} to ${estimate.confidenceInterval.upper.toPrecision(4)}` : "—"}</td>
-                <td>{estimate.pValue != null ? estimate.pValue.toPrecision(4) : "—"}</td>
-                <td>{estimate.exponentiatedEstimate?.toPrecision(5) ?? "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <h3>Diagnostics</h3>
-      <div className="method-list">
-        {result.diagnostics.map((diagnostic) => (
-          <div className="method-card" key={diagnostic.id}>
-            <Badge kind={diagnostic.status === "passed" ? "success" : diagnostic.status === "failed" ? "danger" : "warning"}>{diagnostic.status}</Badge>
-            <strong>{diagnostic.label}</strong>
-            {diagnostic.value != null && <p>{String(diagnostic.value)}</p>}
-            {diagnostic.message && <small>{diagnostic.message}</small>}
+    <div className="method-list">
+      {results.map((result, resultIndex) => (
+        <section className="panel" key={result.jobId}>
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">RESULT {resultIndex + 1}</p>
+              <h2>{result.methodId.replaceAll("_", " ")}</h2>
+            </div>
+            <Badge kind="success">{result.software.engine}</Badge>
           </div>
-        ))}
-      </div>
-      <p className="muted">Executed with {result.software.package} {result.software.packageVersion} on {result.software.engine}.</p>
-    </section>
+          <div className="spec-grid">
+            <div><span>Complete observations</span><strong>{result.n}</strong></div>
+            <div><span>Engine</span><strong>{result.software.engine}</strong></div>
+            <div><span>Package</span><strong>{result.software.package}</strong></div>
+            <div><span>Version</span><strong>{result.software.packageVersion}</strong></div>
+          </div>
+
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Term</th>
+                  <th>Estimate</th>
+                  <th>SE</th>
+                  <th>95% CI</th>
+                  <th>p</th>
+                  <th>Exponentiated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.estimates.map((estimate) => (
+                  <tr key={estimate.term}>
+                    <td>{estimate.term}</td>
+                    <td>{estimate.estimate.toPrecision(5)}</td>
+                    <td>{estimate.standardError?.toPrecision(5) ?? "—"}</td>
+                    <td>
+                      {estimate.confidenceInterval
+                        ? `${estimate.confidenceInterval.lower.toPrecision(4)} to ${estimate.confidenceInterval.upper.toPrecision(4)}`
+                        : "—"}
+                    </td>
+                    <td>{estimate.pValue != null ? estimate.pValue.toPrecision(4) : "—"}</td>
+                    <td>{estimate.exponentiatedEstimate?.toPrecision(5) ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Diagnostics</h3>
+          <div className="method-list">
+            {result.diagnostics.map((diagnostic) => (
+              <div className="method-card" key={diagnostic.id}>
+                <Badge
+                  kind={
+                    diagnostic.status === "passed"
+                      ? "success"
+                      : diagnostic.status === "failed"
+                        ? "danger"
+                        : "warning"
+                  }
+                >
+                  {diagnostic.status.replaceAll("_", " ")}
+                </Badge>
+                <strong>{diagnostic.label}</strong>
+                {diagnostic.value != null && <p>{String(diagnostic.value)}</p>}
+                {diagnostic.message && <small>{diagnostic.message}</small>}
+              </div>
+            ))}
+          </div>
+
+          {result.warnings.length > 0 && (
+            <div className="warning-panel">
+              <b>Warnings</b>
+              {result.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+            </div>
+          )}
+          <p className="muted">
+            Job <code>{result.jobId}</code>. Executed with {result.software.package} {result.software.packageVersion}.
+          </p>
+        </section>
+      ))}
+      <Button href={`/app/projects/${projectId}/reports`} variant="secondary">
+        Continue to reports
+      </Button>
+      {status && <p className="confirmation" role="status">{status}</p>}
+    </div>
   );
 }
 
@@ -1497,15 +2929,21 @@ export async function performSignOut() {
 
 
 export function LiveMethodsPage() {
-  const [methods, setMethods] = useState<Array<Record<string, unknown>>>([]);
+  const [methods, setMethods] = useState<MethodRegistryEntry[]>([]);
   const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("Loading method registry…");
 
   useEffect(() => {
-    getMethods().then((response) => setMethods(response.methods)).catch(() => setMethods([]));
+    getMethods()
+      .then((response) => {
+        setMethods(response.methods);
+        setStatus("");
+      })
+      .catch(() => setStatus("Methodome could not load the method registry."));
   }, []);
 
   const visible = methods.filter((method) =>
-    String(method.displayName ?? "").toLowerCase().includes(query.toLowerCase())
+    method.displayName.toLowerCase().includes(query.toLowerCase())
   );
 
   return (
@@ -1513,20 +2951,43 @@ export function LiveMethodsPage() {
       <PageHeader
         eyebrow="METHODS LIBRARY"
         title="Methods library"
-        description="The live registry controls analytical eligibility and execution maturity."
+        description="The live registry shows method maturity, execution status and required diagnostics."
       />
       <div className="catalogue-tools">
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search methods" />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search methods"
+          aria-label="Search methods"
+        />
       </div>
+      {status && <p className="muted">{status}</p>}
       <div className="method-list">
         {visible.map((method) => (
-          <article className="method-card" key={String(method.id)}>
-            <Badge kind={String(method.maturity) === "validated" ? "success" : String(method.maturity) === "supported" ? "blue" : "warning"}>
-              {String(method.maturity)}
-            </Badge>
-            <h3>{String(method.displayName)}</h3>
-            <p>{String(method.family)}</p>
-            <small>{Array.isArray(method.diagnostics) ? method.diagnostics.join(", ") : ""}</small>
+          <article className="method-card" key={method.id}>
+            <div>
+              <div className="action-row method-badges">
+                <Badge
+                  kind={
+                    method.maturity === "validated"
+                      ? "success"
+                      : method.maturity === "supported"
+                        ? "blue"
+                        : "warning"
+                  }
+                >
+                  {method.maturity.replace(/^./, (character) => character.toUpperCase())}
+                </Badge>
+                <Badge kind={method.executable ? "teal" : "neutral"}>
+                  {method.executable ? "Executable" : "Execution pending"}
+                </Badge>
+              </div>
+              <h3>{method.displayName}</h3>
+              <p className="muted">{method.family.replaceAll("_", " ")}</p>
+              <small>
+                Diagnostics: {method.diagnostics.length ? method.diagnostics.join(", ") : "None listed"}
+              </small>
+            </div>
           </article>
         ))}
       </div>

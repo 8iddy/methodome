@@ -7,13 +7,18 @@
   "observability": {
     "enabled": true
   },
+  "ai": {
+    "binding": "AI"
+  },
   "vars": {
     "APP_ENV": "production",
     "AUTH_MODE": "better_auth",
     "ALLOWED_ORIGINS": "https://methodome.com,http://localhost:3000",
     "MAX_DIRECT_UPLOAD_BYTES": "26214400",
     "STORAGE_MODE": "r2",
-    "BETTER_AUTH_URL": "https://api.methodome.com"
+    "BETTER_AUTH_URL": "https://api.methodome.com",
+    "EMAIL_VERIFICATION_REQUIRED": "false",
+    "EMAIL_FROM": "no-reply@methodome.com"
   },
   "d1_databases": [
     {

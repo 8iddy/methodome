@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
-import { parseStudySpecification } from "@methodome/study-spec";
+import { parseStudySpecification, type StudySpecification } from "@methodome/study-spec";
 import {
   methodRegistry,
   registryVersion,
@@ -18,13 +18,22 @@ import {
   lockAnalysisPlan
 } from "@methodome/analysis-plan";
 import type { Project } from "@methodome/domain";
-import type { ProjectProcessingPolicy } from "@methodome/policy-engine";
+import { assertModelRequestAllowed, type ProjectProcessingPolicy } from "@methodome/policy-engine";
 import { compareDatasetSchemas } from "@methodome/schema-harmonisation";
 import { requireAuth } from "./auth";
 import { consumeAnalysisQueue } from "./analysis-worker";
-import { createAuth } from "./better-auth";
+import { createAuth, emailVerificationEnabled } from "./better-auth";
+import { turnstileConfigurationIncomplete, turnstileEnabled, validateTurnstile } from "./auth-security";
 import type { Env, Variables } from "./env";
 import { makeId } from "./id";
+import {
+  extractProtocolWithAi,
+  protocolExtractionSchema,
+  PROTOCOL_EXTRACTION_MODEL,
+  PROTOCOL_EXTRACTION_PROMPT_VERSION,
+  researchFileToText,
+  suggestMappingsWithAi
+} from "./protocol-extraction";
 import {
   appendAuditEvent,
   createAnalysisJob,
@@ -48,6 +57,7 @@ import {
   getProjectPolicy,
   getStudySpecification,
   getLatestAnalysisPlan,
+  getLatestProtocolExtraction,
   listAnalysisHistory,
   listAuditEvents,
   listDatasetVersions,
@@ -55,6 +65,7 @@ import {
   listVariableMappings,
   listProjects,
   saveAnalysisPlan,
+  saveProtocolExtraction,
   saveStudySpecification,
   saveVariableMappings,
   updateProjectPolicy,
@@ -99,6 +110,106 @@ app.get("/health", (c) =>
   })
 );
 
+app.get("/auth-config", (c) => {
+  return c.json({
+    turnstileRequired: turnstileEnabled(c.env),
+    turnstileSiteKey: c.env.TURNSTILE_SITE_KEY ?? null,
+    emailVerificationRequired: emailVerificationEnabled(c.env)
+  });
+});
+
+app.post("/auth/sign-up/email", async (c) => {
+  if (c.env.AUTH_MODE !== "better_auth" || !c.env.BETTER_AUTH_SECRET) {
+    return c.json(
+      {
+        error: {
+          code: "AUTH_NOT_CONFIGURED",
+          message: "Production authentication has not been enabled."
+        }
+      },
+      503
+    );
+  }
+
+  if (turnstileConfigurationIncomplete(c.env)) {
+    return c.json(
+      {
+        error: {
+          code: "TURNSTILE_CONFIG_INCOMPLETE",
+          message: "Account bot protection is not completely configured."
+        }
+      },
+      503
+    );
+  }
+
+  const body = await c.req.json().catch(() => null) as
+    | {
+        name?: string;
+        email?: string;
+        password?: string;
+        turnstileToken?: string;
+      }
+    | null;
+
+  if (!body) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_SIGN_UP",
+          message: "Account details are invalid."
+        }
+      },
+      400
+    );
+  }
+
+  if (turnstileEnabled(c.env)) {
+    const token = body.turnstileToken?.trim();
+    if (!token) {
+      return c.json(
+        {
+          error: {
+            code: "TURNSTILE_REQUIRED",
+            message: "Complete the bot check before creating an account."
+          }
+        },
+        400
+      );
+    }
+
+    const result = await validateTurnstile(
+      c.env,
+      token,
+      c.req.header("cf-connecting-ip")
+    );
+    if (!result.success) {
+      return c.json(
+        {
+          error: {
+            code: "TURNSTILE_FAILED",
+            message: "The bot check could not be verified. Try again.",
+            details: result["error-codes"] ?? []
+          }
+        },
+        400
+      );
+    }
+  }
+
+  const { turnstileToken: _turnstileToken, ...authBody } = body;
+  const headers = new Headers(c.req.raw.headers);
+  headers.set("content-type", "application/json");
+
+  return createAuth(c.env).handler(
+    new Request(c.req.raw.url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(authBody)
+    })
+  );
+});
+
 app.all("/auth/*", async (c) => {
   if (c.env.AUTH_MODE !== "better_auth" || !c.env.BETTER_AUTH_SECRET) {
     return c.json(
@@ -118,6 +229,8 @@ app.all("/auth/*", async (c) => {
 app.use("*", async (c, next) => {
   if (
     c.req.path === "/api/health" ||
+    c.req.path === "/api/methods" ||
+    c.req.path === "/api/auth-config" ||
     c.req.path.startsWith("/api/auth/")
   ) {
     return next();
@@ -158,6 +271,125 @@ async function addAudit(
   );
   await appendAuditEvent(c.env.DB, event);
   return event;
+}
+
+
+async function profileDatasetForProject(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  datasetVersionId: string
+): Promise<{
+  rowCount: number;
+  columnCount: number;
+  variables: Array<{
+    variableName: string;
+    label?: string;
+    dataType: string;
+    missingCount: number;
+    uniqueCount: number;
+    responseChoices?: Array<{ value: string | number; label: string }>;
+    range?: { min: number; max: number };
+  }>;
+}> {
+  if (!c.env.FILES || c.env.STORAGE_MODE !== "r2") {
+    throw new Error("R2 storage is required for dataset profiling.");
+  }
+  const dataset = await getDatasetVersionRecord(c.env.DB, datasetVersionId, projectId);
+  if (!dataset) throw new Error("Dataset version was not found.");
+  const object = await c.env.FILES.get(dataset.objectKey);
+  if (!object) throw new Error("Stored dataset object was not found.");
+  const response = await c.env.STATS.fetch(
+    new Request("https://methodome-stats.internal/profile", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ csv: await object.text() })
+    })
+  );
+  if (!response.ok) {
+    throw new Error(`Dataset profiling failed with HTTP ${response.status}.`);
+  }
+  return (await response.json()) as {
+    rowCount: number;
+    columnCount: number;
+    variables: Array<{
+      variableName: string;
+      label?: string;
+      dataType: string;
+      missingCount: number;
+      uniqueCount: number;
+      responseChoices?: Array<{ value: string | number; label: string }>;
+      range?: { min: number; max: number };
+    }>;
+  };
+}
+
+function normalizeConcept(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+async function resolveStudySpecificationForMethods(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  specification: StudySpecification,
+  requestedDatasetVersionId?: string
+): Promise<{ specification: StudySpecification; datasetVersionId?: string }> {
+  const [mappings, datasets] = await Promise.all([
+    listVariableMappings(c.env.DB, projectId),
+    listDatasetVersions(c.env.DB, projectId)
+  ]);
+  const confirmed = new Map(
+    mappings
+      .filter((mapping) => mapping.confirmedBy && mapping.datasetVariable)
+      .map((mapping) => [normalizeConcept(mapping.researchConcept), mapping])
+  );
+  const preferred = requestedDatasetVersionId
+    ? datasets.find((dataset) => dataset.id === requestedDatasetVersionId)
+    : datasets.find((dataset) => dataset.sourceKind === "derived") ?? datasets[0];
+  if (!preferred) return { specification };
+
+  let profile: Awaited<ReturnType<typeof profileDatasetForProject>>;
+  try {
+    profile = await profileDatasetForProject(c, projectId, preferred.id);
+  } catch {
+    return { specification, datasetVersionId: preferred.id };
+  }
+  const byName = new Map(profile.variables.map((variable) => [variable.variableName, variable]));
+
+  const resolved = structuredClone(specification);
+  for (const question of resolved.researchQuestions) {
+    for (const variable of [
+      ...question.outcomes,
+      ...question.predictors,
+      ...question.covariates
+    ]) {
+      const mapping = confirmed.get(normalizeConcept(variable.concept));
+      if (!mapping?.datasetVariable) continue;
+      const profiled = byName.get(mapping.datasetVariable);
+      variable.datasetVariable = mapping.datasetVariable;
+      variable.mappingStatus = mapping.mappingStatus as typeof variable.mappingStatus;
+      variable.variableType =
+        profiled?.dataType && [
+          "binary",
+          "categorical_nominal",
+          "categorical_ordinal",
+          "count",
+          "continuous",
+          "time_to_event",
+          "date",
+          "text",
+          "unknown"
+        ].includes(profiled.dataType)
+          ? (profiled.dataType as typeof variable.variableType)
+          : variable.variableType;
+    }
+  }
+
+  return { specification: resolved, datasetVersionId: preferred.id };
 }
 
 const createProjectSchema = z.object({
@@ -714,6 +946,328 @@ app.post("/projects/:projectId/schema-comparison", async (c) => {
   return c.json({ comparison });
 });
 
+app.get("/projects/:projectId/protocol-extraction", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const record = await getLatestProtocolExtraction(c.env.DB, projectId);
+  if (!record) return c.json({ extraction: null });
+
+  return c.json({
+    extraction: {
+      ...protocolExtractionSchema.parse(record.extraction),
+      provenance: {
+        id: record.id,
+        protocolFileId: record.protocolFileId,
+        protocolChecksum: record.protocolChecksum,
+        provider: record.provider,
+        model: record.model,
+        promptVersion: record.promptVersion,
+        createdAt: record.createdAt
+      }
+    }
+  });
+});
+
+app.post("/projects/:projectId/protocol-extraction", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  if (!c.env.FILES) {
+    return c.json(
+      {
+        error: {
+          code: "OBJECT_STORAGE_NOT_CONFIGURED",
+          message: "Research file storage is required for protocol extraction."
+        }
+      },
+      503
+    );
+  }
+
+  if (!c.env.AI) {
+    return c.json(
+      {
+        error: {
+          code: "AI_NOT_CONFIGURED",
+          message: "Workers AI is required for protocol extraction."
+        }
+      },
+      503
+    );
+  }
+
+  const policy = await getProjectPolicy(c.env.DB, projectId);
+  if (policy) {
+    try {
+      assertModelRequestAllowed(policy, {
+        processorId: "workers-ai",
+        providerKind: "internal",
+        payloadKind: "document_text",
+        containsIdentifiers: policy.containsIdentifiableData
+      });
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "MODEL_PROCESSING_BLOCKED",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Project processing policy blocks protocol extraction."
+          }
+        },
+        409
+      );
+    }
+  }
+
+  const body = await c.req.json().catch(() => ({})) as { fileId?: string };
+  const protocolFiles = await listProjectFiles(c.env.DB, projectId, "protocol");
+  const fileId = body.fileId ?? protocolFiles[0]?.id;
+  if (!fileId) {
+    return c.json(
+      {
+        error: {
+          code: "PROTOCOL_REQUIRED",
+          message: "Upload a protocol before extracting study information."
+        }
+      },
+      409
+    );
+  }
+
+  const file = await getFileRecord(c.env.DB, fileId, getUserId(c));
+  if (!file || file.projectId !== projectId || file.fileKind !== "protocol") {
+    return c.json(
+      {
+        error: {
+          code: "PROTOCOL_FILE_NOT_FOUND",
+          message: "The selected protocol file was not found in this project."
+        }
+      },
+      404
+    );
+  }
+
+  if (file.checksumSha256 === "pending") {
+    return c.json(
+      {
+        error: {
+          code: "PROTOCOL_UPLOAD_INCOMPLETE",
+          message: "Finish uploading the protocol before extraction."
+        }
+      },
+      409
+    );
+  }
+
+  const object = await c.env.FILES.get(file.objectKey);
+  if (!object) {
+    return c.json(
+      {
+        error: {
+          code: "PROTOCOL_OBJECT_NOT_FOUND",
+          message: "The stored protocol file could not be read."
+        }
+      },
+      404
+    );
+  }
+
+  try {
+    const bytes = await object.arrayBuffer();
+    const text = await researchFileToText({
+      env: c.env,
+      filename: file.filename,
+      ...(file.mediaType ? { mediaType: file.mediaType } : {}),
+      bytes
+    });
+    const extraction = await extractProtocolWithAi(c.env, text);
+    const id = makeId("extract");
+    await saveProtocolExtraction(c.env.DB, {
+      id,
+      projectId,
+      protocolFileId: file.id,
+      protocolChecksum: file.checksumSha256,
+      extraction,
+      provider: "cloudflare-workers-ai",
+      model: PROTOCOL_EXTRACTION_MODEL,
+      promptVersion: PROTOCOL_EXTRACTION_PROMPT_VERSION
+    });
+    await addAudit(c, {
+      projectId,
+      action: "protocol_information_extracted",
+      objectType: "protocol_extraction",
+      objectId: id,
+      modelId: PROTOCOL_EXTRACTION_MODEL,
+      after: {
+        protocolFileId: file.id,
+        protocolChecksum: file.checksumSha256,
+        promptVersion: PROTOCOL_EXTRACTION_PROMPT_VERSION,
+        researchQuestionCount: extraction.researchQuestions.length
+      }
+    });
+
+    return c.json({
+      extraction: {
+        ...extraction,
+        provenance: {
+          id,
+          protocolFileId: file.id,
+          protocolChecksum: file.checksumSha256,
+          provider: "cloudflare-workers-ai",
+          model: PROTOCOL_EXTRACTION_MODEL,
+          promptVersion: PROTOCOL_EXTRACTION_PROMPT_VERSION,
+          createdAt: new Date().toISOString()
+        }
+      }
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: "PROTOCOL_EXTRACTION_FAILED",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Methodome could not extract study information from this protocol."
+        }
+      },
+      422
+    );
+  }
+});
+
+app.get("/projects/:projectId/variable-mapping-suggestions", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const specification = await getStudySpecification(c.env.DB, projectId);
+  if (!specification) {
+    return c.json(
+      {
+        error: {
+          code: "STUDY_SPECIFICATION_REQUIRED",
+          message: "Confirm the study specification before mapping variables."
+        }
+      },
+      409
+    );
+  }
+
+  const datasets = await listDatasetVersions(c.env.DB, projectId);
+  const preferred =
+    datasets.find((dataset) => dataset.sourceKind === "derived") ?? datasets[0];
+  if (!preferred) {
+    return c.json(
+      {
+        error: {
+          code: "DATASET_REQUIRED",
+          message: "Upload a dataset before Methodome can map study concepts."
+        }
+      },
+      409
+    );
+  }
+
+  let profile;
+  try {
+    profile = await profileDatasetForProject(c, projectId, preferred.id);
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: "DATASET_PROFILE_FAILED",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Methodome could not profile the selected dataset."
+        }
+      },
+      422
+    );
+  }
+
+  const concepts = specification.researchQuestions.flatMap((question) => [
+    ...question.outcomes.map((variable) => variable.concept),
+    ...question.predictors.map((variable) => variable.concept),
+    ...question.covariates.map((variable) => variable.concept)
+  ]);
+
+  let instrumentText = "";
+  if (c.env.FILES) {
+    const researchFiles = (await listProjectFiles(c.env.DB, projectId))
+      .filter((file) => file.fileKind === "instrument" || file.fileKind === "codebook")
+      .slice(0, 2);
+    for (const summary of researchFiles) {
+      try {
+        const record = await getFileRecord(c.env.DB, summary.id, getUserId(c));
+        if (!record) continue;
+        const object = await c.env.FILES.get(record.objectKey);
+        if (!object) continue;
+        const text = await researchFileToText({
+          env: c.env,
+          filename: record.filename,
+          ...(record.mediaType ? { mediaType: record.mediaType } : {}),
+          bytes: await object.arrayBuffer()
+        });
+        instrumentText += `\n\nFILE: ${record.filename}\n${text.slice(0, 15000)}`;
+      } catch {
+        // Instrument text is helpful evidence but is not required for mapping.
+      }
+    }
+  }
+
+  const policy = await getProjectPolicy(c.env.DB, projectId);
+  if (policy) {
+    try {
+      assertModelRequestAllowed(policy, {
+        processorId: "workers-ai",
+        providerKind: "internal",
+        payloadKind: instrumentText ? "document_text" : "metadata",
+        containsIdentifiers: policy.containsIdentifiableData
+      });
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "MODEL_PROCESSING_BLOCKED",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Project processing policy blocks model-assisted variable mapping."
+          }
+        },
+        409
+      );
+    }
+  }
+
+  const suggestions = await suggestMappingsWithAi({
+    env: c.env,
+    concepts,
+    variables: profile.variables.map((variable) => ({
+      variableName: variable.variableName,
+      ...(variable.label ? { label: variable.label } : {}),
+      dataType: variable.dataType,
+      ...(variable.responseChoices
+        ? { responseChoices: variable.responseChoices }
+        : {})
+    })),
+    ...(instrumentText ? { instrumentText } : {})
+  });
+
+  return c.json({
+    datasetVersionId: preferred.id,
+    variables: profile.variables,
+    suggestions
+  });
+});
+
 app.get("/projects/:projectId/study-specification", async (c) => {
   const projectId = c.req.param("projectId");
   const access = await requireProject(c, projectId);
@@ -786,11 +1340,20 @@ app.get("/projects/:projectId/method-candidates", async (c) => {
     );
   }
 
-  const selections = specification.researchQuestions.map((question) =>
-    selectCandidateMethods(specification, question.id)
+  const resolved = await resolveStudySpecificationForMethods(
+    c,
+    projectId,
+    specification
+  );
+  const selections = resolved.specification.researchQuestions.map((question) =>
+    selectCandidateMethods(resolved.specification, question.id)
   );
 
-  return c.json({ selections, registryVersion });
+  return c.json({
+    selections,
+    registryVersion,
+    datasetVersionId: resolved.datasetVersionId
+  });
 });
 
 const policySchema = z.object({
@@ -1125,34 +1688,105 @@ app.post("/projects/:projectId/analysis-plan", async (c) => {
     );
   }
 
-  for (const analysis of parsed.data.analyses) {
-    const selection = selectCandidateMethods(
-      specification,
-      analysis.researchQuestionId
-    );
-    const allowed = new Set(
-      selection.candidates.map((candidate) => candidate.methodId)
-    );
+  const resolvedForPlan = await resolveStudySpecificationForMethods(
+    c,
+    projectId,
+    specification,
+    parsed.data.datasetVersionId
+  );
 
-    if (
-      analysis.selectedMethodId &&
-      !allowed.has(analysis.selectedMethodId) &&
-      analysis.warnings.length === 0
-    ) {
+  for (const analysis of parsed.data.analyses) {
+    const question = resolvedForPlan.specification.researchQuestions.find(
+      (item) => item.id === analysis.researchQuestionId
+    );
+    if (!question) {
       return c.json(
         {
           error: {
-            code: "ANALYSIS_PLAN_METHOD_OUTSIDE_CANDIDATES",
-            message:
-              "A selected method falls outside the current deterministic candidate set. Record the methodological warning before saving the plan.",
-            details: {
-              researchQuestionId: analysis.researchQuestionId,
-              methodId: analysis.selectedMethodId
-            }
+            code: "RESEARCH_QUESTION_NOT_FOUND",
+            message: "An analysis references a research question that is not in the current study specification."
           }
         },
         409
       );
+    }
+
+    const mappedOutcomes = new Set(
+      question.outcomes.flatMap((item) =>
+        item.datasetVariable ? [item.datasetVariable] : []
+      )
+    );
+    const mappedPredictors = new Set(
+      question.predictors.flatMap((item) =>
+        item.datasetVariable ? [item.datasetVariable] : []
+      )
+    );
+    const mappedCovariates = new Set(
+      question.covariates.flatMap((item) =>
+        item.datasetVariable ? [item.datasetVariable] : []
+      )
+    );
+
+    if (
+      !mappedOutcomes.has(analysis.outcome) ||
+      analysis.predictors.some((item) => !mappedPredictors.has(item)) ||
+      analysis.covariates.some((item) => !mappedCovariates.has(item))
+    ) {
+      return c.json(
+        {
+          error: {
+            code: "ANALYSIS_PLAN_VARIABLE_MISMATCH",
+            message:
+              "Planned variables must come from confirmed mappings for the referenced research question.",
+            details: { researchQuestionId: analysis.researchQuestionId }
+          }
+        },
+        409
+      );
+    }
+
+    const selection = selectCandidateMethods(
+      resolvedForPlan.specification,
+      analysis.researchQuestionId
+    );
+    if (analysis.selectedMethodId) {
+      const selectedCandidate = selection.candidates.find(
+        (candidate) => candidate.methodId === analysis.selectedMethodId
+      );
+
+      if (!selectedCandidate) {
+        return c.json(
+          {
+            error: {
+              code: "ANALYSIS_PLAN_METHOD_OUTSIDE_CANDIDATES",
+              message:
+                "A selected method falls outside the current deterministic candidate set.",
+              details: {
+                researchQuestionId: analysis.researchQuestionId,
+                methodId: analysis.selectedMethodId
+              }
+            }
+          },
+          409
+        );
+      }
+
+      if (!selectedCandidate.executable) {
+        return c.json(
+          {
+            error: {
+              code: "ANALYSIS_PLAN_METHOD_NOT_EXECUTABLE",
+              message:
+                "The selected method is a candidate but is not executable in the current statistical runner.",
+              details: {
+                researchQuestionId: analysis.researchQuestionId,
+                methodId: analysis.selectedMethodId
+              }
+            }
+          },
+          409
+        );
+      }
     }
   }
 
@@ -1447,11 +2081,87 @@ app.post("/projects/:projectId/analysis-jobs", async (c) => {
     );
   }
 
+  if (parsed.data.analysisPlanId) {
+    const referencedPlan = await getAnalysisPlanById(
+      c.env.DB,
+      projectId,
+      parsed.data.analysisPlanId
+    );
+
+    if (!referencedPlan) {
+      return c.json(
+        {
+          error: {
+            code: "ANALYSIS_PLAN_NOT_FOUND",
+            message: "The analysis plan referenced by this job was not found."
+          }
+        },
+        404
+      );
+    }
+
+    if (!referencedPlan.lockedAt || !referencedPlan.lockHash) {
+      return c.json(
+        {
+          error: {
+            code: "ANALYSIS_PLAN_NOT_LOCKED",
+            message: "Lock the analysis plan before running it as planned analysis."
+          }
+        },
+        409
+      );
+    }
+
+    if (
+      referencedPlan.datasetVersionId &&
+      referencedPlan.datasetVersionId !== parsed.data.datasetVersionId
+    ) {
+      return c.json(
+        {
+          error: {
+            code: "ANALYSIS_PLAN_DATASET_MISMATCH",
+            message: "The requested dataset does not match the locked analysis plan."
+          }
+        },
+        409
+      );
+    }
+
+    const inPlan = referencedPlan.analyses.some(
+      (analysis) =>
+        analysis.selectedMethodId === parsed.data.methodId &&
+        analysis.outcome === parsed.data.outcome &&
+        JSON.stringify(analysis.predictors) === JSON.stringify(parsed.data.predictors) &&
+        JSON.stringify(analysis.covariates) === JSON.stringify(parsed.data.covariates)
+    );
+
+    if (!inPlan) {
+      return c.json(
+        {
+          error: {
+            code: "ANALYSIS_JOB_NOT_IN_LOCKED_PLAN",
+            message:
+              "The requested analysis does not match an analysis recorded in the locked plan."
+          }
+        },
+        409
+      );
+    }
+  }
+
   const specification = await getStudySpecification(c.env.DB, projectId);
-  const eligible = specification
+  const resolvedForJob = specification
+    ? await resolveStudySpecificationForMethods(
+        c,
+        projectId,
+        specification,
+        parsed.data.datasetVersionId
+      )
+    : null;
+  const eligible = resolvedForJob
     ? new Set(
-        specification.researchQuestions.flatMap((question) =>
-          selectCandidateMethods(specification, question.id).candidates.map(
+        resolvedForJob.specification.researchQuestions.flatMap((question) =>
+          selectCandidateMethods(resolvedForJob.specification, question.id).candidates.map(
             (candidate) => candidate.methodId
           )
         )
