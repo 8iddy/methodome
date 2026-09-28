@@ -589,3 +589,189 @@ export async function getFileForDatasetRegistration(
       }
     : null;
 }
+
+export async function saveAnalysisPlan(
+  db: D1Database,
+  plan: import("@methodome/analysis-contracts").AnalysisPlan
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO analysis_plans
+       (id, project_id, version, status, plan_json, locked_at, lock_hash,
+        created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      plan.id,
+      plan.projectId,
+      plan.versionId,
+      plan.status,
+      JSON.stringify(plan),
+      plan.lockedAt ?? null,
+      plan.lockHash ?? null,
+      plan.createdBy,
+      plan.createdAt
+    )
+    .run();
+}
+
+export async function updateStoredAnalysisPlan(
+  db: D1Database,
+  plan: import("@methodome/analysis-contracts").AnalysisPlan
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE analysis_plans
+       SET status = ?, plan_json = ?, locked_at = ?, lock_hash = ?
+       WHERE id = ? AND project_id = ?`
+    )
+    .bind(
+      plan.status,
+      JSON.stringify(plan),
+      plan.lockedAt ?? null,
+      plan.lockHash ?? null,
+      plan.id,
+      plan.projectId
+    )
+    .run();
+}
+
+export async function getLatestAnalysisPlan(
+  db: D1Database,
+  projectId: string
+): Promise<import("@methodome/analysis-contracts").AnalysisPlan | null> {
+  const row = await db
+    .prepare(
+      `SELECT plan_json
+       FROM analysis_plans
+       WHERE project_id = ?
+       ORDER BY created_at DESC
+       LIMIT 1`
+    )
+    .bind(projectId)
+    .first<{ plan_json: string }>();
+
+  return row
+    ? (JSON.parse(row.plan_json) as import("@methodome/analysis-contracts").AnalysisPlan)
+    : null;
+}
+
+export async function getAnalysisPlanById(
+  db: D1Database,
+  projectId: string,
+  planId: string
+): Promise<import("@methodome/analysis-contracts").AnalysisPlan | null> {
+  const row = await db
+    .prepare(
+      `SELECT plan_json
+       FROM analysis_plans
+       WHERE project_id = ? AND id = ?
+       LIMIT 1`
+    )
+    .bind(projectId, planId)
+    .first<{ plan_json: string }>();
+
+  return row
+    ? (JSON.parse(row.plan_json) as import("@methodome/analysis-contracts").AnalysisPlan)
+    : null;
+}
+
+export async function saveVariableMappings(
+  db: D1Database,
+  input: {
+    projectId: string;
+    studySpecificationId: string;
+    mappings: Array<{
+      id: string;
+      researchConcept: string;
+      datasetVariable?: string;
+      mappingStatus: "direct_match" | "probable_match" | "uncertain" | "no_match";
+      evidence: string[];
+      confirmedBy?: string;
+    }>;
+  }
+): Promise<void> {
+  const now = new Date().toISOString();
+  const statements: D1PreparedStatement[] = input.mappings.map((mapping) =>
+    db
+      .prepare(
+        `INSERT INTO variable_mappings
+         (id, project_id, study_specification_id, research_concept,
+          dataset_variable, mapping_status, evidence_json, confirmed_by,
+          created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           dataset_variable = excluded.dataset_variable,
+           mapping_status = excluded.mapping_status,
+           evidence_json = excluded.evidence_json,
+           confirmed_by = excluded.confirmed_by,
+           updated_at = excluded.updated_at`
+      )
+      .bind(
+        mapping.id,
+        input.projectId,
+        input.studySpecificationId,
+        mapping.researchConcept,
+        mapping.datasetVariable ?? null,
+        mapping.mappingStatus,
+        JSON.stringify(mapping.evidence),
+        mapping.confirmedBy ?? null,
+        now,
+        now
+      )
+  );
+
+  if (statements.length > 0) {
+    await db.batch(statements);
+  }
+}
+
+export async function listVariableMappings(
+  db: D1Database,
+  projectId: string
+): Promise<Array<{
+  id: string;
+  researchConcept: string;
+  datasetVariable?: string;
+  mappingStatus: string;
+  evidence: string[];
+  confirmedBy?: string;
+}>> {
+  const result = await db
+    .prepare(
+      `SELECT id, research_concept, dataset_variable, mapping_status,
+              evidence_json, confirmed_by
+       FROM variable_mappings
+       WHERE project_id = ?
+       ORDER BY research_concept ASC`
+    )
+    .bind(projectId)
+    .all<Record<string, unknown>>();
+
+  return result.results.map((row) => ({
+    id: String(row.id),
+    researchConcept: String(row.research_concept),
+    ...(row.dataset_variable ? { datasetVariable: String(row.dataset_variable) } : {}),
+    mappingStatus: String(row.mapping_status),
+    evidence: parseJson<string[]>(String(row.evidence_json ?? "[]"), []),
+    ...(row.confirmed_by ? { confirmedBy: String(row.confirmed_by) } : {})
+  }));
+}
+
+export async function getCurrentStudySpecificationRecord(
+  db: D1Database,
+  projectId: string
+): Promise<{ id: string; version: string } | null> {
+  const row = await db
+    .prepare(
+      `SELECT id, version
+       FROM study_specifications
+       WHERE project_id = ?
+       ORDER BY created_at DESC
+       LIMIT 1`
+    )
+    .bind(projectId)
+    .first<{ id: string; version: string }>();
+
+  return row ?? null;
+}
