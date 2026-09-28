@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://methodome.com/spec/analysis-job.schema.json",
+  "title": "Methodome Analysis Job",
+  "type": "object",
+  "required": ["job_id", "project_id", "dataset_version_id", "method_id", "requested_by"],
+  "properties": {
+    "job_id": {"type": "string"},
+    "project_id": {"type": "string"},
+    "dataset_version_id": {"type": "string"},
+    "analysis_plan_version_id": {"type": ["string", "null"]},
+    "method_id": {"type": "string"},
+    "outcome": {"type": ["string", "null"]},
+    "predictors": {"type": "array", "items": {"type": "string"}},
+    "covariates": {"type": "array", "items": {"type": "string"}},
+    "cluster": {"type": ["string", "null"]},
+    "weights": {"type": ["string", "null"]},
+    "strata": {"type": ["string", "null"]},
+    "filters": {"type": "array", "items": {"type": "object"}},
+    "missing_data_strategy": {"type": ["string", "null"]},
+    "requested_by": {"type": "string"},
+    "override_reason": {"type": ["string", "null"]},
+    "registry_version": {"type": "string"},
+    "created_at": {"type": "string", "format": "date-time"}
+  }
+}
