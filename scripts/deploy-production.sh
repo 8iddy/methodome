@@ -20,6 +20,7 @@ npm install
 echo "-- Verify TypeScript and unit tests"
 npm run typecheck
 npm test
+npm --prefix apps/web install --workspaces=false
 npm run web:typecheck
 npm run web:build
 
