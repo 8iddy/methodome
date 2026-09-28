@@ -157,6 +157,43 @@ async function main() {
     );
     console.log("PASS two source datasets");
 
+    const [day1Profile, day2Profile] = await Promise.all([
+      request(`/projects/${projectId}/datasets/${day1}/profile`, {}, [200]),
+      request(`/projects/${projectId}/datasets/${day2}/profile`, {}, [200])
+    ]);
+    if (day1Profile.payload.profile.rowCount !== 3 || day2Profile.payload.profile.rowCount !== 3) {
+      throw new Error("Dataset profiling returned an unexpected row count.");
+    }
+    console.log("PASS dataset profiling");
+
+    const schemaComparison = await request(
+      `/projects/${projectId}/schema-comparison`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          leftDatasetVersionId: day1,
+          rightDatasetVersionId: day2,
+          leftVariables: day1Profile.payload.profile.variables.map((variable) => ({
+            variableName: variable.variableName,
+            label: variable.label,
+            dataType: variable.dataType,
+            responseChoices: variable.responseChoices
+          })),
+          rightVariables: day2Profile.payload.profile.variables.map((variable) => ({
+            variableName: variable.variableName,
+            label: variable.label,
+            dataType: variable.dataType,
+            responseChoices: variable.responseChoices
+          }))
+        })
+      },
+      [200]
+    );
+    if (!schemaComparison.payload.comparison) {
+      throw new Error("Schema comparison did not return a comparison object.");
+    }
+    console.log("PASS form-version schema comparison");
+
     const appended = await request(
       `/projects/${projectId}/datasets/append`,
       {
