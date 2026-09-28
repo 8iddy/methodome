@@ -554,3 +554,55 @@ def harmonise_append(payload: dict[str, Any]) -> dict[str, Any]:
         "columnCount": len(target_variables),
         "columns": target_variables,
     }
+
+
+def profile_csv(csv_text: str) -> dict[str, Any]:
+    rows = _rows(csv_text)
+    columns = list(rows[0].keys())
+    variables: list[dict[str, Any]] = []
+
+    for column in columns:
+        observed = [str(row.get(column)).strip() for row in rows if not _missing(row.get(column))]
+        unique = sorted(set(observed))
+        numeric = True
+        numeric_values: list[float] = []
+        for value in observed:
+            try:
+                numeric_values.append(float(value))
+            except ValueError:
+                numeric = False
+                break
+
+        if numeric and observed:
+            all_binary = set(numeric_values).issubset({0.0, 1.0})
+            data_type = "binary" if all_binary else "continuous"
+        elif len(unique) == 2:
+            data_type = "binary"
+        elif len(unique) <= 20:
+            data_type = "categorical_nominal"
+        else:
+            data_type = "text"
+
+        variable: dict[str, Any] = {
+            "variableName": column,
+            "label": column,
+            "dataType": data_type,
+            "missingCount": len(rows) - len(observed),
+            "uniqueCount": len(unique),
+        }
+        if not numeric and len(unique) <= 20:
+            variable["responseChoices"] = [
+                {"value": value, "label": value} for value in unique
+            ]
+        if numeric_values and numeric:
+            variable["range"] = {
+                "min": float(min(numeric_values)),
+                "max": float(max(numeric_values)),
+            }
+        variables.append(variable)
+
+    return {
+        "rowCount": len(rows),
+        "columnCount": len(columns),
+        "variables": variables,
+    }
