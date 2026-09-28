@@ -1005,3 +1005,53 @@ export async function deleteApplicationAndAuthUser(
     db.prepare("DELETE FROM auth_user WHERE id = ?").bind(userId)
   ]);
 }
+
+export async function listProjectFiles(
+  db: D1Database,
+  projectId: string,
+  fileKind?: string
+): Promise<Array<{
+  id: string;
+  projectId: string;
+  fileKind: string;
+  filename: string;
+  mediaType?: string;
+  checksumSha256: string;
+  sizeBytes?: number;
+  createdBy: string;
+  createdAt: string;
+}>> {
+  const statement = fileKind
+    ? db
+        .prepare(
+          `SELECT id, project_id, file_kind, filename, media_type,
+                  checksum_sha256, size_bytes, created_by, created_at
+           FROM files
+           WHERE project_id = ? AND file_kind = ?
+           ORDER BY created_at DESC`
+        )
+        .bind(projectId, fileKind)
+    : db
+        .prepare(
+          `SELECT id, project_id, file_kind, filename, media_type,
+                  checksum_sha256, size_bytes, created_by, created_at
+           FROM files
+           WHERE project_id = ?
+           ORDER BY created_at DESC`
+        )
+        .bind(projectId);
+
+  const result = await statement.all<Record<string, unknown>>();
+
+  return result.results.map((row) => ({
+    id: String(row.id),
+    projectId: String(row.project_id),
+    fileKind: String(row.file_kind),
+    filename: String(row.filename),
+    ...(row.media_type ? { mediaType: String(row.media_type) } : {}),
+    checksumSha256: String(row.checksum_sha256),
+    ...(row.size_bytes != null ? { sizeBytes: Number(row.size_bytes) } : {}),
+    createdBy: String(row.created_by),
+    createdAt: String(row.created_at)
+  }));
+}
