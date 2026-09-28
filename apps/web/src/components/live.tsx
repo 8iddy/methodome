@@ -1525,9 +1525,25 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
   useEffect(() => {
     Promise.all([
       getStudySpecification(projectId),
-      getProtocolExtraction(projectId)
+      getProtocolExtraction(projectId),
+      getProjectFiles(projectId)
     ])
-      .then(([specification, extraction]) => {
+      .then(async ([specification, extraction, files]) => {
+        let activeExtraction = extraction;
+
+        if (!specification && !activeExtraction) {
+          const latestProtocol = files.find((item) => item.fileKind === "protocol");
+          if (latestProtocol) {
+            setStatus("Extracting study information from the protocol…");
+            try {
+              activeExtraction = await extractProtocol(projectId, latestProtocol.id);
+              setStatus("Study information extracted. Review it before confirming.");
+            } catch (err) {
+              setStatus(message(err));
+            }
+          }
+        }
+
         if (specification) {
           setQuestions(
             specification.researchQuestions.map((question) => ({
@@ -1556,10 +1572,10 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
           return;
         }
 
-        if (extraction) {
+        if (activeExtraction) {
           setQuestions(
-            extraction.researchQuestions.length
-              ? extraction.researchQuestions.map((question, index) => ({
+            activeExtraction.researchQuestions.length
+              ? activeExtraction.researchQuestions.map((question, index) => ({
                   id: `rq${index + 1}`,
                   text: question.text,
                   objectiveType: question.objectiveType,
@@ -1570,18 +1586,18 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
                 }))
               : [emptyQuestion()]
           );
-          setDesign(extraction.studyDesign ?? "other");
-          setUnit(extraction.unitOfAnalysis ?? "");
-          setRepeatedMeasures(extraction.repeatedMeasures ?? false);
-          setClustered(extraction.clustered ?? false);
-          setClusterVariable(extraction.clusterConcept ?? "");
-          setSurveyWeights(extraction.surveyWeights ?? false);
-          setWeightVariable(extraction.weightConcept ?? "");
-          setStratified(extraction.stratified ?? false);
-          setStrataVariable(extraction.strataConcept ?? "");
-          setSamplingDesign(extraction.samplingDesign ?? "");
-          setMissingDataPlan(extraction.missingDataPlan ?? "");
-          setStatedAnalysisPlan(extraction.statedAnalysisPlan ?? "");
+          setDesign(activeExtraction.studyDesign ?? "other");
+          setUnit(activeExtraction.unitOfAnalysis ?? "");
+          setRepeatedMeasures(activeExtraction.repeatedMeasures ?? false);
+          setClustered(activeExtraction.clustered ?? false);
+          setClusterVariable(activeExtraction.clusterConcept ?? "");
+          setSurveyWeights(activeExtraction.surveyWeights ?? false);
+          setWeightVariable(activeExtraction.weightConcept ?? "");
+          setStratified(activeExtraction.stratified ?? false);
+          setStrataVariable(activeExtraction.strataConcept ?? "");
+          setSamplingDesign(activeExtraction.samplingDesign ?? "");
+          setMissingDataPlan(activeExtraction.missingDataPlan ?? "");
+          setStatedAnalysisPlan(activeExtraction.statedAnalysisPlan ?? "");
           setSource("protocol");
         }
       })
