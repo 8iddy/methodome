@@ -156,6 +156,7 @@ export interface CandidateMethod {
   methodId: string;
   displayName: string;
   maturity: "validated" | "supported" | "experimental";
+  executable: boolean;
   rationale: string;
   requiredChecks: string[];
   decisionRequired?: string;
