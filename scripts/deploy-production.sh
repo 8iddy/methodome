@@ -68,11 +68,21 @@ echo "-- Deploy internal Python statistics Worker"
   "$UV_BIN" run --group dev pywrangler deploy --config wrangler.jsonc
 )
 
-echo "-- Verify analysis queue consumer"
-npx wrangler queues consumer worker list methodome-analysis --json
+echo "-- Remove legacy Python queue consumer if present"
+if npx wrangler queues consumer worker list methodome-analysis --json | grep -q '"script": "methodome-stats"'; then
+  npx wrangler queues consumer worker remove methodome-analysis methodome-stats
+fi
 
 echo "-- Deploy Methodome API Worker"
 npx wrangler deploy --config wrangler.jsonc
+
+echo "-- Verify analysis queue consumer"
+CONSUMERS_JSON="$(npx wrangler queues consumer worker list methodome-analysis --json)"
+echo "$CONSUMERS_JSON"
+echo "$CONSUMERS_JSON" | grep -q '"script": "methodome-api"' || {
+  echo "methodome-api is not registered as the analysis queue consumer."
+  exit 1
+}
 
 echo "-- Ensure Better Auth secret exists"
 if npx wrangler secret list --config wrangler.jsonc 2>/dev/null | grep -q "BETTER_AUTH_SECRET"; then
