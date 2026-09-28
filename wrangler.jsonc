@@ -18,6 +18,7 @@
     {
       "binding": "DB",
       "database_name": "methodome",
+      "database_id": "2a7e2a38-14fb-4fca-882b-8bac86d44536",
       "migrations_dir": "migrations"
     }
   ],
