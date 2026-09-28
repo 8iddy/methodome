@@ -30,6 +30,7 @@ import {
   createAnalysisJob,
   createDatasetVersion,
   createFileRecord,
+  createTransformationEvent,
   createProject,
   datasetBelongsToProject,
   finaliseFileChecksum,
@@ -38,6 +39,7 @@ import {
   getAnalysisResult,
   getAuditHeadHash,
   getCurrentStudySpecificationRecord,
+  getDatasetVersionRecord,
   getFileForDatasetRegistration,
   getFileRecord,
   getProject,
@@ -321,6 +323,190 @@ app.post("/projects/:projectId/datasets", async (c) => {
   return c.json({ datasetVersionId: datasetId }, 201);
 });
 
+
+const harmonisedAppendSchema = z.object({
+  sourceDatasetVersionIds: z.array(z.string().min(1)).min(2),
+  label: z.string().trim().min(1).max(300),
+  reason: z.string().trim().max(2000).optional(),
+  mappings: z.array(
+    z.object({
+      sourceDatasetVersionId: z.string().min(1),
+      sourceVariable: z.string().min(1),
+      targetVariable: z.string().min(1),
+      categoryMap: z.record(z.string(), z.string()).optional()
+    })
+  ).min(1)
+});
+
+app.post("/projects/:projectId/datasets/append", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  if (!c.env.FILES || c.env.STORAGE_MODE !== "r2") {
+    return c.json(
+      {
+        error: {
+          code: "OBJECT_STORAGE_NOT_CONFIGURED",
+          message: "R2 storage is required for dataset harmonisation."
+        }
+      },
+      503
+    );
+  }
+
+  const parsed = harmonisedAppendSchema.safeParse(
+    await c.req.json().catch(() => null)
+  );
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_HARMONISED_APPEND",
+          message: "Dataset append specification is invalid.",
+          details: parsed.error.flatten()
+        }
+      },
+      400
+    );
+  }
+
+  const sources = [];
+  for (const datasetVersionId of parsed.data.sourceDatasetVersionIds) {
+    const dataset = await getDatasetVersionRecord(
+      c.env.DB,
+      datasetVersionId,
+      projectId
+    );
+    if (!dataset) {
+      return c.json(
+        {
+          error: {
+            code: "DATASET_NOT_FOUND",
+            message: `Dataset version ${datasetVersionId} was not found in this project.`
+          }
+        },
+        404
+      );
+    }
+    const object = await c.env.FILES.get(dataset.objectKey);
+    if (!object) {
+      return c.json(
+        {
+          error: {
+            code: "DATASET_OBJECT_NOT_FOUND",
+            message: `Stored data for ${datasetVersionId} was not found.`
+          }
+        },
+        404
+      );
+    }
+    sources.push({
+      datasetVersionId,
+      csv: await object.text()
+    });
+  }
+
+  const response = await c.env.STATS.fetch(
+    new Request("https://methodome-stats.internal/harmonise/append", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sources,
+        mappings: parsed.data.mappings
+      })
+    })
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    return c.json(
+      {
+        error: {
+          code: "HARMONISATION_FAILED",
+          message: "Methodome could not create the harmonised dataset.",
+          details: detail
+        }
+      },
+      response.status >= 500 ? 502 : 400
+    );
+  }
+
+  const harmonised = (await response.json()) as {
+    csv: string;
+    rowCount: number;
+    columnCount: number;
+    columns: string[];
+  };
+
+  const datasetVersionId = makeId("dsv");
+  const filename = `${safeFilename(parsed.data.label)}.csv`;
+  const objectKey = `projects/${projectId}/derived/${datasetVersionId}/${filename}`;
+  const bytes = new TextEncoder().encode(harmonised.csv);
+  const buffer = bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength
+  ) as ArrayBuffer;
+  const checksum = await sha256BytesHex(buffer);
+
+  await c.env.FILES.put(objectKey, buffer, {
+    httpMetadata: { contentType: "text/csv; charset=utf-8" },
+    customMetadata: {
+      sha256: checksum,
+      transformation: "harmonised_append"
+    }
+  });
+
+  await createDatasetVersion(c.env.DB, {
+    id: datasetVersionId,
+    projectId,
+    label: parsed.data.label,
+    sourceKind: "derived",
+    objectKey,
+    checksumSha256: checksum,
+    rowCount: harmonised.rowCount,
+    columnCount: harmonised.columnCount,
+    createdBy: getUserId(c),
+    parentVersionIds: parsed.data.sourceDatasetVersionIds
+  });
+
+  await createTransformationEvent(c.env.DB, {
+    id: makeId("transform"),
+    projectId,
+    outputDatasetVersionId: datasetVersionId,
+    inputDatasetVersionIds: parsed.data.sourceDatasetVersionIds,
+    operation: "append",
+    specification: {
+      mappings: parsed.data.mappings,
+      columns: harmonised.columns
+    },
+    ...(parsed.data.reason ? { reason: parsed.data.reason } : {}),
+    createdBy: getUserId(c)
+  });
+
+  await addAudit(c, {
+    projectId,
+    action: "datasets_harmonised_and_appended",
+    objectType: "dataset_version",
+    objectId: datasetVersionId,
+    after: {
+      parentDatasetVersionIds: parsed.data.sourceDatasetVersionIds,
+      checksumSha256: checksum,
+      rowCount: harmonised.rowCount,
+      columnCount: harmonised.columnCount
+    }
+  });
+
+  return c.json(
+    {
+      datasetVersionId,
+      checksumSha256: checksum,
+      rowCount: harmonised.rowCount,
+      columnCount: harmonised.columnCount
+    },
+    201
+  );
+});
 
 const variableSchemaInput = z.object({
   variableName: z.string().min(1),
