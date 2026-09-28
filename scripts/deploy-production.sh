@@ -62,16 +62,16 @@ echo "-- Test Python statistics engine"
   "$UV_BIN" run --group dev pytest tests -q
 )
 
+echo "-- Remove legacy Python queue consumer if present"
+if npx wrangler queues consumer worker list methodome-analysis --json | grep -q '"script": "methodome-stats"'; then
+  npx wrangler queues consumer worker remove methodome-analysis methodome-stats
+fi
+
 echo "-- Deploy internal Python statistics Worker"
 (
   cd services/stats-worker
   "$UV_BIN" run --group dev pywrangler deploy --config wrangler.jsonc
 )
-
-echo "-- Remove legacy Python queue consumer if present"
-if npx wrangler queues consumer worker list methodome-analysis --json | grep -q '"script": "methodome-stats"'; then
-  npx wrangler queues consumer worker remove methodome-analysis methodome-stats
-fi
 
 echo "-- Deploy Methodome API Worker"
 npx wrangler deploy --config wrangler.jsonc
