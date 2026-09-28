@@ -1,4 +1,4 @@
 Methodome production deployment trigger
 
-Requested from integration after Cloudflare GitHub secrets were configured.
-Triggered at: 2026-09-28T17:16:00+03:00
+Retry after Python import-path fix and green integration CI.
+Triggered at: 2026-09-28T17:20:00+03:00
