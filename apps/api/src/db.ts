@@ -917,3 +917,52 @@ export async function listAnalysisHistory(
     ...(row.completed_at ? { completedAt: String(row.completed_at) } : {})
   }));
 }
+
+export async function createTransformationEvent(
+  db: D1Database,
+  input: {
+    id: string;
+    projectId: string;
+    outputDatasetVersionId: string;
+    inputDatasetVersionIds: string[];
+    operation: string;
+    specification: Record<string, unknown>;
+    reason?: string;
+    createdBy: string;
+  }
+): Promise<void> {
+  const now = new Date().toISOString();
+  const statements: D1PreparedStatement[] = [
+    db
+      .prepare(
+        `INSERT INTO transformation_events
+         (id, project_id, output_dataset_version_id, operation,
+          specification_json, reason, created_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        input.id,
+        input.projectId,
+        input.outputDatasetVersionId,
+        input.operation,
+        JSON.stringify(input.specification),
+        input.reason ?? null,
+        input.createdBy,
+        now
+      )
+  ];
+
+  for (const datasetVersionId of input.inputDatasetVersionIds) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO transformation_inputs
+           (transformation_event_id, dataset_version_id)
+           VALUES (?, ?)`
+        )
+        .bind(input.id, datasetVersionId)
+    );
+  }
+
+  await db.batch(statements);
+}
