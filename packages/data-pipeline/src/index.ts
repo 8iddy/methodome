@@ -65,3 +65,5 @@ export function containsNumeral(value: string): boolean {
 export function mayUseFuzzyCategoryMatching(a: string, b: string): boolean {
   return !containsNumeral(a) && !containsNumeral(b);
 }
+
+export * from "./normalisation";
