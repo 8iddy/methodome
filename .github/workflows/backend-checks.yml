@@ -34,3 +34,9 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Apply D1 migration locally
+        run: npm run d1:migrate:local
+
+      - name: Bundle Worker
+        run: npx wrangler deploy --dry-run --config wrangler.jsonc
