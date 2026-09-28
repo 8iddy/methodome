@@ -139,7 +139,7 @@ const extractionJsonSchema = {
   ]
 } as const;
 
-export const PROTOCOL_EXTRACTION_MODEL = "@cf/google/gemma-4-26b-a4b-it";
+export const PROTOCOL_EXTRACTION_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 export const PROTOCOL_EXTRACTION_PROMPT_VERSION = "protocol-extraction-v1";
 
 function modelText(result: unknown): string {
@@ -149,6 +149,7 @@ function modelText(result: unknown): string {
   }
   const record = result as Record<string, unknown>;
   if (typeof record.response === "string") return record.response;
+  if (record.response && typeof record.response === "object") return JSON.stringify(record.response);
   if (record.result && typeof record.result === "object") {
     const nested = record.result as Record<string, unknown>;
     if (typeof nested.response === "string") return nested.response;
@@ -244,11 +245,7 @@ export async function extractProtocolWithAi(
     temperature: 0,
     response_format: {
       type: "json_schema",
-      json_schema: {
-        name: "methodome_protocol_extraction",
-        strict: true,
-        schema: extractionJsonSchema
-      }
+      json_schema: extractionJsonSchema
     }
   });
 
