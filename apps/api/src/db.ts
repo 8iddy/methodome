@@ -788,6 +788,8 @@ export async function saveVariableMappings(
           created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
+           study_specification_id = excluded.study_specification_id,
+           research_concept = excluded.research_concept,
            dataset_variable = excluded.dataset_variable,
            mapping_status = excluded.mapping_status,
            evidence_json = excluded.evidence_json,
@@ -826,13 +828,20 @@ export async function listVariableMappings(
 }>> {
   const result = await db
     .prepare(
-      `SELECT id, research_concept, dataset_variable, mapping_status,
-              evidence_json, confirmed_by
-       FROM variable_mappings
-       WHERE project_id = ?
-       ORDER BY research_concept ASC`
+      `SELECT vm.id, vm.research_concept, vm.dataset_variable,
+              vm.mapping_status, vm.evidence_json, vm.confirmed_by
+       FROM variable_mappings vm
+       WHERE vm.project_id = ?
+         AND vm.study_specification_id = (
+           SELECT ss.id
+           FROM study_specifications ss
+           WHERE ss.project_id = ?
+           ORDER BY ss.created_at DESC, ss.rowid DESC
+           LIMIT 1
+         )
+       ORDER BY vm.research_concept ASC`
     )
-    .bind(projectId)
+    .bind(projectId, projectId)
     .all<Record<string, unknown>>();
 
   return result.results.map((row) => ({
