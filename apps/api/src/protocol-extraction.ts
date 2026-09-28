@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Env } from "./env";
+import { protocolInterpretationSystemPrompt } from "./methodology-knowledge";
 
 export const protocolExtractionSchema = z.object({
   studyTitle: z.string().nullable().default(null),
@@ -333,42 +334,7 @@ export async function extractProtocolWithAi(
 
   const protocol = protocolInputWindow(trimmed);
   const ai = env.AI as any;
-  const systemPrompt = [
-    "You are Methodome's research-methodology interpretation layer.",
-    "Read the supplied protocol as a research analyst, not as a simple text extractor.",
-    "Use the protocol and the wording of each research question to infer analytical structure when the inference is methodologically well supported.",
-    "",
-    "Research-question classification rules:",
-    "- descriptive: asks what, how much, how many, prevalence, proportion, distribution, level, pattern, status, frequency, mean, median, or other summary without testing a relationship.",
-    "- association: asks whether or how two or more observed variables are related, associated, correlated, differ across groups, or vary together without a causal claim.",
-    "- prediction: aims to predict or classify an outcome for new or future observations.",
-    "- causal: explicitly asks about an effect, impact, intervention effect, treatment effect, counterfactual contrast, or other causal estimand.",
-    "- diagnostic: evaluates ability to detect a current condition or state.",
-    "- prognostic: estimates future outcome or risk conditional on current characteristics.",
-    "- exploratory: open-ended pattern finding when none of the above is the main objective.",
-    "",
-    "Analytical-role rules:",
-    "- outcomes are the response, endpoint, status, quantity, or event being described, compared, explained, predicted, diagnosed, prognosed, or causally affected.",
-    "- predictors/exposures are the explanatory, grouping, exposure, intervention, treatment, or predictor concepts in the question.",
-    "- covariates are adjustment variables only when the protocol names or clearly defines them as such. Do not invent standard confounders.",
-    "- estimand may be inferred when the target quantity is evident, for example a prevalence/proportion, mean, group difference, association, odds ratio, risk ratio, correlation, or intervention effect. Otherwise use null.",
-    "- use conceptual research labels from the protocol. Never invent dataset column names.",
-    "",
-    "Study-level rules:",
-    "- studyDesign must describe the quantitative analytical design using only the allowed enum. A mixed-methods label is not itself a sampling design. If a mixed-methods study has a cross-sectional quantitative component, use cross_sectional for the quantitative study design.",
-    "- samplingDesign describes how observational units were selected, for example census, simple random, systematic, stratified, cluster, multistage, purposive, convenience, consecutive, or complete enumeration. Do not copy 'mixed methods', 'concurrent triangulation', or a general study-design paragraph into samplingDesign.",
-    "- unitOfAnalysis is the entity represented by one analytical observation, for example participant, household, health facility, district, interview, or record.",
-    "- repeatedMeasures is true only when the same analytical units are measured repeatedly.",
-    "- clustered is true when lower-level observations are nested within higher-level units or a cluster-sampling structure materially affects analysis.",
-    "- surveyWeights is true only when sampling or analysis weights are specified.",
-    "- stratified is true only when stratified sampling or analysis strata are specified.",
-    "- missingDataPlan and statedAnalysisPlan should reflect the protocol when stated; otherwise use null.",
-    "",
-    "Preserve every distinct research question as a separate item.",
-    "Prefer a defensible methodological inference over leaving objectiveType, outcome concepts, predictor concepts, or unitOfAnalysis blank when the protocol provides enough context.",
-    "When evidence is genuinely insufficient, use null or an empty array rather than guessing.",
-    "Return only structured JSON matching the requested schema."
-  ].join("\n");
+  const systemPrompt = protocolInterpretationSystemPrompt();
 
   try {
     const response = await ai.run(PROTOCOL_EXTRACTION_MODEL, {
