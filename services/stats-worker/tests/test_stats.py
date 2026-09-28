@@ -53,7 +53,14 @@ def test_logistic_regression_runs_and_returns_odds_ratios():
         }
     )
     assert result["n"] == 12
-    assert all("exponentiatedEstimate" in item for item in result["estimates"])
+    terms = {item["term"]: item for item in result["estimates"]}
+    assert math.isclose(terms["Intercept"]["estimate"], -8.49885246, rel_tol=1e-5, abs_tol=1e-5)
+    assert math.isclose(terms["x"]["estimate"], 13.07515764, rel_tol=1e-5, abs_tol=1e-5)
+    assert math.isclose(
+        terms["x"]["exponentiatedEstimate"],
+        476945.562,
+        rel_tol=1e-4,
+    )
 
 
 def test_chi_square_flags_expected_counts():
@@ -116,3 +123,22 @@ def test_harmonised_append_maps_form_versions():
     assert result["columnCount"] == 2
     assert "facility_level,stockout_status" in result["csv"]
     assert "HCIII,No" in result["csv"]
+
+
+def test_fisher_exact_known_table():
+    csv_text = (
+        "outcome,group\n"
+        "Yes,A\nYes,A\nYes,A\nNo,A\n"
+        "Yes,B\nNo,B\nNo,B\nNo,B\n"
+    )
+    result = run_analysis(
+        {
+            "methodId": "fisher_exact",
+            "csv": csv_text,
+            "outcome": "outcome",
+            "predictors": ["group"],
+        }
+    )
+    estimate = result["estimates"][0]
+    assert math.isclose(estimate["estimate"], 9.0, rel_tol=1e-12)
+    assert 0 <= estimate["pValue"] <= 1
