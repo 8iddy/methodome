@@ -413,3 +413,39 @@ export async function finaliseFileChecksum(
     .bind(checksumSha256, sizeBytes, fileId)
     .run();
 }
+
+export async function updateProjectPolicy(
+  db: D1Database,
+  projectId: string,
+  policy: ProjectProcessingPolicy
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE project_policies
+       SET data_class = ?,
+           contains_identifiable_data = ?,
+           ethics_approval_reference = ?,
+           allowed_processors_json = ?,
+           external_model_allowed = ?,
+           qualitative_text_external_allowed = ?,
+           row_level_quantitative_external_allowed = ?,
+           retention_rule = ?,
+           export_restrictions_json = ?,
+           updated_at = ?
+       WHERE project_id = ?`
+    )
+    .bind(
+      policy.dataClass,
+      policy.containsIdentifiableData ? 1 : 0,
+      policy.ethicsApprovalReference ?? null,
+      JSON.stringify(policy.allowedProcessors),
+      policy.externalModelAllowed ? 1 : 0,
+      policy.qualitativeTextExternalAllowed ? 1 : 0,
+      policy.rowLevelQuantitativeExternalAllowed ? 1 : 0,
+      policy.retentionRule ?? null,
+      JSON.stringify(policy.exportRestrictions),
+      new Date().toISOString(),
+      projectId
+    )
+    .run();
+}
