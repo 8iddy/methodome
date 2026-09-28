@@ -41,24 +41,26 @@ else
   echo "BETTER_AUTH_SECRET configured"
 fi
 
-echo "-- Verify Python tooling"
-if ! command -v uv >/dev/null; then
-  echo "uv is required to package the Cloudflare Python Worker."
-  echo "Install uv, then rerun this script: https://docs.astral.sh/uv/getting-started/installation/"
-  exit 2
+echo "-- Prepare Python deployment tooling"
+UV_BIN="$(command -v uv || true)"
+if [[ -z "$UV_BIN" ]]; then
+  DEPLOY_VENV="$ROOT/.methodome-deploy-venv"
+  python3 -m venv "$DEPLOY_VENV"
+  "$DEPLOY_VENV/bin/python" -m pip install --disable-pip-version-check --quiet uv
+  UV_BIN="$DEPLOY_VENV/bin/uv"
 fi
 
 echo "-- Test Python statistics engine"
 (
   cd services/stats-worker
-  uv sync --group dev
-  uv run --group dev pytest tests -q
+  "$UV_BIN" sync --group dev
+  "$UV_BIN" run --group dev pytest tests -q
 )
 
 echo "-- Deploy internal Python statistics Worker"
 (
   cd services/stats-worker
-  uv run --group dev pywrangler deploy --config wrangler.jsonc
+  "$UV_BIN" run --group dev pywrangler deploy --config wrangler.jsonc
 )
 
 echo "-- Deploy Methodome API Worker"
