@@ -15,3 +15,6 @@ dev = [
   "workers-runtime-sdk",
   "pytest"
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
