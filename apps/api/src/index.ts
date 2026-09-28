@@ -21,6 +21,7 @@ import type { Project } from "@methodome/domain";
 import type { ProjectProcessingPolicy } from "@methodome/policy-engine";
 import { compareDatasetSchemas } from "@methodome/schema-harmonisation";
 import { requireAuth } from "./auth";
+import { consumeAnalysisQueue } from "./analysis-worker";
 import { createAuth } from "./better-auth";
 import type { Env, Variables } from "./env";
 import { makeId } from "./id";
@@ -1576,5 +1577,6 @@ app.onError((error, c) => {
 });
 
 export default {
-  fetch: app.fetch
+  fetch: app.fetch,
+  queue: consumeAnalysisQueue
 } satisfies ExportedHandler<Env>;
