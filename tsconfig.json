@@ -57,7 +57,7 @@
     ]
   },
   "include": [
-    "apps/**/*.ts",
+    "apps/api/**/*.ts",
     "packages/**/*.ts",
     "services/**/*.ts",
     "tests/**/*.ts",
@@ -65,6 +65,7 @@
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "apps/web"
   ]
 }
