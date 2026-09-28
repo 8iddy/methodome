@@ -152,6 +152,28 @@ export interface StudySpecification {
   statedAnalysisPlan: string | null;
 }
 
+export interface DatasetVariableSchema {
+  sourceDatasetVersionId?: string;
+  variableName: string;
+  label?: string;
+  dataType: string;
+  responseChoices?: Array<{ value: string | number; label: string }>;
+}
+
+export interface SchemaComparison {
+  leftDatasetVersionId: string;
+  rightDatasetVersionId: string;
+  mappings: Array<{
+    left: DatasetVariableSchema;
+    right?: DatasetVariableSchema;
+    status: "direct_match" | "probable_match" | "uncertain" | "no_match";
+    evidence: string[];
+    requiresConfirmation: boolean;
+  }>;
+  leftOnly: DatasetVariableSchema[];
+  rightOnly: DatasetVariableSchema[];
+}
+
 export interface CandidateMethod {
   methodId: string;
   displayName: string;
@@ -401,7 +423,7 @@ export async function compareDatasetSchemas(
   }
 ) {
   return (
-    await request<{ comparison: unknown }>(
+    await request<{ comparison: SchemaComparison }>(
       `/projects/${projectId}/schema-comparison`,
       { method: "POST", body: JSON.stringify(input) }
     )
