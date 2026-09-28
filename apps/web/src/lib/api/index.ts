@@ -164,6 +164,59 @@ export interface StudySpecification {
   statedAnalysisPlan: string | null;
 }
 
+export interface ProtocolExtraction {
+  studyTitle: string | null;
+  objectives: string[];
+  hypotheses: string[];
+  researchQuestions: Array<{
+    text: string;
+    objectiveType:
+      | "descriptive"
+      | "association"
+      | "prediction"
+      | "causal"
+      | "diagnostic"
+      | "prognostic"
+      | "exploratory"
+      | null;
+    outcomes: string[];
+    predictors: string[];
+    covariates: string[];
+    estimand: string | null;
+  }>;
+  studyDesign: StudySpecification["studyDesign"] | null;
+  unitOfAnalysis: string | null;
+  population: string | null;
+  samplingDesign: string | null;
+  repeatedMeasures: boolean | null;
+  clustered: boolean | null;
+  clusterConcept: string | null;
+  surveyWeights: boolean | null;
+  weightConcept: string | null;
+  stratified: boolean | null;
+  strataConcept: string | null;
+  missingDataPlan: string | null;
+  statedAnalysisPlan: string | null;
+  provenance?: {
+    id: string;
+    protocolFileId: string;
+    protocolChecksum: string;
+    provider: string;
+    model: string;
+    promptVersion: string;
+    createdAt: string;
+  };
+}
+
+export interface VariableMapping {
+  id: string;
+  researchConcept: string;
+  datasetVariable?: string;
+  mappingStatus: "direct_match" | "probable_match" | "uncertain" | "no_match";
+  evidence: string[];
+  confirmedBy?: string;
+}
+
 export interface DatasetVariableSchema {
   sourceDatasetVersionId?: string;
   variableName: string;
@@ -401,6 +454,39 @@ export async function registerDataset(
   );
 }
 
+export async function getProtocolExtraction(projectId: string) {
+  return (
+    await request<{ extraction: ProtocolExtraction | null }>(
+      `/projects/${projectId}/protocol-extraction`
+    )
+  ).extraction;
+}
+
+export async function extractProtocol(projectId: string, fileId?: string) {
+  return (
+    await request<{ extraction: ProtocolExtraction }>(
+      `/projects/${projectId}/protocol-extraction`,
+      {
+        method: "POST",
+        body: JSON.stringify(fileId ? { fileId } : {})
+      }
+    )
+  ).extraction;
+}
+
+export async function getVariableMappingSuggestions(projectId: string) {
+  return request<{
+    datasetVersionId: string;
+    variables: DatasetProfile["variables"];
+    suggestions: Array<{
+      researchConcept: string;
+      datasetVariable?: string;
+      mappingStatus: "direct_match" | "probable_match" | "uncertain" | "no_match";
+      evidence: string[];
+    }>;
+  }>(`/projects/${projectId}/variable-mapping-suggestions`);
+}
+
 export async function getStudySpecification(projectId: string) {
   return (
     await request<{ specification: StudySpecification | null }>(
@@ -453,7 +539,7 @@ export async function compareDatasetSchemas(
 
 export async function getVariableMappings(projectId: string) {
   return (
-    await request<{ mappings: Array<Record<string, unknown>> }>(
+    await request<{ mappings: VariableMapping[] }>(
       `/projects/${projectId}/variable-mappings`
     )
   ).mappings;
