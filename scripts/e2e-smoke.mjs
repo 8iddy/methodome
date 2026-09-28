@@ -57,6 +57,43 @@ async function request(path, init = {}, expected = [200]) {
   return { status: response.status, payload };
 }
 
+async function uploadResearchFile(kind, filename, content, mediaType = "text/plain") {
+  const intent = await request(
+    `/projects/${projectId}/uploads`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        filename,
+        mediaType,
+        fileKind: kind,
+        sizeBytes: Buffer.byteLength(content)
+      })
+    },
+    [201]
+  );
+
+  const uploadPath = intent.payload.uploadPath;
+  const uploadUrl = uploadPath.startsWith("http")
+    ? uploadPath
+    : `${API.replace(/\/api$/, "")}${uploadPath}`;
+
+  const headers = new Headers({ "content-type": mediaType });
+  const cookie = cookieHeader();
+  if (cookie) headers.set("cookie", cookie);
+
+  const response = await fetch(uploadUrl, {
+    method: "PUT",
+    headers,
+    body: content
+  });
+  updateCookies(response.headers);
+  if (!response.ok) {
+    throw new Error(`Research file upload returned ${response.status}: ${await response.text()}`);
+  }
+
+  return intent.payload.fileId;
+}
+
 async function uploadDataset(label, filename, csv) {
   const intent = await request(
     `/projects/${projectId}/uploads`,
@@ -144,6 +181,24 @@ async function main() {
     );
     projectId = project.payload.project.id;
     console.log("PASS project creation");
+
+    await uploadResearchFile(
+      "protocol",
+      "smoke-protocol.txt",
+      "Objective: assess whether x is associated with y. Design: cross sectional."
+    );
+    await uploadResearchFile(
+      "instrument",
+      "smoke-instrument.csv",
+      "variable,question\nx,Predictor x\ny,Outcome y\n",
+      "text/csv"
+    );
+    const sourceFiles = await request(`/projects/${projectId}/files`, {}, [200]);
+    const sourceKinds = sourceFiles.payload.files.map((item) => item.fileKind);
+    if (!sourceKinds.includes("protocol") || !sourceKinds.includes("instrument")) {
+      throw new Error("Protocol or instrument file was not persisted.");
+    }
+    console.log("PASS protocol and instrument storage");
 
     const day1 = await uploadDataset(
       "Day 1 Form v1",
