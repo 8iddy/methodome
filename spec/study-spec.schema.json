@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://methodome.com/spec/study-spec.schema.json",
+  "title": "Methodome Study Specification",
+  "type": "object",
+  "required": ["version", "research_questions", "study_design", "unit_of_analysis"],
+  "properties": {
+    "version": {"type": "string"},
+    "research_questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text"],
+        "properties": {
+          "id": {"type": "string"},
+          "text": {"type": "string"},
+          "objective_type": {
+            "type": ["string", "null"],
+            "enum": ["descriptive", "association", "prediction", "causal", "diagnostic", "prognostic", "exploratory", null]
+          },
+          "outcomes": {"type": "array", "items": {"$ref": "#/$defs/variableConcept"}},
+          "predictors": {"type": "array", "items": {"$ref": "#/$defs/variableConcept"}},
+          "covariates": {"type": "array", "items": {"$ref": "#/$defs/variableConcept"}},
+          "estimand": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "study_design": {
+      "type": "string",
+      "enum": ["cross_sectional", "cohort", "case_control", "trial", "longitudinal", "time_series", "ecological", "other"]
+    },
+    "unit_of_analysis": {"type": "string"},
+    "repeated_measures": {"type": "boolean", "default": false},
+    "clustered": {"type": "boolean", "default": false},
+    "cluster_variable": {"type": ["string", "null"]},
+    "survey_weights": {"type": "boolean", "default": false},
+    "weight_variable": {"type": ["string", "null"]},
+    "stratified": {"type": "boolean", "default": false},
+    "strata_variable": {"type": ["string", "null"]},
+    "sampling_design": {"type": ["string", "null"]},
+    "missing_data_plan": {"type": ["string", "null"]},
+    "stated_analysis_plan": {"type": ["string", "null"]},
+    "source_references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source_id"],
+        "properties": {
+          "source_id": {"type": "string"},
+          "page": {"type": ["integer", "null"]},
+          "section": {"type": ["string", "null"]},
+          "quote": {"type": ["string", "null"]}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "variableConcept": {
+      "type": "object",
+      "required": ["concept"],
+      "properties": {
+        "concept": {"type": "string"},
+        "dataset_variable": {"type": ["string", "null"]},
+        "variable_type": {
+          "type": ["string", "null"],
+          "enum": ["binary", "categorical_nominal", "categorical_ordinal", "count", "continuous", "time_to_event", "date", "text", "unknown", null]
+        },
+        "mapping_status": {
+          "type": ["string", "null"],
+          "enum": ["direct_match", "probable_match", "uncertain", "no_match", null]
+        }
+      }
+    }
+  }
+}
