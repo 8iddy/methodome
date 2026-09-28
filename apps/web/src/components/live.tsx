@@ -75,13 +75,13 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
           setState("ready");
         } else {
           setState("blocked");
-          router.replace("/sign-in");
+          router.replace(`/sign-in?next=${encodeURIComponent(window.location.pathname)}`);
         }
       })
       .catch(() => {
         if (!active) return;
         setState("blocked");
-        router.replace("/sign-in");
+        router.replace(`/sign-in?next=${encodeURIComponent(window.location.pathname)}`);
       });
     return () => {
       active = false;
