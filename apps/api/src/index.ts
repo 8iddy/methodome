@@ -9,7 +9,7 @@ import {
 } from "@methodome/method-registry";
 import {
   hashAuditEvent,
-  sha256Hex,
+  sha256BytesHex,
   type AuditEventPayload
 } from "@methodome/provenance";
 import type { AnalysisJob } from "@methodome/analysis-contracts";
@@ -424,11 +424,7 @@ app.put("/files/:fileId/content", async (c) => {
     );
   }
 
-  const checksum = await sha256Hex(
-    Array.from(new Uint8Array(bytes))
-      .map((value) => String.fromCharCode(value))
-      .join("")
-  );
+  const checksum = await sha256BytesHex(bytes);
 
   await c.env.FILES.put(record.objectKey, bytes, {
     httpMetadata: {
