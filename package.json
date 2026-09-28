@@ -16,7 +16,10 @@
     "dev:api": "wrangler dev --config wrangler.jsonc",
     "deploy:api": "wrangler deploy --config wrangler.jsonc",
     "d1:migrate:local": "wrangler d1 migrations apply DB --local --config wrangler.jsonc",
-    "d1:migrate:remote": "wrangler d1 migrations apply DB --remote --config wrangler.jsonc"
+    "d1:migrate:remote": "wrangler d1 migrations apply DB --remote --config wrangler.jsonc",
+    "web:typecheck": "npm --workspace @methodome/web run typecheck",
+    "web:build": "npm --workspace @methodome/web run build",
+    "check:integration": "npm run typecheck && npm test && npm run d1:migrate:local && npx wrangler deploy --dry-run --config wrangler.jsonc && npm run web:typecheck && npm run web:build"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
