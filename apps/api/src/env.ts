@@ -2,6 +2,7 @@ export interface Env {
   DB: D1Database;
   FILES?: R2Bucket;
   ANALYSIS_QUEUE: Queue<AnalysisQueueMessage>;
+  STATS: Fetcher;
   APP_ENV: string;
   AUTH_MODE: string;
   BETTER_AUTH_SECRET?: string;
