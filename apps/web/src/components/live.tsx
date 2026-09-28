@@ -359,9 +359,10 @@ export function LiveProjectPage({
 function LiveProjectStage({ projectId }: { projectId: string }) {
   const [state, setState] = useState({
     protocol: false,
+    instruments: false,
     data: false,
-    cleaning: false,
     design: false,
+    mappings: false,
     plan: false,
     analysis: false
   });
@@ -372,27 +373,28 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
       getProjectFiles(projectId),
       getDatasets(projectId),
       getStudySpecification(projectId),
-      getAnalysisPlan(projectId)
+      getVariableMappings(projectId),
+      getAnalysisPlan(projectId),
+      getAnalysisHistory()
     ])
-      .then(async ([files, datasets, specification, plan]) => {
-        let analysis = false;
-        const jobId = localStorage.getItem(`methodome:last-job:${projectId}`);
-        if (jobId) {
-          try {
-            const job = await getAnalysisJob(jobId);
-            analysis = job.state === "complete";
-          } catch {
-            analysis = false;
-          }
-        }
+      .then(([files, datasets, specification, mappings, plan, history]) => {
         if (!active) return;
         setState({
           protocol: files.some((file) => file.fileKind === "protocol"),
+          instruments: files.some(
+            (file) => file.fileKind === "instrument" || file.fileKind === "codebook"
+          ),
           data: datasets.length > 0,
-          cleaning: datasets.some((dataset) => dataset.sourceKind === "derived"),
           design: Boolean(specification),
+          mappings:
+            mappings.length > 0 &&
+            mappings.every((mapping) => Boolean(mapping.confirmedBy)),
           plan: Boolean(plan?.lockedAt),
-          analysis
+          analysis: history.some(
+            (item) =>
+              String(item.projectId ?? "") === projectId &&
+              String(item.state ?? "") === "complete"
+          )
         });
       })
       .catch(() => undefined);
@@ -404,9 +406,10 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
 
   const stages = [
     ["Protocol", state.protocol],
+    ["Instruments", state.instruments],
     ["Data", state.data],
-    ["Preparation", state.cleaning],
     ["Design", state.design],
+    ["Mappings", state.mappings],
     ["Plan", state.plan],
     ["Analysis", state.analysis]
   ] as const;
@@ -428,25 +431,112 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
 }
 
 function LiveWorkflowGuide({ projectId }: { projectId: string }) {
-  const [next, setNext] = useState({ label: "Loading project guidance", detail: "Checking the research records in this project.", href: "" });
+  const [next, setNext] = useState({
+    label: "Loading project guidance",
+    detail: "Checking the research records in this project.",
+    href: ""
+  });
 
   useEffect(() => {
-    Promise.all([getProjectFiles(projectId), getDatasets(projectId), getStudySpecification(projectId), getVariableMappings(projectId), getAnalysisPlan(projectId)])
-      .then(([files, datasets, specification, mappings, plan]) => {
+    Promise.all([
+      getProjectFiles(projectId),
+      getDatasets(projectId),
+      getStudySpecification(projectId),
+      getVariableMappings(projectId),
+      getAnalysisPlan(projectId),
+      getAnalysisHistory()
+    ])
+      .then(([files, datasets, specification, mappings, plan, history]) => {
         const base = `/app/projects/${projectId}`;
-        if (!files.some((file) => file.fileKind === "protocol")) return setNext({ label: "Add a protocol", detail: "Upload a protocol so Methodome can keep the study rationale with this project.", href: `${base}/protocol` });
-        if (!files.some((file) => file.fileKind === "instrument" || file.fileKind === "codebook")) return setNext({ label: "Add an instrument or codebook", detail: "Instrument context helps a researcher review later mappings.", href: `${base}/instruments` });
-        if (datasets.length === 0) return setNext({ label: "Upload a dataset", detail: "Upload a CSV dataset before Methodome can profile variables or map study concepts.", href: `${base}/data` });
-        if (!specification) return setNext({ label: "Review study design", detail: "Confirm research questions and study-level design before mapping them to data fields.", href: `${base}/study-design` });
-        if (mappings.length === 0 || mappings.some((mapping) => !mapping.confirmedBy)) return setNext({ label: "Review variable mappings", detail: "Confirm evidence-backed links between research concepts and dataset variables.", href: `${base}/variables` });
-        if (!plan) return setNext({ label: "Build an analysis plan", detail: "Review deterministic method candidates for each confirmed research question.", href: `${base}/analysis-plan` });
-        if (!plan.lockedAt) return setNext({ label: "Approve and lock the plan", detail: "Locking records a timestamp and SHA-256 hash before analysis.", href: `${base}/analysis-plan` });
-        return setNext({ label: "Run analysis", detail: "The approved plan is ready for deterministic execution.", href: `${base}/analysis` });
+        if (!files.some((file) => file.fileKind === "protocol")) {
+          return setNext({
+            label: "Add a protocol",
+            detail: "Upload the research protocol so Methodome can extract and retain the study logic.",
+            href: `${base}/protocol`
+          });
+        }
+        if (!files.some((file) => file.fileKind === "instrument" || file.fileKind === "codebook")) {
+          return setNext({
+            label: "Add an instrument or codebook",
+            detail: "Question text and codebook metadata improve later variable mapping.",
+            href: `${base}/instruments`
+          });
+        }
+        if (datasets.length === 0) {
+          return setNext({
+            label: "Upload a dataset",
+            detail: "Upload a CSV dataset before Methodome can profile variables or map study concepts.",
+            href: `${base}/data`
+          });
+        }
+        if (!specification) {
+          return setNext({
+            label: "Review extracted study information",
+            detail: "Confirm the research questions and study design extracted from the protocol.",
+            href: `${base}/study-design`
+          });
+        }
+        if (
+          mappings.length === 0 ||
+          mappings.some((mapping) => !mapping.confirmedBy)
+        ) {
+          return setNext({
+            label: "Review variable mappings",
+            detail: "Confirm evidence-backed links between research concepts and dataset variables.",
+            href: `${base}/variables`
+          });
+        }
+        if (!plan) {
+          return setNext({
+            label: "Build an analysis plan",
+            detail: "Review deterministic method candidates for each research question that is ready.",
+            href: `${base}/analysis-plan`
+          });
+        }
+        if (!plan.lockedAt) {
+          return setNext({
+            label: "Approve and lock the plan",
+            detail: "Locking records the plan and its SHA-256 hash before planned analysis.",
+            href: `${base}/analysis-plan`
+          });
+        }
+
+        const complete = history.some(
+          (item) =>
+            String(item.projectId ?? "") === projectId &&
+            String(item.state ?? "") === "complete"
+        );
+        if (!complete) {
+          return setNext({
+            label: "Run approved analyses",
+            detail: "The locked plan is ready for deterministic statistical execution.",
+            href: `${base}/analysis`
+          });
+        }
+
+        return setNext({
+          label: "Review results",
+          detail: "At least one analysis is complete. Review estimates, diagnostics and execution details.",
+          href: `${base}/results`
+        });
       })
-      .catch(() => setNext({ label: "Review project records", detail: "Methodome could not determine the next step. Review the available project records.", href: `/app/projects/${projectId}/overview` }));
+      .catch(() =>
+        setNext({
+          label: "Review project records",
+          detail: "Methodome could not determine the next step. Review the available project records.",
+          href: `/app/projects/${projectId}/overview`
+        })
+      );
   }, [projectId]);
 
-  return <section className="panel workflow-guide"><p className="eyebrow">NEXT RECOMMENDED ACTION</p><h2>{next.label}</h2><p>{next.detail}</p>{next.href && <Button href={next.href}>Continue</Button>}</section>;
+  return (
+    <section className="panel workflow-guide">
+      <p className="eyebrow">NEXT RECOMMENDED ACTION</p>
+      <h2>{next.label}</h2>
+      <p>{next.detail}</p>
+      {next.href && <Button href={next.href}>Continue</Button>}
+    </section>
+  );
 }
 
 function LiveOverview({
