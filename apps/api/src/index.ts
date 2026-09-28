@@ -1598,29 +1598,44 @@ app.post("/projects/:projectId/analysis-plan", async (c) => {
       resolvedForPlan.specification,
       analysis.researchQuestionId
     );
-    const allowed = new Set(
-      selection.candidates.map((candidate) => candidate.methodId)
-    );
-
-    if (
-      analysis.selectedMethodId &&
-      !allowed.has(analysis.selectedMethodId) &&
-      analysis.warnings.length === 0
-    ) {
-      return c.json(
-        {
-          error: {
-            code: "ANALYSIS_PLAN_METHOD_OUTSIDE_CANDIDATES",
-            message:
-              "A selected method falls outside the current deterministic candidate set. Record the methodological warning before saving the plan.",
-            details: {
-              researchQuestionId: analysis.researchQuestionId,
-              methodId: analysis.selectedMethodId
-            }
-          }
-        },
-        409
+    if (analysis.selectedMethodId) {
+      const selectedCandidate = selection.candidates.find(
+        (candidate) => candidate.methodId === analysis.selectedMethodId
       );
+
+      if (!selectedCandidate) {
+        return c.json(
+          {
+            error: {
+              code: "ANALYSIS_PLAN_METHOD_OUTSIDE_CANDIDATES",
+              message:
+                "A selected method falls outside the current deterministic candidate set.",
+              details: {
+                researchQuestionId: analysis.researchQuestionId,
+                methodId: analysis.selectedMethodId
+              }
+            }
+          },
+          409
+        );
+      }
+
+      if (!selectedCandidate.executable) {
+        return c.json(
+          {
+            error: {
+              code: "ANALYSIS_PLAN_METHOD_NOT_EXECUTABLE",
+              message:
+                "The selected method is a candidate but is not executable in the current statistical runner.",
+              details: {
+                researchQuestionId: analysis.researchQuestionId,
+                methodId: analysis.selectedMethodId
+              }
+            }
+          },
+          409
+        );
+      }
     }
   }
 
