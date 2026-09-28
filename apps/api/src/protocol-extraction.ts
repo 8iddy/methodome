@@ -292,6 +292,79 @@ function validateProtocolExtraction(payload: unknown): ProtocolExtraction {
   return enrichProtocolExtraction(parsed);
 }
 
+async function refineResearchQuestionsWithAi(
+  env: Env,
+  protocol: string,
+  extraction: ProtocolExtraction
+): Promise<ProtocolExtraction> {
+  const needsFocusedReview =
+    extraction.researchQuestions.length > 1 ||
+    extraction.researchQuestions.some(
+      (question) => !question.objectiveType || question.outcomes.length === 0
+    );
+
+  if (!needsFocusedReview || !env.AI) return extraction;
+
+  const ai = env.AI as any;
+  try {
+    const response = await ai.run(PROTOCOL_EXTRACTION_MODEL, {
+      messages: [
+        {
+          role: "system",
+          content: [
+            "Review research questions as an experienced research methodologist.",
+            "Treat each research question independently so concepts from one question do not leak into another.",
+            "Preserve the exact question text and question order.",
+            "For each question, classify objectiveType and identify only the outcomes, predictors/exposures and covariates that belong to that question.",
+            "Outcome concepts must directly correspond to what that question is trying to describe, compare, explain, predict, diagnose, prognose or causally affect.",
+            "Do not copy an outcome from a different research question.",
+            "Use protocol terminology and conceptual labels, never dataset column names.",
+            "Infer an estimand only when the target quantity is methodologically defensible from the question and protocol.",
+            "Return one JSON object with a researchQuestions array and no prose."
+          ].join("\n")
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            protocol: protocol.slice(0, 50000),
+            currentInterpretation: extraction.researchQuestions
+          })
+        }
+      ],
+      temperature: 0,
+      max_tokens: 2600,
+      response_format: { type: "json_object" }
+    });
+
+    const parsed = parseModelJson(modelPayload(response));
+    const refined = z
+      .object({
+        researchQuestions: protocolExtractionSchema.shape.researchQuestions
+      })
+      .safeParse(parsed);
+
+    if (!refined.success) return extraction;
+    if (
+      refined.data.researchQuestions.length !==
+      extraction.researchQuestions.length
+    ) {
+      return extraction;
+    }
+
+    return enrichProtocolExtraction({
+      ...extraction,
+      researchQuestions: refined.data.researchQuestions.map(
+        (question, index) => ({
+          ...question,
+          text: extraction.researchQuestions[index]?.text ?? question.text
+        })
+      )
+    });
+  } catch {
+    return extraction;
+  }
+}
+
 export async function researchFileToText(input: {
   env: Env;
   filename: string;
@@ -373,7 +446,8 @@ export async function extractProtocolWithAi(
       }
     });
 
-    return validateProtocolExtraction(modelPayload(response));
+    const extraction = validateProtocolExtraction(modelPayload(response));
+    return refineResearchQuestionsWithAi(env, protocol, extraction);
   } catch (firstError) {
     const retry = await ai.run(PROTOCOL_EXTRACTION_MODEL, {
       messages: [
@@ -396,7 +470,8 @@ export async function extractProtocolWithAi(
     });
 
     try {
-      return validateProtocolExtraction(modelPayload(retry));
+      const extraction = validateProtocolExtraction(modelPayload(retry));
+      return refineResearchQuestionsWithAi(env, protocol, extraction);
     } catch {
       const reason =
         firstError instanceof Error ? firstError.message : "structured extraction failed";
