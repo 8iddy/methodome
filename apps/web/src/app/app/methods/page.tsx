@@ -1,2 +1,5 @@
-import { MethodsCatalogue } from "@/components/public";
-export default function Page() { return <MethodsCatalogue />; }
+import { LiveMethodsPage } from "@/components/live";
+
+export default function Page() {
+  return <LiveMethodsPage />;
+}
