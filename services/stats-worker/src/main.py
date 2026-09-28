@@ -5,7 +5,6 @@ from urllib.parse import urlparse
 
 from workers import Response, WorkerEntrypoint
 
-from queue_worker import PermanentAnalysisError, mark_failed, process_analysis_message
 from stats import harmonise_append, profile_csv, run_analysis
 
 
@@ -66,30 +65,3 @@ class Default(WorkerEntrypoint):
                 {"detail": "Statistical execution failed."},
                 status=500,
             )
-
-    async def queue(self, batch):
-        for message in batch.messages:
-            try:
-                await process_analysis_message(message.body, self.env)
-                message.ack()
-            except PermanentAnalysisError as exc:
-                await mark_failed(message.body, self.env, str(exc))
-                message.ack()
-            except Exception as exc:
-                attempts = int(getattr(message, "attempts", 1) or 1)
-                print(
-                    "Transient analysis queue failure "
-                    f"on attempt {attempts}: {exc}"
-                )
-                if attempts >= 3:
-                    await mark_failed(
-                        message.body,
-                        self.env,
-                        (
-                            "Analysis execution failed after "
-                            f"{attempts} attempts: {exc}"
-                        ),
-                    )
-                    message.ack()
-                else:
-                    message.retry()
