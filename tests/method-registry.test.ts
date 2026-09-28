@@ -48,6 +48,16 @@ describe("deterministic method registry", () => {
     expect(selection.candidates.every((item) => item.decisionRequired)).toBe(true);
   });
 
+  it("keeps qualitative questions out of the quantitative method pipeline", () => {
+    const study = clusteredBinaryStudy();
+    study.researchQuestions[0]!.objectiveType = "qualitative";
+
+    const selection = selectCandidateMethods(study, "rq1");
+
+    expect(selection.candidates).toHaveLength(0);
+    expect(selection.blockedReason).toContain("quantitative");
+  });
+
   it("blocks causal automatic selection in the initial boundary", () => {
     const study = clusteredBinaryStudy();
     study.researchQuestions[0]!.objectiveType = "causal";
