@@ -522,6 +522,7 @@ export async function suggestMappingsWithAi(input: {
     responseChoices?: Array<{ value: string | number; label: string }>;
   }>;
   instrumentText?: string;
+  allowModelAssist?: boolean;
 }): Promise<MappingSuggestion[]> {
   const uniqueConcepts = Array.from(
     new Set(input.concepts.map((item) => item.trim()).filter(Boolean))
@@ -559,19 +560,25 @@ export async function suggestMappingsWithAi(input: {
 
   if (unresolved.length === 0) return output;
 
-  if (!input.env.AI) {
+  if (input.allowModelAssist === false || !input.env.AI) {
     output.push(
       ...unresolved.map((researchConcept) => ({
         researchConcept,
         mappingStatus: "no_match" as const,
-        evidence: ["Workers AI is not configured for semantic mapping."]
+        evidence: [
+          input.allowModelAssist === false
+            ? "Model-assisted mapping is unavailable under the current project processing policy. Review the profiled dataset variables manually."
+            : "Workers AI is unavailable for semantic mapping. Review the profiled dataset variables manually."
+        ]
       }))
     );
     return output;
   }
 
   const ai = input.env.AI as any;
-  const response = await ai.run(PROTOCOL_EXTRACTION_MODEL, {
+  let response: unknown;
+  try {
+    response = await ai.run(PROTOCOL_EXTRACTION_MODEL, {
     messages: [
       {
         role: "system",
@@ -589,10 +596,22 @@ export async function suggestMappingsWithAi(input: {
     ],
     temperature: 0,
     max_tokens: 2048,
-    response_format: {
-      type: "json_object"
-    }
-  });
+      response_format: {
+        type: "json_object"
+      }
+    });
+  } catch {
+    output.push(
+      ...unresolved.map((researchConcept) => ({
+        researchConcept,
+        mappingStatus: "no_match" as const,
+        evidence: [
+          "Automatic semantic mapping could not be completed. The dataset profile is still available for manual mapping review."
+        ]
+      }))
+    );
+    return output;
+  }
 
   let parsed: unknown;
   try {

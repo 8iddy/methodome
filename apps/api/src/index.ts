@@ -1223,6 +1223,9 @@ app.get("/projects/:projectId/variable-mapping-suggestions", async (c) => {
   }
 
   const policy = await getProjectPolicy(c.env.DB, projectId);
+  let modelAssistAllowed = true;
+  let modelAssistReason: string | undefined;
+
   if (policy) {
     try {
       assertModelRequestAllowed(policy, {
@@ -1232,18 +1235,11 @@ app.get("/projects/:projectId/variable-mapping-suggestions", async (c) => {
         containsIdentifiers: policy.containsIdentifiableData
       });
     } catch (error) {
-      return c.json(
-        {
-          error: {
-            code: "MODEL_PROCESSING_BLOCKED",
-            message:
-              error instanceof Error
-                ? error.message
-                : "Project processing policy blocks model-assisted variable mapping."
-          }
-        },
-        409
-      );
+      modelAssistAllowed = false;
+      modelAssistReason =
+        error instanceof Error
+          ? error.message
+          : "Project processing policy blocks model-assisted variable mapping.";
     }
   }
 
@@ -1258,13 +1254,21 @@ app.get("/projects/:projectId/variable-mapping-suggestions", async (c) => {
         ? { responseChoices: variable.responseChoices }
         : {})
     })),
-    ...(instrumentText ? { instrumentText } : {})
+    ...(instrumentText ? { instrumentText } : {}),
+    allowModelAssist: modelAssistAllowed
   });
 
   return c.json({
     datasetVersionId: preferred.id,
     variables: profile.variables,
-    suggestions
+    suggestions,
+    modelAssistance: modelAssistAllowed
+      ? { status: "available" as const }
+      : {
+          status: "blocked" as const,
+          reason: modelAssistReason ??
+            "Model-assisted mapping is unavailable for this project."
+        }
   });
 });
 
