@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://methodome.com/spec/project-policy.schema.json",
+  "title": "Methodome Project Processing Policy",
+  "type": "object",
+  "required": ["data_class", "contains_identifiable_data", "external_model_allowed"],
+  "properties": {
+    "data_class": {
+      "type": "string",
+      "enum": ["public", "restricted", "identifiable"]
+    },
+    "contains_identifiable_data": {"type": "boolean"},
+    "ethics_approval_reference": {"type": ["string", "null"]},
+    "allowed_processors": {"type": "array", "items": {"type": "string"}},
+    "external_model_allowed": {"type": "boolean"},
+    "qualitative_text_external_allowed": {"type": "boolean", "default": false},
+    "row_level_quantitative_external_allowed": {"type": "boolean", "default": false},
+    "retention_rule": {"type": ["string", "null"]},
+    "export_restrictions": {"type": "array", "items": {"type": "string"}},
+    "institution_notes": {"type": ["string", "null"]}
+  }
+}
