@@ -46,6 +46,9 @@
       ],
       "@methodome/analysis-plan": [
         "packages/analysis-plan/src/index.ts"
+      ],
+      "@methodome/schema-harmonisation": [
+        "packages/schema-harmonisation/src/index.ts"
       ]
     },
     "types": [
