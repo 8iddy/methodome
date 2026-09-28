@@ -23,7 +23,7 @@ function WorkflowStrip() {
         </div>
         <Button href="/how-it-works" variant="secondary">See how it works</Button>
       </div>
-      <div>
+      <div className="workflow-steps">
         {labels.map((label, index) => (
           <span key={label}>
             <b>{String(index + 1).padStart(2, "0")}</b>
