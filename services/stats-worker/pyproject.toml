@@ -1,0 +1,17 @@
+[project]
+name = "methodome-stats"
+version = "0.1.0"
+description = "Methodome deterministic statistical execution worker"
+requires-python = ">=3.13"
+dependencies = [
+  "fastapi",
+  "numpy",
+  "scipy"
+]
+
+[dependency-groups]
+dev = [
+  "workers-py",
+  "workers-runtime-sdk",
+  "pytest"
+]
