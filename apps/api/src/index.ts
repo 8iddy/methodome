@@ -21,6 +21,7 @@ import { makeId } from "./id";
 import {
   appendAuditEvent,
   createAnalysisJob,
+  createDatasetVersion,
   createFileRecord,
   createProject,
   datasetBelongsToProject,
@@ -28,11 +29,13 @@ import {
   getAnalysisJob,
   getAnalysisResult,
   getAuditHeadHash,
+  getFileForDatasetRegistration,
   getFileRecord,
   getProject,
   getProjectPolicy,
   getStudySpecification,
   listAuditEvents,
+  listDatasetVersions,
   listProjects,
   saveStudySpecification,
   updateProjectPolicy
@@ -168,6 +171,104 @@ app.get("/projects/:projectId", async (c) => {
   const access = await requireProject(c, c.req.param("projectId"));
   if ("response" in access) return access.response;
   return c.json({ project: access.project });
+});
+
+
+const registerDatasetSchema = z.object({
+  fileId: z.string().min(1),
+  label: z.string().trim().min(1).max(300),
+  rowCount: z.number().int().nonnegative().optional(),
+  columnCount: z.number().int().nonnegative().optional()
+});
+
+app.get("/projects/:projectId/datasets", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  return c.json({
+    datasets: await listDatasetVersions(c.env.DB, projectId)
+  });
+});
+
+app.post("/projects/:projectId/datasets", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const parsed = registerDatasetSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_DATASET_REGISTRATION",
+          message: "Dataset registration is invalid.",
+          details: parsed.error.flatten()
+        }
+      },
+      400
+    );
+  }
+
+  const file = await getFileForDatasetRegistration(
+    c.env.DB,
+    parsed.data.fileId,
+    projectId
+  );
+
+  if (!file || file.fileKind !== "dataset") {
+    return c.json(
+      {
+        error: {
+          code: "DATASET_FILE_NOT_FOUND",
+          message: "The selected file is not a dataset upload for this project."
+        }
+      },
+      404
+    );
+  }
+
+  if (file.checksumSha256 === "pending") {
+    return c.json(
+      {
+        error: {
+          code: "DATASET_UPLOAD_INCOMPLETE",
+          message: "Finish uploading the dataset before registering it."
+        }
+      },
+      409
+    );
+  }
+
+  const datasetId = makeId("dsv");
+  await createDatasetVersion(c.env.DB, {
+    id: datasetId,
+    projectId,
+    label: parsed.data.label,
+    sourceKind: "original",
+    objectKey: file.objectKey,
+    checksumSha256: file.checksumSha256,
+    ...(parsed.data.rowCount != null ? { rowCount: parsed.data.rowCount } : {}),
+    ...(parsed.data.columnCount != null
+      ? { columnCount: parsed.data.columnCount }
+      : {}),
+    createdBy: getUserId(c),
+    parentVersionIds: []
+  });
+
+  await addAudit(c, {
+    projectId,
+    action: "dataset_registered",
+    objectType: "dataset_version",
+    objectId: datasetId,
+    after: {
+      label: parsed.data.label,
+      sourceFileId: file.id,
+      checksumSha256: file.checksumSha256
+    }
+  });
+
+  return c.json({ datasetVersionId: datasetId }, 201);
 });
 
 app.get("/projects/:projectId/study-specification", async (c) => {
