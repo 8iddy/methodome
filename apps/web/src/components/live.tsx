@@ -1164,100 +1164,405 @@ function LiveDataPreparation({ projectId }: { projectId: string }) {
 }
 
 function LiveStudyDesign({ projectId }: { projectId: string }) {
-  const [question, setQuestion] = useState("");
-  const [outcome, setOutcome] = useState("");
-  const [outcomeType, setOutcomeType] = useState<"binary" | "continuous" | "count">("binary");
-  const [predictor, setPredictor] = useState("");
-  const [predictorType, setPredictorType] = useState<"binary" | "categorical_nominal" | "continuous">("continuous");
+  type ObjectiveType = StudySpecification["researchQuestions"][number]["objectiveType"];
+  type QuestionDraft = {
+    id: string;
+    text: string;
+    objectiveType: ObjectiveType;
+    outcomes: string;
+    predictors: string;
+    covariates: string;
+    estimand: string;
+  };
+
+  const emptyQuestion = (): QuestionDraft => ({
+    id: `rq-${crypto.randomUUID()}`,
+    text: "",
+    objectiveType: null,
+    outcomes: "",
+    predictors: "",
+    covariates: "",
+    estimand: ""
+  });
+
+  const [questions, setQuestions] = useState<QuestionDraft[]>([emptyQuestion()]);
   const [design, setDesign] = useState<StudySpecification["studyDesign"]>("cross_sectional");
-  const [unit, setUnit] = useState("observation");
+  const [unit, setUnit] = useState("");
+  const [repeatedMeasures, setRepeatedMeasures] = useState(false);
   const [clustered, setClustered] = useState(false);
   const [clusterVariable, setClusterVariable] = useState("");
+  const [surveyWeights, setSurveyWeights] = useState(false);
+  const [weightVariable, setWeightVariable] = useState("");
+  const [stratified, setStratified] = useState(false);
+  const [strataVariable, setStrataVariable] = useState("");
+  const [samplingDesign, setSamplingDesign] = useState("");
+  const [missingDataPlan, setMissingDataPlan] = useState("");
+  const [statedAnalysisPlan, setStatedAnalysisPlan] = useState("");
+  const [source, setSource] = useState<"saved" | "protocol" | "manual">("manual");
   const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  function concepts(value: string): string[] {
+    return value
+      .split(/[,\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
 
   useEffect(() => {
-    getStudySpecification(projectId).then((spec) => {
-      if (!spec) return;
-      const rq = spec.researchQuestions[0];
-      setQuestion(rq?.text ?? "");
-      setOutcome(rq?.outcomes[0]?.datasetVariable ?? "");
-      if (rq?.outcomes[0]?.variableType === "continuous" || rq?.outcomes[0]?.variableType === "count" || rq?.outcomes[0]?.variableType === "binary") {
-        setOutcomeType(rq.outcomes[0].variableType);
-      }
-      setPredictor(rq?.predictors[0]?.datasetVariable ?? "");
-      if (rq?.predictors[0]?.variableType === "continuous" || rq?.predictors[0]?.variableType === "binary" || rq?.predictors[0]?.variableType === "categorical_nominal") {
-        setPredictorType(rq.predictors[0].variableType);
-      }
-      setDesign(spec.studyDesign);
-      setUnit(spec.unitOfAnalysis);
-      setClustered(spec.clustered);
-      setClusterVariable(spec.clusterVariable ?? "");
-    }).catch(() => undefined);
+    Promise.all([
+      getStudySpecification(projectId),
+      getProtocolExtraction(projectId)
+    ])
+      .then(([specification, extraction]) => {
+        if (specification) {
+          setQuestions(
+            specification.researchQuestions.map((question) => ({
+              id: question.id,
+              text: question.text,
+              objectiveType: question.objectiveType,
+              outcomes: question.outcomes.map((item) => item.concept).join(", "),
+              predictors: question.predictors.map((item) => item.concept).join(", "),
+              covariates: question.covariates.map((item) => item.concept).join(", "),
+              estimand: question.estimand ?? ""
+            }))
+          );
+          setDesign(specification.studyDesign);
+          setUnit(specification.unitOfAnalysis);
+          setRepeatedMeasures(specification.repeatedMeasures);
+          setClustered(specification.clustered);
+          setClusterVariable(specification.clusterVariable ?? "");
+          setSurveyWeights(specification.surveyWeights);
+          setWeightVariable(specification.weightVariable ?? "");
+          setStratified(specification.stratified);
+          setStrataVariable(specification.strataVariable ?? "");
+          setSamplingDesign(specification.samplingDesign ?? "");
+          setMissingDataPlan(specification.missingDataPlan ?? "");
+          setStatedAnalysisPlan(specification.statedAnalysisPlan ?? "");
+          setSource("saved");
+          return;
+        }
+
+        if (extraction) {
+          setQuestions(
+            extraction.researchQuestions.length
+              ? extraction.researchQuestions.map((question, index) => ({
+                  id: `rq${index + 1}`,
+                  text: question.text,
+                  objectiveType: question.objectiveType,
+                  outcomes: question.outcomes.join(", "),
+                  predictors: question.predictors.join(", "),
+                  covariates: question.covariates.join(", "),
+                  estimand: question.estimand ?? ""
+                }))
+              : [emptyQuestion()]
+          );
+          setDesign(extraction.studyDesign ?? "other");
+          setUnit(extraction.unitOfAnalysis ?? "");
+          setRepeatedMeasures(extraction.repeatedMeasures ?? false);
+          setClustered(extraction.clustered ?? false);
+          setClusterVariable(extraction.clusterConcept ?? "");
+          setSurveyWeights(extraction.surveyWeights ?? false);
+          setWeightVariable(extraction.weightConcept ?? "");
+          setStratified(extraction.stratified ?? false);
+          setStrataVariable(extraction.strataConcept ?? "");
+          setSamplingDesign(extraction.samplingDesign ?? "");
+          setMissingDataPlan(extraction.missingDataPlan ?? "");
+          setStatedAnalysisPlan(extraction.statedAnalysisPlan ?? "");
+          setSource("protocol");
+        }
+      })
+      .catch((err) => setStatus(message(err)));
   }, [projectId]);
 
+  function updateQuestion(index: number, patch: Partial<QuestionDraft>) {
+    setQuestions((current) =>
+      current.map((question, itemIndex) =>
+        itemIndex === index ? { ...question, ...patch } : question
+      )
+    );
+  }
+
   async function save() {
+    const validQuestions = questions.filter((question) => question.text.trim());
+    if (validQuestions.length === 0) {
+      setStatus("Add at least one research question.");
+      return;
+    }
+    if (!unit.trim()) {
+      setStatus("Confirm the unit of analysis before saving.");
+      return;
+    }
+
     const specification: StudySpecification = {
       version: `v-${Date.now()}`,
-      researchQuestions: [
-        {
-          id: "rq1",
-          text: question,
-          objectiveType: "association",
-          outcomes: [
-            {
-              concept: outcome || "Outcome",
-              datasetVariable: outcome,
-              variableType: outcomeType,
-              mappingStatus: "direct_match"
-            }
-          ],
-          predictors: [
-            {
-              concept: predictor || "Predictor",
-              datasetVariable: predictor,
-              variableType: predictorType,
-              mappingStatus: "direct_match"
-            }
-          ],
-          covariates: [],
-          estimand: null
-        }
-      ],
+      researchQuestions: validQuestions.map((question, index) => ({
+        id: question.id || `rq${index + 1}`,
+        text: question.text.trim(),
+        objectiveType: question.objectiveType,
+        outcomes: concepts(question.outcomes).map((concept) => ({
+          concept,
+          datasetVariable: null,
+          variableType: null,
+          mappingStatus: null
+        })),
+        predictors: concepts(question.predictors).map((concept) => ({
+          concept,
+          datasetVariable: null,
+          variableType: null,
+          mappingStatus: null
+        })),
+        covariates: concepts(question.covariates).map((concept) => ({
+          concept,
+          datasetVariable: null,
+          variableType: null,
+          mappingStatus: null
+        })),
+        estimand: question.estimand.trim() || null
+      })),
       studyDesign: design,
-      unitOfAnalysis: unit,
-      repeatedMeasures: false,
+      unitOfAnalysis: unit.trim(),
+      repeatedMeasures,
       clustered,
-      clusterVariable: clustered ? clusterVariable : null,
-      surveyWeights: false,
-      weightVariable: null,
-      stratified: false,
-      strataVariable: null,
-      samplingDesign: null,
-      missingDataPlan: "Complete case for the first executable analysis.",
-      statedAnalysisPlan: null
+      clusterVariable: clustered ? clusterVariable.trim() || null : null,
+      surveyWeights,
+      weightVariable: surveyWeights ? weightVariable.trim() || null : null,
+      stratified,
+      strataVariable: stratified ? strataVariable.trim() || null : null,
+      samplingDesign: samplingDesign.trim() || null,
+      missingDataPlan: missingDataPlan.trim() || null,
+      statedAnalysisPlan: statedAnalysisPlan.trim() || null
     };
+
+    setBusy(true);
+    setStatus("");
     try {
       await saveStudySpecification(projectId, specification);
-      setStatus("Study specification saved.");
+      setSource("saved");
+      setStatus(
+        `Study specification saved with ${specification.researchQuestions.length} research question${specification.researchQuestions.length === 1 ? "" : "s"}.`
+      );
     } catch (err) {
       setStatus(message(err));
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <section className="form-panel study-form">
-      <label>Research question<input value={question} onChange={(e) => setQuestion(e.target.value)} /></label>
-      <div className="form-grid">
-        <label>Outcome variable<input value={outcome} onChange={(e) => setOutcome(e.target.value)} /></label>
-        <label>Outcome type<select value={outcomeType} onChange={(e) => setOutcomeType(e.target.value as typeof outcomeType)}><option value="binary">Binary</option><option value="continuous">Continuous</option><option value="count">Count</option></select></label>
-        <label>Primary predictor<input value={predictor} onChange={(e) => setPredictor(e.target.value)} /></label>
-        <label>Predictor type<select value={predictorType} onChange={(e) => setPredictorType(e.target.value as typeof predictorType)}><option value="continuous">Continuous</option><option value="binary">Binary</option><option value="categorical_nominal">Categorical</option></select></label>
-        <label>Study design<select value={design} onChange={(e) => setDesign(e.target.value as StudySpecification["studyDesign"])}><option value="cross_sectional">Cross sectional</option><option value="cohort">Cohort</option><option value="case_control">Case control</option><option value="trial">Trial</option><option value="longitudinal">Longitudinal</option></select></label>
-        <label>Unit of analysis<input value={unit} onChange={(e) => setUnit(e.target.value)} /></label>
+      <div className="source-note">
+        <Badge kind={source === "protocol" ? "blue" : source === "saved" ? "success" : "neutral"}>
+          {source === "protocol"
+            ? "Extracted from protocol"
+            : source === "saved"
+              ? "Saved study specification"
+              : "Manual study review"}
+        </Badge>
+        <span>
+          Review the research logic here. Dataset field names are assigned later in Variable Mapping.
+        </span>
       </div>
-      <label><input type="checkbox" checked={clustered} onChange={(e) => setClustered(e.target.checked)} /> Observations are clustered</label>
-      {clustered && <label>Cluster variable<input value={clusterVariable} onChange={(e) => setClusterVariable(e.target.value)} /></label>}
-      <Button onClick={() => void save()}>Save study specification</Button>
+
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">RESEARCH QUESTIONS</p>
+          <h2>{questions.length} question{questions.length === 1 ? "" : "s"}</h2>
+        </div>
+        <Button
+          variant="secondary"
+          onClick={() => setQuestions((current) => [...current, emptyQuestion()])}
+        >
+          Add research question
+        </Button>
+      </div>
+
+      <div className="method-list">
+        {questions.map((question, index) => (
+          <article className="method-card" key={question.id}>
+            <div className="panel-heading">
+              <strong>Research question {index + 1}</strong>
+              {questions.length > 1 && (
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() =>
+                    setQuestions((current) =>
+                      current.filter((_, itemIndex) => itemIndex !== index)
+                    )
+                  }
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            <label>
+              Question
+              <textarea
+                value={question.text}
+                onChange={(event) => updateQuestion(index, { text: event.target.value })}
+              />
+            </label>
+            <div className="form-grid">
+              <label>
+                Objective type
+                <select
+                  value={question.objectiveType ?? ""}
+                  onChange={(event) =>
+                    updateQuestion(index, {
+                      objectiveType: (event.target.value || null) as ObjectiveType
+                    })
+                  }
+                >
+                  <option value="">Not confirmed</option>
+                  <option value="descriptive">Descriptive</option>
+                  <option value="association">Association</option>
+                  <option value="prediction">Prediction</option>
+                  <option value="causal">Causal</option>
+                  <option value="diagnostic">Diagnostic</option>
+                  <option value="prognostic">Prognostic</option>
+                  <option value="exploratory">Exploratory</option>
+                </select>
+              </label>
+              <label>
+                Estimand, if stated
+                <input
+                  value={question.estimand}
+                  onChange={(event) => updateQuestion(index, { estimand: event.target.value })}
+                />
+              </label>
+            </div>
+            <label>
+              Outcome concepts
+              <input
+                value={question.outcomes}
+                onChange={(event) => updateQuestion(index, { outcomes: event.target.value })}
+                placeholder="medicine stockout status, days out of stock"
+              />
+            </label>
+            <label>
+              Predictor or exposure concepts
+              <input
+                value={question.predictors}
+                onChange={(event) => updateQuestion(index, { predictors: event.target.value })}
+                placeholder="reporting completeness"
+              />
+            </label>
+            <label>
+              Covariate concepts
+              <input
+                value={question.covariates}
+                onChange={(event) => updateQuestion(index, { covariates: event.target.value })}
+                placeholder="facility level, patient volume"
+              />
+            </label>
+          </article>
+        ))}
+      </div>
+
+      <p className="eyebrow">STUDY LEVEL DESIGN</p>
+      <div className="form-grid">
+        <label>
+          Study design
+          <select
+            value={design}
+            onChange={(event) =>
+              setDesign(event.target.value as StudySpecification["studyDesign"])
+            }
+          >
+            <option value="cross_sectional">Cross sectional</option>
+            <option value="cohort">Cohort</option>
+            <option value="case_control">Case control</option>
+            <option value="trial">Trial</option>
+            <option value="longitudinal">Longitudinal</option>
+            <option value="time_series">Time series</option>
+            <option value="ecological">Ecological</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          Unit of analysis
+          <input value={unit} onChange={(event) => setUnit(event.target.value)} />
+        </label>
+        <label>
+          Sampling design
+          <input
+            value={samplingDesign}
+            onChange={(event) => setSamplingDesign(event.target.value)}
+          />
+        </label>
+        <label>
+          Missing data plan
+          <input
+            value={missingDataPlan}
+            onChange={(event) => setMissingDataPlan(event.target.value)}
+          />
+        </label>
+      </div>
+
+      <div className="form-grid">
+        <label>
+          <input
+            type="checkbox"
+            checked={repeatedMeasures}
+            onChange={(event) => setRepeatedMeasures(event.target.checked)}
+          />
+          Repeated observations
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={clustered}
+            onChange={(event) => setClustered(event.target.checked)}
+          />
+          Clustered observations
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={surveyWeights}
+            onChange={(event) => setSurveyWeights(event.target.checked)}
+          />
+          Survey weights
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={stratified}
+            onChange={(event) => setStratified(event.target.checked)}
+          />
+          Stratification
+        </label>
+      </div>
+
+      {clustered && (
+        <label>
+          Cluster variable or concept
+          <input value={clusterVariable} onChange={(event) => setClusterVariable(event.target.value)} />
+        </label>
+      )}
+      {surveyWeights && (
+        <label>
+          Weight variable or concept
+          <input value={weightVariable} onChange={(event) => setWeightVariable(event.target.value)} />
+        </label>
+      )}
+      {stratified && (
+        <label>
+          Strata variable or concept
+          <input value={strataVariable} onChange={(event) => setStrataVariable(event.target.value)} />
+        </label>
+      )}
+
+      <label>
+        Analysis plan stated in protocol
+        <textarea
+          value={statedAnalysisPlan}
+          onChange={(event) => setStatedAnalysisPlan(event.target.value)}
+        />
+      </label>
+
+      <Button onClick={() => void save()}>{busy ? "Saving…" : "Confirm study specification"}</Button>
       {status && <p className="confirmation" role="status">{status}</p>}
     </section>
   );
