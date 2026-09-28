@@ -38,6 +38,9 @@ else
   npx wrangler queues create methodome-analysis
 fi
 
+echo "-- Resume analysis queue delivery"
+npx wrangler queues resume-delivery methodome-analysis
+
 echo "-- Apply remote D1 migrations"
 npx wrangler d1 migrations apply DB --remote --config wrangler.jsonc
 
@@ -64,6 +67,9 @@ echo "-- Deploy internal Python statistics Worker"
   cd services/stats-worker
   "$UV_BIN" run --group dev pywrangler deploy --config wrangler.jsonc
 )
+
+echo "-- Verify analysis queue consumer"
+npx wrangler queues consumer worker list methodome-analysis --json
 
 echo "-- Deploy Methodome API Worker"
 npx wrangler deploy --config wrangler.jsonc
