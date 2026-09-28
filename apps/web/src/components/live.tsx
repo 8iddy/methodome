@@ -2134,19 +2134,35 @@ function LiveAnalysisPlan({ projectId }: { projectId: string }) {
 
 function LiveAnalysis({ projectId }: { projectId: string }) {
   const [plan, setPlan] = useState<AnalysisPlan | null>(null);
-  const [state, setState] = useState("");
-  const [jobId, setJobId] = useState("");
+  const [jobs, setJobs] = useState<Record<string, { jobId: string; state: string }>>({});
+  const [status, setStatus] = useState("");
 
   useEffect(() => {
-    getAnalysisPlan(projectId).then(setPlan).catch((err) => setState(message(err)));
+    getAnalysisPlan(projectId).then(setPlan).catch((err) => setStatus(message(err)));
+    try {
+      const stored = localStorage.getItem(`methodome:jobs:${projectId}`);
+      if (stored) setJobs(JSON.parse(stored));
+    } catch {
+      // Ignore invalid local job cache.
+    }
   }, [projectId]);
 
-  async function run() {
-    const analysis = plan?.analyses[0];
-    if (!plan?.datasetVersionId || !analysis?.selectedMethodId) {
-      setState("A dataset and selected method are required in the analysis plan.");
+  function persist(next: Record<string, { jobId: string; state: string }>) {
+    setJobs(next);
+    localStorage.setItem(`methodome:jobs:${projectId}`, JSON.stringify(next));
+  }
+
+  async function run(analysis: AnalysisPlan["analyses"][number]) {
+    if (!plan?.datasetVersionId || !analysis.selectedMethodId) {
+      setStatus("A dataset and selected method are required in the analysis plan.");
       return;
     }
+    if (!plan.lockedAt) {
+      setStatus("Lock the analysis plan before running planned analyses.");
+      return;
+    }
+
+    setStatus("");
     try {
       const created = await createAnalysisJob(projectId, {
         datasetVersionId: plan.datasetVersionId,
@@ -2156,29 +2172,122 @@ function LiveAnalysis({ projectId }: { projectId: string }) {
         predictors: analysis.predictors,
         covariates: analysis.covariates
       });
-      setJobId(created.jobId);
+      let next = {
+        ...jobs,
+        [analysis.id]: { jobId: created.jobId, state: created.state }
+      };
+      persist(next);
       localStorage.setItem(`methodome:last-job:${projectId}`, created.jobId);
-      setState(created.state);
 
       for (let attempt = 0; attempt < 60; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1500));
         const current = await getAnalysisJob(created.jobId);
-        setState(current.state);
-        if (current.state === "complete" || current.state === "failed" || current.state === "cancelled") break;
+        next = {
+          ...next,
+          [analysis.id]: { jobId: created.jobId, state: current.state }
+        };
+        persist(next);
+        if (
+          current.state === "complete" ||
+          current.state === "failed" ||
+          current.state === "cancelled"
+        ) {
+          break;
+        }
       }
     } catch (err) {
-      setState(message(err));
+      setStatus(message(err));
     }
+  }
+
+  if (!plan) {
+    return (
+      <section className="panel">
+        <h2>No analysis plan yet</h2>
+        <p>Build and lock an analysis plan before running guided analyses.</p>
+        <Button href={`/app/projects/${projectId}/analysis-plan`}>Build analysis plan</Button>
+        {status && <p className="confirmation" role="status">{status}</p>}
+      </section>
+    );
   }
 
   return (
     <section className="panel">
-      <h2>Execute approved analysis</h2>
-      <p>{plan?.lockedAt ? "The current analysis plan is locked." : "Lock the analysis plan before treating this run as planned analysis."}</p>
-      <Button onClick={() => void run()}>Run analysis</Button>
-      {jobId && <p><code>{jobId}</code></p>}
-      {state && <p className="confirmation" role="status">Job state: {state}</p>}
-      {state === "complete" && <Button href={`/app/projects/${projectId}/results`} variant="secondary">View results</Button>}
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">DETERMINISTIC EXECUTION</p>
+          <h2>Run approved analyses</h2>
+        </div>
+        <Badge kind={plan.lockedAt ? "success" : "warning"}>
+          {plan.lockedAt ? "Plan locked" : "Plan not locked"}
+        </Badge>
+      </div>
+      <p>
+        Each analysis below comes from the current analysis plan. Statistical values are calculated by the statistical Worker, not by the language model.
+      </p>
+
+      <div className="method-list">
+        {plan.analyses.map((analysis, index) => {
+          const job = jobs[analysis.id];
+          const running =
+            job &&
+            !["complete", "failed", "cancelled"].includes(job.state);
+          return (
+            <article className="method-card" key={analysis.id}>
+              <p className="eyebrow">PLANNED ANALYSIS {index + 1}</p>
+              <h3>{analysis.selectedMethodId?.replaceAll("_", " ") ?? "Method not selected"}</h3>
+              <p>
+                <b>Outcome:</b> <code>{analysis.outcome}</code>
+              </p>
+              {analysis.predictors.length > 0 && (
+                <p>
+                  <b>Predictors:</b> <code>{analysis.predictors.join(", ")}</code>
+                </p>
+              )}
+              {analysis.covariates.length > 0 && (
+                <p>
+                  <b>Covariates:</b> <code>{analysis.covariates.join(", ")}</code>
+                </p>
+              )}
+              {analysis.warnings.map((warning) => (
+                <p className="muted" key={warning}>{warning}</p>
+              ))}
+              <div className="action-row">
+                <Button
+                  onClick={() => void run(analysis)}
+                >
+                  {running
+                    ? "Running…"
+                    : job?.state === "complete"
+                      ? "Run again"
+                      : "Run analysis"}
+                </Button>
+                {job && (
+                  <Badge
+                    kind={
+                      job.state === "complete"
+                        ? "success"
+                        : job.state === "failed"
+                          ? "danger"
+                          : "blue"
+                    }
+                  >
+                    {job.state.replaceAll("_", " ")}
+                  </Badge>
+                )}
+              </div>
+              {job?.jobId && <code>{job.jobId}</code>}
+            </article>
+          );
+        })}
+      </div>
+
+      {Object.values(jobs).some((job) => job.state === "complete") && (
+        <Button href={`/app/projects/${projectId}/results`} variant="secondary">
+          View results
+        </Button>
+      )}
+      {status && <p className="confirmation" role="status">{status}</p>}
     </section>
   );
 }
