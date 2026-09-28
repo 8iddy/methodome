@@ -89,6 +89,18 @@ export interface DatasetVersion {
   parentVersionIds: string[];
 }
 
+export interface ProjectFile {
+  id: string;
+  projectId: string;
+  fileKind: string;
+  filename: string;
+  mediaType?: string;
+  checksumSha256: string;
+  sizeBytes?: number;
+  createdBy: string;
+  createdAt: string;
+}
+
 export interface StudyVariable {
   concept: string;
   datasetVariable: string | null;
@@ -311,6 +323,15 @@ export async function getDatasets(projectId: string) {
       `/projects/${projectId}/datasets`
     )
   ).datasets;
+}
+
+export async function getProjectFiles(projectId: string, kind?: string) {
+  const query = kind ? `?kind=${encodeURIComponent(kind)}` : "";
+  return (
+    await request<{ files: ProjectFile[] }>(
+      `/projects/${projectId}/files${query}`
+    )
+  ).files;
 }
 
 export async function createUpload(
