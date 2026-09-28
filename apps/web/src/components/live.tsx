@@ -22,6 +22,7 @@ import {
   getMethods,
   getAnalysisHistory,
   getProject,
+  getProjectFiles,
   getProjectPolicy,
   getProjects,
   getSession,
@@ -41,6 +42,7 @@ import {
   type BackendProject,
   type CandidateSelection,
   type DatasetVersion,
+  type ProjectFile,
   type SchemaComparison,
   type StudySpecification
 } from "@/lib/api";
@@ -314,6 +316,8 @@ export function LiveProjectPage({
         description="This workspace is connected to the Methodome API."
       />
       {section === "overview" && <LiveOverview projectId={projectId} project={project} />}
+      {section === "protocol" && <LiveProjectFiles projectId={projectId} mode="protocol" />}
+      {section === "instruments" && <LiveProjectFiles projectId={projectId} mode="instruments" />}
       {section === "data" && <LiveData projectId={projectId} />}
       {section === "study-design" && <LiveStudyDesign projectId={projectId} />}
       {section === "variables" && <LiveVariables projectId={projectId} />}
@@ -324,6 +328,8 @@ export function LiveProjectPage({
       {section === "settings" && <LiveProjectSettings projectId={projectId} />}
       {![
         "overview",
+        "protocol",
+        "instruments",
         "data",
         "study-design",
         "variables",
@@ -364,6 +370,110 @@ function LiveOverview({
       <div><span>Study design</span>{specification ? <Badge kind="success">Confirmed</Badge> : <Badge kind="warning">Required</Badge>}</div>
       <div><span>Analysis plan</span>{plan ? <Badge kind={plan.lockedAt ? "success" : "blue"}>{plan.lockedAt ? "Locked" : "Draft"}</Badge> : <Badge kind="warning">Required</Badge>}</div>
     </section>
+  );
+}
+
+function LiveProjectFiles({
+  projectId,
+  mode
+}: {
+  projectId: string;
+  mode: "protocol" | "instruments";
+}) {
+  const [files, setFiles] = useState<ProjectFile[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [kind, setKind] = useState<"protocol" | "instrument" | "codebook">(
+    mode === "protocol" ? "protocol" : "instrument"
+  );
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function refresh() {
+    const current = await getProjectFiles(projectId);
+    setFiles(
+      current.filter((item) =>
+        mode === "protocol"
+          ? item.fileKind === "protocol"
+          : item.fileKind === "instrument" || item.fileKind === "codebook"
+      )
+    );
+  }
+
+  useEffect(() => {
+    void refresh().catch((err) => setStatus(message(err)));
+  }, [projectId, mode]);
+
+  async function upload() {
+    if (!file) return;
+    setBusy(true);
+    setStatus("");
+    try {
+      const intent = await createUpload(projectId, {
+        filename: file.name,
+        mediaType: file.type || "application/octet-stream",
+        fileKind: kind,
+        sizeBytes: file.size
+      });
+      await uploadFile(intent.uploadPath, file, file.type || "application/octet-stream");
+      setFile(null);
+      setStatus("Research file uploaded.");
+      await refresh();
+    } catch (err) {
+      setStatus(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <section className="form-panel">
+        <p className="eyebrow">{mode === "protocol" ? "PROTOCOL SOURCE" : "RESEARCH INSTRUMENTS"}</p>
+        <h2>{mode === "protocol" ? "Upload protocol" : "Upload instrument or codebook"}</h2>
+        {mode === "instruments" && (
+          <label>
+            File type
+            <select value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>
+              <option value="instrument">Instrument</option>
+              <option value="codebook">Codebook</option>
+            </select>
+          </label>
+        )}
+        <label>
+          Research file
+          <input
+            type="file"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          />
+        </label>
+        <Button onClick={() => void upload()}>{busy ? "Uploading…" : "Upload file"}</Button>
+        {status && <p className="confirmation" role="status">{status}</p>}
+      </section>
+
+      <section className="panel table-wrap">
+        <div className="panel-heading">
+          <h2>{mode === "protocol" ? "Protocol files" : "Instrument files"}</h2>
+          <Badge kind="neutral">{files.length} files</Badge>
+        </div>
+        <table>
+          <thead>
+            <tr><th>File</th><th>Type</th><th>Size</th><th>Checksum</th><th>Uploaded</th></tr>
+          </thead>
+          <tbody>
+            {files.map((item) => (
+              <tr key={item.id}>
+                <td>{item.filename}</td>
+                <td>{item.fileKind}</td>
+                <td>{item.sizeBytes != null ? `${Math.ceil(item.sizeBytes / 1024)} KB` : "—"}</td>
+                <td><code>{item.checksumSha256 === "pending" ? "pending" : item.checksumSha256.slice(0, 12)}</code></td>
+                <td>{new Date(item.createdAt).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {files.length === 0 && <p className="muted">No files uploaded yet.</p>}
+      </section>
+    </>
   );
 }
 
