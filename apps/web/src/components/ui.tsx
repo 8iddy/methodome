@@ -7,6 +7,36 @@ import type { ReactNode } from "react";
 import { getProject, signOut } from "@/lib/api";
 import type { Maturity } from "@/lib/types";
 
+export function ThemeToggle() {
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const current =
+      document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+    setTheme(current);
+  }, []);
+
+  function toggle() {
+    const next = theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem("methodome-theme", next);
+    setTheme(next);
+  }
+
+  return (
+    <button
+      type="button"
+      className="theme-toggle"
+      onClick={toggle}
+      aria-label={theme === "dark" ? "Use light mode" : "Use dark mode"}
+      title={theme === "dark" ? "Use light mode" : "Use dark mode"}
+    >
+      <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+      <span>{theme === "dark" ? "Light" : "Dark"}</span>
+    </button>
+  );
+}
+
 export function Mark() { return <Link href="/" className="brand" aria-label="Methodome home"><span className="mark">M</span><span>Methodome</span></Link>; }
 export function Button({ children, href, variant = "primary", type = "button", onClick }: { children: ReactNode; href?: string; variant?: "primary" | "secondary" | "quiet"; type?: "button" | "submit"; onClick?: () => void }) { const className = `button ${variant}`; return href ? <Link href={href} className={className}>{children}</Link> : <button type={type} className={className} onClick={onClick}>{children}</button>; }
 export function Badge({ children, kind = "neutral" }: { children: ReactNode; kind?: "success" | "warning" | "danger" | "blue" | "neutral" | "teal" }) { return <span className={`badge ${kind}`}>{children}</span>; }
@@ -113,7 +143,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               </>
             )}
           </div>
-          <Badge kind="teal">Research workspace</Badge>
+          <div className="app-top-actions">
+            <ThemeToggle />
+            <Badge kind="teal">Research workspace</Badge>
+          </div>
         </header>
         {children}
       </section>
