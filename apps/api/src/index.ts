@@ -233,7 +233,8 @@ function normalizeConcept(value: string): string {
 async function resolveStudySpecificationForMethods(
   c: import("hono").Context<AppBindings>,
   projectId: string,
-  specification: StudySpecification
+  specification: StudySpecification,
+  requestedDatasetVersionId?: string
 ): Promise<{ specification: StudySpecification; datasetVersionId?: string }> {
   const [mappings, datasets] = await Promise.all([
     listVariableMappings(c.env.DB, projectId),
@@ -244,8 +245,9 @@ async function resolveStudySpecificationForMethods(
       .filter((mapping) => mapping.confirmedBy && mapping.datasetVariable)
       .map((mapping) => [normalizeConcept(mapping.researchConcept), mapping])
   );
-  const preferred =
-    datasets.find((dataset) => dataset.sourceKind === "derived") ?? datasets[0];
+  const preferred = requestedDatasetVersionId
+    ? datasets.find((dataset) => dataset.id === requestedDatasetVersionId)
+    : datasets.find((dataset) => dataset.sourceKind === "derived") ?? datasets[0];
   if (!preferred) return { specification };
 
   let profile: Awaited<ReturnType<typeof profileDatasetForProject>>;
@@ -1587,7 +1589,8 @@ app.post("/projects/:projectId/analysis-plan", async (c) => {
   const resolvedForPlan = await resolveStudySpecificationForMethods(
     c,
     projectId,
-    specification
+    specification,
+    parsed.data.datasetVersionId
   );
 
   for (const analysis of parsed.data.analyses) {
@@ -1914,7 +1917,12 @@ app.post("/projects/:projectId/analysis-jobs", async (c) => {
 
   const specification = await getStudySpecification(c.env.DB, projectId);
   const resolvedForJob = specification
-    ? await resolveStudySpecificationForMethods(c, projectId, specification)
+    ? await resolveStudySpecificationForMethods(
+        c,
+        projectId,
+        specification,
+        parsed.data.datasetVersionId
+      )
     : null;
   const eligible = resolvedForJob
     ? new Set(
