@@ -12,7 +12,11 @@ import {
   sha256BytesHex,
   type AuditEventPayload
 } from "@methodome/provenance";
-import type { AnalysisJob } from "@methodome/analysis-contracts";
+import type { AnalysisJob, PlannedAnalysis } from "@methodome/analysis-contracts";
+import {
+  createAnalysisPlan as buildAnalysisPlan,
+  lockAnalysisPlan
+} from "@methodome/analysis-plan";
 import type { Project } from "@methodome/domain";
 import type { ProjectProcessingPolicy } from "@methodome/policy-engine";
 import { requireAuth } from "./auth";
@@ -27,18 +31,25 @@ import {
   datasetBelongsToProject,
   finaliseFileChecksum,
   getAnalysisJob,
+  getAnalysisPlanById,
   getAnalysisResult,
   getAuditHeadHash,
+  getCurrentStudySpecificationRecord,
   getFileForDatasetRegistration,
   getFileRecord,
   getProject,
   getProjectPolicy,
   getStudySpecification,
+  getLatestAnalysisPlan,
   listAuditEvents,
   listDatasetVersions,
+  listVariableMappings,
   listProjects,
+  saveAnalysisPlan,
   saveStudySpecification,
-  updateProjectPolicy
+  saveVariableMappings,
+  updateProjectPolicy,
+  updateStoredAnalysisPlan
 } from "./db";
 
 type AppBindings = { Bindings: Env; Variables: Variables };
@@ -554,6 +565,299 @@ app.put("/files/:fileId/content", async (c) => {
     fileId: record.id,
     checksumSha256: checksum,
     sizeBytes: bytes.byteLength
+  });
+});
+
+
+const plannedAnalysisSchema = z.object({
+  id: z.string().min(1),
+  researchQuestionId: z.string().min(1),
+  outcome: z.string().min(1),
+  predictors: z.array(z.string()),
+  covariates: z.array(z.string()),
+  candidateMethodIds: z.array(z.string()).min(1),
+  selectedMethodId: z.string().min(1).optional(),
+  requiredDecisions: z.array(z.string()),
+  warnings: z.array(z.string()),
+  diagnostics: z.array(z.string()),
+  addedAfterLock: z.boolean().default(false)
+});
+
+const createPlanSchema = z.object({
+  versionId: z.string().min(1).max(100),
+  datasetVersionId: z.string().min(1).optional(),
+  status: z.enum([
+    "preregistered",
+    "planned_before_analysis",
+    "exploratory"
+  ]),
+  analyses: z.array(plannedAnalysisSchema)
+});
+
+app.get("/projects/:projectId/analysis-plan", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  return c.json({
+    plan: await getLatestAnalysisPlan(c.env.DB, projectId)
+  });
+});
+
+app.post("/projects/:projectId/analysis-plan", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const parsed = createPlanSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_ANALYSIS_PLAN",
+          message: "Analysis plan is invalid.",
+          details: parsed.error.flatten()
+        }
+      },
+      400
+    );
+  }
+
+  const specification = await getStudySpecification(c.env.DB, projectId);
+  if (!specification) {
+    return c.json(
+      {
+        error: {
+          code: "STUDY_SPECIFICATION_REQUIRED",
+          message: "Confirm the study specification before creating an analysis plan."
+        }
+      },
+      409
+    );
+  }
+
+  if (
+    parsed.data.datasetVersionId &&
+    !(await datasetBelongsToProject(
+      c.env.DB,
+      parsed.data.datasetVersionId,
+      projectId
+    ))
+  ) {
+    return c.json(
+      {
+        error: {
+          code: "DATASET_NOT_FOUND",
+          message: "The selected dataset version does not belong to this project."
+        }
+      },
+      404
+    );
+  }
+
+  for (const analysis of parsed.data.analyses) {
+    const selection = selectCandidateMethods(
+      specification,
+      analysis.researchQuestionId
+    );
+    const allowed = new Set(
+      selection.candidates.map((candidate) => candidate.methodId)
+    );
+
+    if (
+      analysis.selectedMethodId &&
+      !allowed.has(analysis.selectedMethodId) &&
+      analysis.warnings.length === 0
+    ) {
+      return c.json(
+        {
+          error: {
+            code: "ANALYSIS_PLAN_METHOD_OUTSIDE_CANDIDATES",
+            message:
+              "A selected method falls outside the current deterministic candidate set. Record the methodological warning before saving the plan.",
+            details: {
+              researchQuestionId: analysis.researchQuestionId,
+              methodId: analysis.selectedMethodId
+            }
+          }
+        },
+        409
+      );
+    }
+  }
+
+  const now = new Date().toISOString();
+  const plan = buildAnalysisPlan({
+    id: makeId("plan"),
+    projectId,
+    versionId: parsed.data.versionId,
+    ...(parsed.data.datasetVersionId
+      ? { datasetVersionId: parsed.data.datasetVersionId }
+      : {}),
+    studySpecificationVersion: specification.version,
+    status: parsed.data.status,
+    analyses: parsed.data.analyses as PlannedAnalysis[],
+    createdBy: getUserId(c),
+    createdAt: now
+  });
+
+  await saveAnalysisPlan(c.env.DB, plan);
+  await addAudit(c, {
+    projectId,
+    action: "analysis_plan_created",
+    objectType: "analysis_plan",
+    objectId: plan.id,
+    after: plan
+  });
+
+  return c.json({ plan }, 201);
+});
+
+app.post("/projects/:projectId/analysis-plan/:planId/lock", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const plan = await getAnalysisPlanById(
+    c.env.DB,
+    projectId,
+    c.req.param("planId")
+  );
+
+  if (!plan) {
+    return c.json(
+      {
+        error: {
+          code: "ANALYSIS_PLAN_NOT_FOUND",
+          message: "Analysis plan was not found."
+        }
+      },
+      404
+    );
+  }
+
+  if (plan.lockedAt || plan.lockHash) {
+    return c.json(
+      {
+        error: {
+          code: "ANALYSIS_PLAN_ALREADY_LOCKED",
+          message: "Analysis plan is already locked."
+        }
+      },
+      409
+    );
+  }
+
+  const locked = await lockAnalysisPlan(plan, new Date().toISOString());
+  await updateStoredAnalysisPlan(c.env.DB, locked);
+  await addAudit(c, {
+    projectId,
+    action: "analysis_plan_locked",
+    objectType: "analysis_plan",
+    objectId: locked.id,
+    after: {
+      versionId: locked.versionId,
+      lockedAt: locked.lockedAt,
+      lockHash: locked.lockHash,
+      status: locked.status
+    }
+  });
+
+  return c.json({ plan: locked });
+});
+
+const variableMappingsSchema = z.object({
+  mappings: z.array(
+    z.object({
+      id: z.string().min(1),
+      researchConcept: z.string().min(1),
+      datasetVariable: z.string().min(1).optional(),
+      mappingStatus: z.enum([
+        "direct_match",
+        "probable_match",
+        "uncertain",
+        "no_match"
+      ]),
+      evidence: z.array(z.string()).default([]),
+      confirmed: z.boolean().default(false)
+    })
+  )
+});
+
+app.get("/projects/:projectId/variable-mappings", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  return c.json({
+    mappings: await listVariableMappings(c.env.DB, projectId)
+  });
+});
+
+app.put("/projects/:projectId/variable-mappings", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const parsed = variableMappingsSchema.safeParse(
+    await c.req.json().catch(() => null)
+  );
+
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_VARIABLE_MAPPINGS",
+          message: "Variable mappings are invalid.",
+          details: parsed.error.flatten()
+        }
+      },
+      400
+    );
+  }
+
+  const specificationRecord = await getCurrentStudySpecificationRecord(
+    c.env.DB,
+    projectId
+  );
+
+  if (!specificationRecord) {
+    return c.json(
+      {
+        error: {
+          code: "STUDY_SPECIFICATION_REQUIRED",
+          message: "Confirm the study specification before mapping variables."
+        }
+      },
+      409
+    );
+  }
+
+  await saveVariableMappings(c.env.DB, {
+    projectId,
+    studySpecificationId: specificationRecord.id,
+    mappings: parsed.data.mappings.map((mapping) => ({
+      id: mapping.id,
+      researchConcept: mapping.researchConcept,
+      ...(mapping.datasetVariable
+        ? { datasetVariable: mapping.datasetVariable }
+        : {}),
+      mappingStatus: mapping.mappingStatus,
+      evidence: mapping.evidence,
+      ...(mapping.confirmed ? { confirmedBy: getUserId(c) } : {})
+    }))
+  });
+
+  await addAudit(c, {
+    projectId,
+    action: "variable_mappings_updated",
+    objectType: "variable_mapping_set",
+    objectId: specificationRecord.id,
+    after: parsed.data.mappings
+  });
+
+  return c.json({
+    mappings: await listVariableMappings(c.env.DB, projectId)
   });
 });
 
