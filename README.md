@@ -56,14 +56,20 @@ The `docs/` directory is the build source of truth.
 7. [Benchmark and validation](docs/07-benchmark-validation.md)
 8. [Build plan](docs/08-build-plan.md)
 9. [Codex build brief](docs/09-codex-build-brief.md)
+10. [Cloudflare bootstrap](docs/10-cloudflare-bootstrap.md)
+11. [Cloudflare deployment mode](docs/11-free-tier-deployment.md)
+12. [Authentication](docs/12-authentication.md)
+13. [Release readiness](docs/13-release-readiness.md)
 
 Machine-readable planning artefacts live under `spec/`.
 
 ## Current stage
 
-Planning and specification.
+Integrated MVP implementation.
 
-Application implementation should begin only after the benchmark design, study specification schema, and method registry contract are agreed.
+The `integration` branch contains the working full-stack implementation: authenticated research projects, R2-backed research files and datasets, form-version profiling and harmonisation, structured study specifications, deterministic method selection, locked analysis plans, queued Python statistical execution, structured results, provenance, audit history, and the Next.js research workspace.
+
+Production deployment remains gated on the automated integration checks and the complete deployed smoke workflow.
 
 ## Initial infrastructure direction
 
