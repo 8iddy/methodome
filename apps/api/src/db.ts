@@ -775,3 +775,145 @@ export async function getCurrentStudySpecificationRecord(
 
   return row ?? null;
 }
+
+export async function getDatasetVersionRecord(
+  db: D1Database,
+  datasetVersionId: string,
+  projectId: string
+): Promise<{
+  id: string;
+  projectId: string;
+  objectKey: string;
+  checksumSha256: string;
+} | null> {
+  const row = await db
+    .prepare(
+      `SELECT id, project_id, object_key, checksum_sha256
+       FROM dataset_versions
+       WHERE id = ? AND project_id = ?
+       LIMIT 1`
+    )
+    .bind(datasetVersionId, projectId)
+    .first<Record<string, unknown>>();
+
+  return row
+    ? {
+        id: String(row.id),
+        projectId: String(row.project_id),
+        objectKey: String(row.object_key),
+        checksumSha256: String(row.checksum_sha256)
+      }
+    : null;
+}
+
+export async function getAnalysisJobForWorker(
+  db: D1Database,
+  jobId: string,
+  projectId: string
+): Promise<AnalysisJob | null> {
+  const row = await db
+    .prepare(
+      `SELECT job_specification_json
+       FROM analysis_jobs
+       WHERE id = ? AND project_id = ?
+       LIMIT 1`
+    )
+    .bind(jobId, projectId)
+    .first<{ job_specification_json: string }>();
+
+  return row ? (JSON.parse(row.job_specification_json) as AnalysisJob) : null;
+}
+
+export async function updateAnalysisJobState(
+  db: D1Database,
+  jobId: string,
+  state: JobState,
+  timestamps?: {
+    startedAt?: string;
+    completedAt?: string;
+  }
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE analysis_jobs
+       SET state = ?,
+           started_at = COALESCE(?, started_at),
+           completed_at = COALESCE(?, completed_at)
+       WHERE id = ?`
+    )
+    .bind(
+      state,
+      timestamps?.startedAt ?? null,
+      timestamps?.completedAt ?? null,
+      jobId
+    )
+    .run();
+}
+
+export async function saveAnalysisResult(
+  db: D1Database,
+  input: {
+    id: string;
+    result: AnalysisResult;
+    provenance: Record<string, unknown>;
+  }
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO analysis_results
+       (id, analysis_job_id, result_json, provenance_json, created_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(analysis_job_id) DO UPDATE SET
+         result_json = excluded.result_json,
+         provenance_json = excluded.provenance_json,
+         created_at = excluded.created_at`
+    )
+    .bind(
+      input.id,
+      input.result.jobId,
+      JSON.stringify(input.result),
+      JSON.stringify(input.provenance),
+      new Date().toISOString()
+    )
+    .run();
+}
+
+export async function listAnalysisHistory(
+  db: D1Database,
+  userId: string
+): Promise<Array<{
+  jobId: string;
+  projectId: string;
+  projectName: string;
+  methodId: string;
+  datasetVersionId: string;
+  state: JobState;
+  createdAt: string;
+  completedAt?: string;
+}>> {
+  const result = await db
+    .prepare(
+      `SELECT j.id AS job_id, j.project_id, p.name AS project_name,
+              j.method_id, j.dataset_version_id, j.state,
+              j.created_at, j.completed_at
+       FROM analysis_jobs j
+       JOIN projects p ON p.id = j.project_id
+       LEFT JOIN project_members pm ON pm.project_id = p.id
+       WHERE p.owner_id = ? OR pm.user_id = ?
+       GROUP BY j.id
+       ORDER BY j.created_at DESC`
+    )
+    .bind(userId, userId)
+    .all<Record<string, unknown>>();
+
+  return result.results.map((row) => ({
+    jobId: String(row.job_id),
+    projectId: String(row.project_id),
+    projectName: String(row.project_name),
+    methodId: String(row.method_id),
+    datasetVersionId: String(row.dataset_version_id),
+    state: String(row.state) as JobState,
+    createdAt: String(row.created_at),
+    ...(row.completed_at ? { completedAt: String(row.completed_at) } : {})
+  }));
+}
