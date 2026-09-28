@@ -50,6 +50,7 @@ import {
   listAnalysisHistory,
   listAuditEvents,
   listDatasetVersions,
+  listProjectFiles,
   listVariableMappings,
   listProjects,
   saveAnalysisPlan,
@@ -866,6 +867,20 @@ function safeFilename(filename: string): string {
     .replace(/^_+|_+$/g, "");
   return cleaned || "file";
 }
+
+app.get("/projects/:projectId/files", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const kind = c.req.query("kind")?.trim();
+  const files = await listProjectFiles(
+    c.env.DB,
+    projectId,
+    kind || undefined
+  );
+  return c.json({ files });
+});
 
 app.post("/projects/:projectId/uploads", async (c) => {
   if (!c.env.FILES || c.env.STORAGE_MODE === "disabled") {
