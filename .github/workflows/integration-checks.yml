@@ -1,0 +1,44 @@
+name: Integration checks
+
+on:
+  push:
+    branches:
+      - integration
+  pull_request:
+    branches:
+      - integration
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install workspace dependencies
+        run: npm install
+
+      - name: Backend TypeScript
+        run: npm run typecheck
+
+      - name: Backend tests
+        run: npm test
+
+      - name: Apply D1 migrations locally
+        run: npm run d1:migrate:local
+
+      - name: Bundle Worker
+        run: npx wrangler deploy --dry-run --config wrangler.jsonc
+
+      - name: Frontend TypeScript
+        run: npm run web:typecheck
+
+      - name: Build frontend
+        run: npm run web:build
