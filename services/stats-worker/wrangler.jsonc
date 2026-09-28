@@ -1,0 +1,8 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "methodome-stats",
+  "main": "src/main.py",
+  "compatibility_date": "2026-09-28",
+  "compatibility_flags": ["python_workers"],
+  "workers_dev": false
+}
