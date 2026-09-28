@@ -1,6 +1,7 @@
 export interface Env {
   DB: D1Database;
   FILES?: R2Bucket;
+  AI?: any;
   ANALYSIS_QUEUE: Queue<AnalysisQueueMessage>;
   STATS: Fetcher;
   APP_ENV: string;
