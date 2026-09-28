@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  extractProtocolWithAi,
   protocolExtractionSchema,
   suggestMappingsWithAi
 } from "../apps/api/src/protocol-extraction";
@@ -66,6 +67,99 @@ describe("protocol extraction schema", () => {
     expect(parsed.studyDesign).toBeNull();
     expect(parsed.unitOfAnalysis).toBeNull();
     expect(parsed.samplingDesign).toBeNull();
+  });
+});
+
+
+describe("protocol extraction runtime", () => {
+  const validExtraction = {
+    studyTitle: "Synthetic study",
+    objectives: ["Assess stockouts"],
+    hypotheses: [],
+    researchQuestions: [
+      {
+        text: "Is reporting completeness associated with stockout status?",
+        objectiveType: "association",
+        outcomes: ["stockout status"],
+        predictors: ["reporting completeness"],
+        covariates: [],
+        estimand: null
+      }
+    ],
+    studyDesign: "cross_sectional",
+    unitOfAnalysis: "health facility",
+    population: "health facilities",
+    samplingDesign: null,
+    repeatedMeasures: false,
+    clustered: false,
+    clusterConcept: null,
+    surveyWeights: false,
+    weightConcept: null,
+    stratified: false,
+    strataConcept: null,
+    missingDataPlan: null,
+    statedAnalysisPlan: null
+  };
+
+  it("accepts the object response returned by Workers AI JSON mode", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const env = {
+      AI: {
+        run: async (_model: string, input: Record<string, unknown>) => {
+          calls.push(input);
+          return { response: validExtraction };
+        }
+      }
+    } as never;
+
+    const result = await extractProtocolWithAi(
+      env,
+      "# Protocol\nResearch question: Is reporting completeness associated with stockout status?"
+    );
+
+    expect(result.researchQuestions).toHaveLength(1);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.max_tokens).toBe(4096);
+  });
+
+  it("retries once when the first response contains incomplete JSON", async () => {
+    let call = 0;
+    const env = {
+      AI: {
+        run: async () => {
+          call += 1;
+          return call === 1
+            ? { response: '{"studyTitle":"Synthetic study","researchQuestions":[' }
+            : { response: validExtraction };
+        }
+      }
+    } as never;
+
+    const result = await extractProtocolWithAi(
+      env,
+      "# Protocol\nResearch question: Is reporting completeness associated with stockout status?"
+    );
+
+    expect(call).toBe(2);
+    expect(result.studyTitle).toBe("Synthetic study");
+  });
+
+  it("accepts fenced JSON on the retry path", async () => {
+    let call = 0;
+    const env = {
+      AI: {
+        run: async () => {
+          call += 1;
+          return call === 1
+            ? { response: "not json" }
+            : { response: `\`\`\`json\n${JSON.stringify(validExtraction)}\n\`\`\`` };
+        }
+      }
+    } as never;
+
+    const result = await extractProtocolWithAi(env, "# Protocol\nResearch question present.");
+
+    expect(result.researchQuestions[0]?.objectiveType).toBe("association");
   });
 });
 
