@@ -1505,6 +1505,8 @@ function LiveDataPreparation({ projectId }: { projectId: string }) {
   );
 }
 
+const CURRENT_PROTOCOL_INTERPRETATION_VERSION = "protocol-extraction-v3";
+
 function LiveStudyDesign({ projectId }: { projectId: string }) {
   type ObjectiveType = StudySpecification["researchQuestions"][number]["objectiveType"];
   type QuestionDraft = {
@@ -1559,17 +1561,25 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
     ])
       .then(async ([specification, extraction, files]) => {
         let activeExtraction = extraction;
+        const latestProtocol = files.find((item) => item.fileKind === "protocol");
+        const extractionNeedsMethodologyRefresh =
+          !specification &&
+          latestProtocol &&
+          (
+            !activeExtraction ||
+            activeExtraction.provenance?.promptVersion !==
+              CURRENT_PROTOCOL_INTERPRETATION_VERSION
+          );
 
-        if (!specification && !activeExtraction) {
-          const latestProtocol = files.find((item) => item.fileKind === "protocol");
-          if (latestProtocol) {
-            setStatus("Extracting study information from the protocol…");
-            try {
-              activeExtraction = await extractProtocol(projectId, latestProtocol.id);
-              setStatus("Study information extracted. Review it before confirming.");
-            } catch (err) {
-              setStatus(message(err));
-            }
+        if (extractionNeedsMethodologyRefresh) {
+          setStatus("Interpreting the protocol with Methodome's research-methodology layer…");
+          try {
+            activeExtraction = await extractProtocol(projectId, latestProtocol.id);
+            setStatus(
+              "Methodome interpreted the research questions and study design. Review the suggestions before confirming."
+            );
+          } catch (err) {
+            setStatus(message(err));
           }
         }
 
@@ -1735,35 +1745,43 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
         </Button>
       </div>
 
-      <div className="method-list">
+      <div className="study-question-list">
         {questions.map((question, index) => (
-          <article className="method-card" key={question.id}>
-            <div className="panel-heading">
-              <strong>Research question {index + 1}</strong>
-              {questions.length > 1 && (
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={() =>
-                    setQuestions((current) =>
-                      current.filter((_, itemIndex) => itemIndex !== index)
-                    )
-                  }
-                >
-                  Remove
-                </button>
-              )}
+          <article className="study-question-card" key={question.id}>
+            <div className="study-question-header">
+              <div>
+                <p className="eyebrow">RESEARCH QUESTION {index + 1}</p>
+                <h3>Question {index + 1}</h3>
+              </div>
+              <div className="study-question-actions">
+                {source === "protocol" && <Badge kind="teal">Methodome suggested</Badge>}
+                {questions.length > 1 && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() =>
+                      setQuestions((current) =>
+                        current.filter((_, itemIndex) => itemIndex !== index)
+                      )
+                    }
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
             </div>
-            <label>
-              Question
+
+            <label className="question-field">
+              <span>Research question</span>
               <textarea
                 value={question.text}
                 onChange={(event) => updateQuestion(index, { text: event.target.value })}
               />
             </label>
-            <div className="form-grid">
+
+            <div className="question-meta-grid">
               <label>
-                Objective type
+                <span>Objective type</span>
                 <select
                   value={question.objectiveType ?? ""}
                   onChange={(event) =>
@@ -1781,136 +1799,172 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
                   <option value="prognostic">Prognostic</option>
                   <option value="exploratory">Exploratory</option>
                 </select>
+                <small className="field-hint">
+                  Methodome classifies this from the question and protocol. Change it only if the analytical intent is different.
+                </small>
               </label>
+
               <label>
-                Estimand, if stated
+                <span>Estimand or target quantity</span>
                 <input
                   value={question.estimand}
                   onChange={(event) => updateQuestion(index, { estimand: event.target.value })}
+                  placeholder="Filled when the protocol supports a specific target quantity"
+                />
+                <small className="field-hint">
+                  Left blank when the protocol does not support a defensible estimand.
+                </small>
+              </label>
+            </div>
+
+            <div className="concept-grid">
+              <label>
+                <span>Outcome concepts</span>
+                <textarea
+                  value={question.outcomes}
+                  onChange={(event) => updateQuestion(index, { outcomes: event.target.value })}
+                  placeholder="What is being described, explained, compared, predicted or affected?"
+                />
+              </label>
+              <label>
+                <span>Predictor or exposure concepts</span>
+                <textarea
+                  value={question.predictors}
+                  onChange={(event) => updateQuestion(index, { predictors: event.target.value })}
+                  placeholder="Exposures, interventions, groups or explanatory concepts"
+                />
+              </label>
+              <label>
+                <span>Covariate concepts</span>
+                <textarea
+                  value={question.covariates}
+                  onChange={(event) => updateQuestion(index, { covariates: event.target.value })}
+                  placeholder="Adjustment variables stated or defined in the protocol"
                 />
               </label>
             </div>
-            <label>
-              Outcome concepts
-              <input
-                value={question.outcomes}
-                onChange={(event) => updateQuestion(index, { outcomes: event.target.value })}
-                placeholder="medicine stockout status, days out of stock"
-              />
-            </label>
-            <label>
-              Predictor or exposure concepts
-              <input
-                value={question.predictors}
-                onChange={(event) => updateQuestion(index, { predictors: event.target.value })}
-                placeholder="reporting completeness"
-              />
-            </label>
-            <label>
-              Covariate concepts
-              <input
-                value={question.covariates}
-                onChange={(event) => updateQuestion(index, { covariates: event.target.value })}
-                placeholder="facility level, patient volume"
-              />
-            </label>
           </article>
         ))}
       </div>
 
-      <p className="eyebrow">STUDY LEVEL DESIGN</p>
-      <div className="form-grid">
-        <label>
-          Study design
-          <select
-            value={design}
-            onChange={(event) =>
-              setDesign(event.target.value as StudySpecification["studyDesign"])
-            }
-          >
-            <option value="cross_sectional">Cross sectional</option>
-            <option value="cohort">Cohort</option>
-            <option value="case_control">Case control</option>
-            <option value="trial">Trial</option>
-            <option value="longitudinal">Longitudinal</option>
-            <option value="time_series">Time series</option>
-            <option value="ecological">Ecological</option>
-            <option value="other">Other</option>
-          </select>
-        </label>
-        <label>
-          Unit of analysis
-          <input value={unit} onChange={(event) => setUnit(event.target.value)} />
-        </label>
-        <label>
-          Sampling design
-          <input
-            value={samplingDesign}
-            onChange={(event) => setSamplingDesign(event.target.value)}
-          />
-        </label>
-        <label>
-          Missing data plan
-          <input
-            value={missingDataPlan}
-            onChange={(event) => setMissingDataPlan(event.target.value)}
-          />
-        </label>
-      </div>
+      <section className="study-level-card">
+        <div className="study-level-heading">
+          <div>
+            <p className="eyebrow">STUDY LEVEL DESIGN</p>
+            <h2>Methodological structure</h2>
+          </div>
+          {source === "protocol" && <Badge kind="teal">Pre-filled from protocol</Badge>}
+        </div>
 
-      <div className="form-grid">
-        <label>
-          <input
-            type="checkbox"
-            checked={repeatedMeasures}
-            onChange={(event) => setRepeatedMeasures(event.target.checked)}
-          />
-          Repeated observations
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={clustered}
-            onChange={(event) => setClustered(event.target.checked)}
-          />
-          Clustered observations
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={surveyWeights}
-            onChange={(event) => setSurveyWeights(event.target.checked)}
-          />
-          Survey weights
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={stratified}
-            onChange={(event) => setStratified(event.target.checked)}
-          />
-          Stratification
-        </label>
-      </div>
+        <div className="study-design-grid">
+          <label>
+            <span>Study design</span>
+            <select
+              value={design}
+              onChange={(event) =>
+                setDesign(event.target.value as StudySpecification["studyDesign"])
+              }
+            >
+              <option value="cross_sectional">Cross sectional</option>
+              <option value="cohort">Cohort</option>
+              <option value="case_control">Case control</option>
+              <option value="trial">Trial</option>
+              <option value="longitudinal">Longitudinal</option>
+              <option value="time_series">Time series</option>
+              <option value="ecological">Ecological</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>
+            <span>Unit of analysis</span>
+            <input value={unit} onChange={(event) => setUnit(event.target.value)} />
+          </label>
+          <label>
+            <span>Sampling design</span>
+            <input
+              value={samplingDesign}
+              onChange={(event) => setSamplingDesign(event.target.value)}
+              placeholder="How analytical units were selected"
+            />
+          </label>
+          <label>
+            <span>Missing data plan</span>
+            <input
+              value={missingDataPlan}
+              onChange={(event) => setMissingDataPlan(event.target.value)}
+              placeholder="Protocol-defined handling, if stated"
+            />
+          </label>
+        </div>
 
-      {clustered && (
-        <label>
-          Cluster variable or concept
-          <input value={clusterVariable} onChange={(event) => setClusterVariable(event.target.value)} />
-        </label>
-      )}
-      {surveyWeights && (
-        <label>
-          Weight variable or concept
-          <input value={weightVariable} onChange={(event) => setWeightVariable(event.target.value)} />
-        </label>
-      )}
-      {stratified && (
-        <label>
-          Strata variable or concept
-          <input value={strataVariable} onChange={(event) => setStrataVariable(event.target.value)} />
-        </label>
-      )}
+        <div className="design-flags" aria-label="Study design features">
+          <label className={repeatedMeasures ? "selected" : ""}>
+            <input
+              type="checkbox"
+              checked={repeatedMeasures}
+              onChange={(event) => setRepeatedMeasures(event.target.checked)}
+            />
+            <span>
+              <strong>Repeated observations</strong>
+              <small>Same analytical units measured more than once.</small>
+            </span>
+          </label>
+          <label className={clustered ? "selected" : ""}>
+            <input
+              type="checkbox"
+              checked={clustered}
+              onChange={(event) => setClustered(event.target.checked)}
+            />
+            <span>
+              <strong>Clustered observations</strong>
+              <small>Observations nested within a higher-level unit.</small>
+            </span>
+          </label>
+          <label className={surveyWeights ? "selected" : ""}>
+            <input
+              type="checkbox"
+              checked={surveyWeights}
+              onChange={(event) => setSurveyWeights(event.target.checked)}
+            />
+            <span>
+              <strong>Survey weights</strong>
+              <small>Sampling or analysis weights are part of the design.</small>
+            </span>
+          </label>
+          <label className={stratified ? "selected" : ""}>
+            <input
+              type="checkbox"
+              checked={stratified}
+              onChange={(event) => setStratified(event.target.checked)}
+            />
+            <span>
+              <strong>Stratification</strong>
+              <small>Sampling or analysis strata are explicitly defined.</small>
+            </span>
+          </label>
+        </div>
+
+        <div className="study-design-grid conditional-fields">
+          {clustered && (
+            <label>
+              <span>Cluster variable or concept</span>
+              <input value={clusterVariable} onChange={(event) => setClusterVariable(event.target.value)} />
+            </label>
+          )}
+          {surveyWeights && (
+            <label>
+              <span>Weight variable or concept</span>
+              <input value={weightVariable} onChange={(event) => setWeightVariable(event.target.value)} />
+            </label>
+          )}
+          {stratified && (
+            <label>
+              <span>Strata variable or concept</span>
+              <input value={strataVariable} onChange={(event) => setStrataVariable(event.target.value)} />
+            </label>
+          )}
+        </div>
+      </section>
 
       <label>
         Analysis plan stated in protocol
