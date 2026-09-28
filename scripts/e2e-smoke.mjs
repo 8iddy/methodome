@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
 const API = (process.env.METHODOME_API_URL ?? "https://api.methodome.com/api").replace(/\/$/, "");
-const email = `smoke-${Date.now()}-${crypto.randomBytes(4).toString("hex")}@methodome.invalid`;
+const email = `smoke-${Date.now()}-${crypto.randomBytes(4).toString("hex")}@methodome.com`;
 const password = `Mth!${crypto.randomBytes(24).toString("base64url")}9a`;
 const cookies = new Map();
 
