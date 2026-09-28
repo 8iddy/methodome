@@ -374,9 +374,10 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
       getStudySpecification(projectId),
       getVariableMappings(projectId),
       getAnalysisPlan(projectId),
-      getAnalysisHistory()
+      getAnalysisHistory(),
+      getProtocolExtraction(projectId)
     ])
-      .then(([files, datasets, specification, mappings, plan, history]) => {
+      .then(([files, datasets, specification, mappings, plan, history, extraction]) => {
         if (!active) return;
         setState({
           protocol: files.some((file) => file.fileKind === "protocol"),
@@ -447,6 +448,13 @@ function LiveWorkflowGuide({ projectId }: { projectId: string }) {
           return setNext({
             label: "Add a protocol",
             detail: "Upload the research protocol so Methodome can extract and retain the study logic.",
+            href: `${base}/protocol`
+          });
+        }
+        if (!specification && !extraction) {
+          return setNext({
+            label: "Extract study information",
+            detail: "The protocol is uploaded. Extract its research questions and design before confirming the study specification.",
             href: `${base}/protocol`
           });
         }
