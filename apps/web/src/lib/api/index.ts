@@ -565,3 +565,37 @@ export async function updateProjectPolicy(
 }
 
 export { API_BASE };
+
+
+export async function appendDatasets(
+  projectId: string,
+  input: {
+    sourceDatasetVersionIds: string[];
+    label: string;
+    reason?: string;
+    mappings: Array<{
+      sourceDatasetVersionId: string;
+      sourceVariable: string;
+      targetVariable: string;
+      categoryMap?: Record<string, string>;
+    }>;
+  }
+) {
+  return request<{
+    datasetVersionId: string;
+    checksumSha256: string;
+    rowCount: number;
+    columnCount: number;
+  }>(`/projects/${projectId}/datasets/append`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export async function deleteProject(projectId: string) {
+  return request<void>(`/projects/${projectId}`, { method: "DELETE" });
+}
+
+export async function deleteAccount() {
+  return request<void>("/account", { method: "DELETE" });
+}
