@@ -215,6 +215,16 @@ export function LiveAuthPage({ signup }: { signup: boolean }) {
       <a href="/" className="auth-brand">
         <span className="brand"><span className="mark">M</span><span>Methodome</span></span>
       </a>
+      <aside className="auth-context" aria-label="Methodome research principles">
+        <p className="eyebrow">RESEARCH INFRASTRUCTURE</p>
+        <h2>A defensible analysis starts before the model runs.</h2>
+        <p>Methodome keeps research intent, dataset evidence, methodological decisions and statistical output in one reviewable record.</p>
+        <dl>
+          <div><dt>01</dt><dd><strong>Researcher reviewed</strong><span>Confirm study logic and variable mappings.</span></dd></div>
+          <div><dt>02</dt><dd><strong>Method governed</strong><span>Deterministic rules constrain executable analyses.</span></dd></div>
+          <div><dt>03</dt><dd><strong>Reproducible</strong><span>Retain versions, diagnostics and provenance.</span></dd></div>
+        </dl>
+      </aside>
 
       {verificationPending ? (
         <form onSubmit={verify}>
@@ -565,7 +575,7 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
           key={label}
           className={complete ? "done" : index === firstIncomplete ? "active" : ""}
         >
-          {complete ? "✓ " : ""}{label}
+          <i aria-hidden="true">{complete ? "✓" : index + 1}</i>{label}
         </span>
       ))}
     </div>
@@ -2144,7 +2154,7 @@ function LiveVariables({ projectId }: { projectId: string }) {
   }
 
   return (
-    <section className="panel table-wrap">
+    <section className="panel table-wrap variable-mapping-panel">
       <div className="panel-heading">
         <div>
           <h2>Variable mappings</h2>
@@ -2433,7 +2443,7 @@ function LiveAnalysisPlan({ projectId }: { projectId: string }) {
   }
 
   return (
-    <section className="panel">
+    <section className={`panel analysis-plan-panel ${plan?.lockedAt ? "is-locked" : "is-draft"}`}>
       <div className="panel-heading">
         <div>
           <p className="eyebrow">ANALYSIS DATASET</p>
@@ -2758,93 +2768,73 @@ function LiveResults({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="method-list">
-      {results.map((result, resultIndex) => (
-        <section className="panel" key={result.jobId}>
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">RESULT {resultIndex + 1}</p>
-              <h2>{result.methodId.replaceAll("_", " ")}</h2>
-            </div>
-            <Badge kind="success">{result.software.engine}</Badge>
-          </div>
-          <div className="spec-grid">
-            <div><span>Complete observations</span><strong>{result.n}</strong></div>
-            <div><span>Engine</span><strong>{result.software.engine}</strong></div>
-            <div><span>Package</span><strong>{result.software.package}</strong></div>
-            <div><span>Version</span><strong>{result.software.packageVersion}</strong></div>
-          </div>
-
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Term</th>
-                  <th>Estimate</th>
-                  <th>SE</th>
-                  <th>95% CI</th>
-                  <th>p</th>
-                  <th>Exponentiated</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.estimates.map((estimate) => (
-                  <tr key={estimate.term}>
-                    <td>{estimate.term}</td>
-                    <td>{estimate.estimate.toPrecision(5)}</td>
-                    <td>{estimate.standardError?.toPrecision(5) ?? "—"}</td>
-                    <td>
-                      {estimate.confidenceInterval
-                        ? `${estimate.confidenceInterval.lower.toPrecision(4)} to ${estimate.confidenceInterval.upper.toPrecision(4)}`
-                        : "—"}
-                    </td>
-                    <td>{estimate.pValue != null ? estimate.pValue.toPrecision(4) : "—"}</td>
-                    <td>{estimate.exponentiatedEstimate?.toPrecision(5) ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <h3>Diagnostics</h3>
-          <div className="method-list">
-            {result.diagnostics.map((diagnostic) => (
-              <div className="method-card" key={diagnostic.id}>
-                <Badge
-                  kind={
-                    diagnostic.status === "passed"
-                      ? "success"
-                      : diagnostic.status === "failed"
-                        ? "danger"
-                        : "warning"
-                  }
-                >
-                  {diagnostic.status.replaceAll("_", " ")}
-                </Badge>
-                <strong>{diagnostic.label}</strong>
-                {diagnostic.value != null && <p>{String(diagnostic.value)}</p>}
-                {diagnostic.message && <small>{diagnostic.message}</small>}
-              </div>
-            ))}
-          </div>
-
-          {result.warnings.length > 0 && (
-            <div className="warning-panel">
-              <b>Warnings</b>
-              {result.warnings.map((warning) => <p key={warning}>{warning}</p>)}
-            </div>
-          )}
-          <p className="muted">
-            Job <code>{result.jobId}</code>. Executed with {result.software.package} {result.software.packageVersion}.
-          </p>
-        </section>
-      ))}
+    <div className="results-list">
+      {results.map((result, resultIndex) => <ResultPanel result={result} index={resultIndex} key={result.jobId} />)}
       <Button href={`/app/projects/${projectId}/reports`} variant="secondary">
         Continue to reports
       </Button>
       {status && <p className="confirmation" role="status">{status}</p>}
     </div>
   );
+}
+
+function ResultPanel({ result, index }: { result: AnalysisResult; index: number }) {
+  const [view, setView] = useState<"research" | "diagnostics" | "technical">("research");
+  const primaryEstimate = result.estimates[0];
+
+  return <section className="panel result-panel">
+    <div className="panel-heading result-heading">
+      <div><p className="eyebrow">RESULT {index + 1}</p><h2>{result.methodId.replaceAll("_", " ")}</h2></div>
+      <Badge kind="success">Analysis complete</Badge>
+    </div>
+    <div className="tabs" role="tablist" aria-label={`Result ${index + 1} views`}>
+      {(["research", "diagnostics", "technical"] as const).map((tab) => <button key={tab} type="button"
+        role="tab" aria-selected={view === tab} className={view === tab ? "selected" : ""}
+        onClick={() => setView(tab)}>{tab === "research" ? "Research view" : tab === "diagnostics" ? "Diagnostics" : "Technical record"}</button>)}
+    </div>
+
+    {view === "research" && <div className="result-research-view">
+      <div className="result-overview">
+        <div><span>Complete observations</span><strong>{result.n}</strong></div>
+        {primaryEstimate && <div><span>Primary estimate</span><strong>{primaryEstimate.estimate.toPrecision(5)}</strong><small>{primaryEstimate.term}</small></div>}
+        <div><span>Warnings</span><strong>{result.warnings.length}</strong></div>
+      </div>
+      <div className="table-wrap"><table className="result-table">
+        <thead><tr><th>Term</th><th className="numeric">Estimate</th><th className="numeric">SE</th><th className="numeric">95% CI</th><th className="numeric">p</th><th className="numeric">Exponentiated</th></tr></thead>
+        <tbody>{result.estimates.map((estimate) => <tr key={estimate.term}>
+          <td><strong>{estimate.term}</strong></td>
+          <td className="numeric">{estimate.estimate.toPrecision(5)}</td>
+          <td className="numeric">{estimate.standardError?.toPrecision(5) ?? "—"}</td>
+          <td className="numeric">{estimate.confidenceInterval ? `${estimate.confidenceInterval.lower.toPrecision(4)} to ${estimate.confidenceInterval.upper.toPrecision(4)}` : "—"}</td>
+          <td className="numeric">{estimate.pValue != null ? estimate.pValue.toPrecision(4) : "—"}</td>
+          <td className="numeric">{estimate.exponentiatedEstimate?.toPrecision(5) ?? "—"}</td>
+        </tr>)}</tbody>
+      </table></div>
+      <p className="result-context">Interpret estimates in the context of the research question, study design and approved analysis plan. Statistical significance does not establish substantive importance or causal effect.</p>
+    </div>}
+
+    {view === "diagnostics" && <div className="diagnostic-list">
+      {result.diagnostics.map((diagnostic) => <article key={diagnostic.id}>
+        <Badge kind={diagnostic.status === "passed" ? "success" : diagnostic.status === "failed" ? "danger" : "warning"}>{diagnostic.status.replaceAll("_", " ")}</Badge>
+        <div><strong>{diagnostic.label}</strong>{diagnostic.message && <p>{diagnostic.message}</p>}</div>
+        {diagnostic.value != null && <code>{String(diagnostic.value)}</code>}
+      </article>)}
+      {result.diagnostics.length === 0 && <p className="empty">No diagnostics were returned for this method.</p>}
+      {result.warnings.length > 0 && <div className="warning-panel"><b>Warnings</b>{result.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div>}
+    </div>}
+
+    {view === "technical" && <div className="technical-record">
+      <dl>
+        <div><dt>Method</dt><dd><code>{result.methodId}</code></dd></div>
+        <div><dt>Job id</dt><dd><code>{result.jobId}</code></dd></div>
+        <div><dt>Engine</dt><dd>{result.software.engine}</dd></div>
+        <div><dt>Package</dt><dd>{result.software.package}</dd></div>
+        <div><dt>Package version</dt><dd><code>{result.software.packageVersion}</code></dd></div>
+        <div><dt>Complete observations</dt><dd>{result.n}</dd></div>
+      </dl>
+      <p className="muted">This execution record is retained with the structured result. Dataset and plan provenance remain available in project records and exports.</p>
+    </div>}
+  </section>;
 }
 
 function LiveProjectSettings({ projectId }: { projectId: string }) {
@@ -3128,4 +3118,43 @@ export function LiveHistoryPage() {
       </section>
     </main>
   );
+}
+
+export function LiveSettingsPage() {
+  const [account, setAccount] = useState<{ name: string; email: string } | null>(null);
+  const [status, setStatus] = useState("Loading account details…");
+
+  useEffect(() => {
+    getSession()
+      .then((session) => {
+        if (session?.user) {
+          setAccount({ name: session.user.name, email: session.user.email });
+          setStatus("");
+        } else {
+          setStatus("Account details are unavailable for this session.");
+        }
+      })
+      .catch((err) => setStatus(message(err)));
+  }, []);
+
+  return <main className="app-content narrow">
+    <PageHeader eyebrow="ACCOUNT SETTINGS" title="Account and preferences" description="Review your authenticated account and choose how Methodome appears on this device." />
+    <section className="settings-section">
+      <div className="settings-heading"><h2>Account</h2><p>Identity is managed by Methodome authentication.</p></div>
+      <dl className="settings-values">
+        <div><dt>Name</dt><dd>{account?.name ?? "—"}</dd></div>
+        <div><dt>Email</dt><dd>{account?.email ?? "—"}</dd></div>
+        <div><dt>Session</dt><dd><Badge kind={account ? "success" : "neutral"}>{account ? "Authenticated" : "Unavailable"}</Badge></dd></div>
+      </dl>
+      {status && <p className="confirmation" role="status">{status}</p>}
+    </section>
+    <section className="settings-section">
+      <div className="settings-heading"><h2>Appearance</h2><p>The preference is stored locally and applies to public and authenticated pages.</p></div>
+      <div className="settings-control"><span><strong>Colour mode</strong><small>Switch between the Methodome light and dark research palettes.</small></span><ThemeToggle /></div>
+    </section>
+    <section className="settings-section danger-zone">
+      <div className="settings-heading"><h2>Session</h2><p>End the current browser session on this device.</p></div>
+      <Button variant="secondary" onClick={() => void performSignOut()}>Sign out</Button>
+    </section>
+  </main>;
 }

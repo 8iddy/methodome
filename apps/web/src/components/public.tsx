@@ -7,18 +7,90 @@ import { systemFlow, workflowSteps } from "@/content/how-it-works";
 import { getMethods, getSession, type MethodRegistryEntry } from "@/lib/api";
 import { Badge, Button, Mark, PageHeader, ThemeToggle } from "@/components/ui";
 
-function StartProjectButton() { const router = useRouter(); return <Button onClick={() => void getSession().then((session) => router.push(session?.user ? "/app/projects/new" : "/sign-in?next=/app/projects/new")).catch(() => router.push("/sign-in?next=/app/projects/new"))}>Start a project</Button>; }
-function PublicHeader() { return <header className="public-header"><Mark /><nav><Link href="/methods">Methods</Link><Link href="/how-it-works">How it works</Link><Link href="/documentation">Documentation</Link></nav><div><ThemeToggle /><StartProjectButton /></div></header>; }
-export function Landing() { return <><PublicHeader /><main className="landing"><section className="hero"><div><p className="eyebrow">RESEARCH WORKSPACE</p><h1>Research analysis,<br />brought together.</h1><p className="hero-copy">Clean data, define your study, build an analysis plan, run statistical methods, review diagnostics and produce reproducible results from one research workspace.</p><div className="hero-actions"><StartProjectButton /><Button href="/methods" variant="secondary">Explore methods</Button></div></div><ResearchMockup /></section><WorkflowStrip /><section className="method-family-section"><div className="section-intro"><div><p className="eyebrow">METHODS LIBRARY</p><h2>Your methods in one place.</h2></div><Button href="/methods" variant="secondary">Explore all methods</Button></div><p className="muted">The registry includes executable methods and methods whose execution is still pending. See the catalogue for method-level status.</p><div className="family-grid">{currentFamilies.map((name, i) => <article key={name}><span>0{i + 1}</span><h3>{name}</h3><p>{familyCopy(name)}</p></article>)}</div></section><section className="two-column-copy"><article><p className="eyebrow">REPRODUCIBILITY</p><h2>Every result has a record.</h2><p>Trace a result to its dataset version, transformations, analysis plan, method, code, package versions and diagnostics.</p></article><article><p className="eyebrow">DATA CONTROL</p><h2>Researchers control processing.</h2><p>Set project data rules before any model assisted extraction or qualitative processing takes place.</p></article></section><section className="final-cta"><p className="eyebrow">READY TO BEGIN</p><h2>Create your first<br />Methodome project.</h2><StartProjectButton /></section></main><PublicFooter /></>; }
-function ResearchMockup() { return <div className="research-mockup"><div className="mock-top"><span>Analysis plan</span><Badge kind="success">Planned before analysis</Badge></div><p className="mono">RESEARCH QUESTION 2</p><h3>Is reporting completeness associated with medicine stockout?</h3><div className="mock-grid"><div><span>Outcome</span><code>stockout_status</code></div><div><span>Outcome type</span><strong>Binary</strong></div><div><span>Design</span><strong>Cross sectional</strong></div><div><span>Repeated / clustered</span><strong>No</strong></div></div><p className="mono">CANDIDATE METHOD</p><div className="method-option"><strong>Binary logistic regression</strong><small>Validated · executable</small></div><a href="/methods">View method requirements and diagnostics</a></div>; }
+function StartProjectButton() {
+  const router = useRouter();
+  return <Button onClick={() => void getSession()
+    .then((session) => router.push(session?.user ? "/app/projects/new" : "/sign-in?next=/app/projects/new"))
+    .catch(() => router.push("/sign-in?next=/app/projects/new"))}>Start a project</Button>;
+}
+
+const publicLinks = [
+  ["Methods", "/methods"],
+  ["How it works", "/how-it-works"],
+  ["Documentation", "/documentation"]
+] as const;
+
+function PublicHeader() {
+  return <header className="public-header">
+    <Mark />
+    <nav className="public-nav" aria-label="Primary navigation">
+      {publicLinks.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}
+    </nav>
+    <div className="public-actions"><ThemeToggle /><StartProjectButton /></div>
+    <details className="public-menu">
+      <summary aria-label="Open navigation">Menu</summary>
+      <nav aria-label="Mobile navigation">
+        {publicLinks.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}
+        <div className="mobile-theme"><ThemeToggle /></div>
+      </nav>
+    </details>
+  </header>;
+}
+
+export function Landing() {
+  return <><PublicHeader /><main className="landing">
+    <section className="hero">
+      <div className="hero-copy-block">
+        <p className="eyebrow">RESEARCH ANALYSIS WORKSPACE</p>
+        <h1>From research question to defensible result.</h1>
+        <p className="hero-copy">Methodome turns protocols, instruments and datasets into a reviewable analysis plan, deterministic computation and a complete record of how each result was produced.</p>
+        <div className="hero-actions"><StartProjectButton /><Button href="/how-it-works" variant="secondary">See the research workflow</Button></div>
+        <p className="hero-footnote">Researcher reviewed. Method governed. Reproducible by design.</p>
+      </div>
+      <ResearchMockup />
+    </section>
+    <section className="principle-strip" aria-label="Methodome principles">
+      <div><b>01</b><span><strong>Research intent first</strong>Protocol and study design shape the plan.</span></div>
+      <div><b>02</b><span><strong>Deterministic methods</strong>Rules constrain what can run.</span></div>
+      <div><b>03</b><span><strong>Traceable output</strong>Every result retains its evidence chain.</span></div>
+    </section>
+    <WorkflowStrip />
+    <section className="method-family-section">
+      <div className="section-intro"><div><p className="eyebrow">METHODS REGISTRY</p><h2>A catalogue with boundaries.</h2><p>Method maturity, eligibility and execution status remain explicit.</p></div><Button href="/methods" variant="secondary">Explore the registry</Button></div>
+      <div className="family-grid">{currentFamilies.map((name, index) => <article key={name}><span>{String(index + 1).padStart(2, "0")}</span><div><h3>{name}</h3><p>{familyCopy(name)}</p></div><i aria-hidden="true">↗</i></article>)}</div>
+    </section>
+    <section className="two-column-copy">
+      <article><p className="eyebrow">REPRODUCIBILITY</p><h2>Every result has a record.</h2><p>Trace an estimate to its dataset version, transformations, locked plan, method, software and diagnostics.</p></article>
+      <article><p className="eyebrow">RESEARCHER CONTROL</p><h2>Inference remains reviewable.</h2><p>Methodome distinguishes extracted suggestions, dataset evidence and researcher-confirmed decisions throughout the workflow.</p></article>
+    </section>
+    <section className="final-cta"><div><p className="eyebrow">BEGIN A STUDY</p><h2>Build the analysis record while you do the work.</h2></div><StartProjectButton /></section>
+  </main><PublicFooter /></>;
+}
+
+function ResearchMockup() {
+  return <div className="research-mockup" aria-label="Example Methodome analysis plan">
+    <div className="mock-top"><span>Analysis plan</span><span className="record-id">PLAN / 02</span></div>
+    <div className="mock-status"><span><i />Researcher reviewed</span><Badge kind="success">Planned before analysis</Badge></div>
+    <div className="mock-question"><p className="mono">RESEARCH QUESTION 02</p><h3>Is reporting completeness associated with medicine stockout?</h3></div>
+    <dl className="mock-grid">
+      <div><dt>Outcome</dt><dd><code>stockout_status</code></dd></div>
+      <div><dt>Design</dt><dd>Cross sectional</dd></div>
+      <div><dt>Predictor</dt><dd><code>reporting_complete</code></dd></div>
+      <div><dt>Observations</dt><dd>1,284 facilities</dd></div>
+    </dl>
+    <div className="mock-method"><span>Selected method</span><strong>Binary logistic regression</strong><small>Validated · executable · 4 diagnostics required</small></div>
+    <div className="mock-provenance"><span>Dataset <code>v_04</code></span><span>Plan hash <code>8f2a…1c04</code></span></div>
+  </div>;
+}
 function WorkflowStrip() {
-  const labels = ["Protocol", "Data", "Define", "Map", "Plan", "Analyse", "Review", "Report"];
+  const labels = ["Protocol", "Instruments", "Data", "Study design", "Variable mapping", "Plan", "Analysis", "Results"];
   return (
     <section className="workflow">
       <div className="section-intro compact-workflow-intro">
         <div>
-          <p className="eyebrow">FROM PROTOCOL TO RESULTS</p>
-          <h2>A defined research workflow.</h2>
+          <p className="eyebrow">THE RESEARCH CHAIN</p>
+          <h2>Each decision has a place and a record.</h2>
+          <p>Move from source evidence to reviewed statistical output without losing the reasoning between them.</p>
         </div>
         <Button href="/how-it-works" variant="secondary">See how it works</Button>
       </div>
@@ -26,7 +98,7 @@ function WorkflowStrip() {
         {labels.map((label, index) => (
           <span key={label}>
             <b>{String(index + 1).padStart(2, "0")}</b>
-            {label}
+            <em>{label}</em>
           </span>
         ))}
       </div>
@@ -51,9 +123,10 @@ function Workflow() {
       <div className="workflow-diagram" aria-label="Methodome system flow">
         {systemFlow.map((item, index) => (
           <div key={item.label} className="workflow-diagram-step">
+            <small>{String(index + 1).padStart(2, "0")}</small>
             <b>{item.label}</b>
             <span>{item.detail}</span>
-            {index < systemFlow.length - 1 && <i aria-hidden="true">↓</i>}
+            {index < systemFlow.length - 1 && <i aria-hidden="true">→</i>}
           </div>
         ))}
       </div>
@@ -61,18 +134,15 @@ function Workflow() {
       <div className="workflow-detail-grid">
         {workflowSteps.map((step) => (
           <article key={step.id} id={step.id}>
-            <b>{step.number}</b>
-            <h2>{step.title}</h2>
-            <p>{step.summary}</p>
-            <ul>
-              {step.details.map((detail) => <li key={detail}>{detail}</li>)}
-            </ul>
-            <small><strong>Output:</strong> {step.output}</small>
+            <div className="workflow-step-number">{step.number}</div>
+            <div className="workflow-step-copy"><h2>{step.title}</h2><p>{step.summary}</p></div>
+            <ul>{step.details.map((detail) => <li key={detail}>{detail}</li>)}</ul>
+            <div className="workflow-output"><span>Output</span><strong>{step.output}</strong></div>
           </article>
         ))}
       </div>
 
-      <section className="panel">
+      <section className="boundary-note">
         <p className="eyebrow">THE BOUNDARY THAT MATTERS</p>
         <h2>Language models do not generate Methodome statistics.</h2>
         <p>

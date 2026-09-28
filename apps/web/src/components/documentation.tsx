@@ -4,7 +4,19 @@ import { documentationSections } from "@/content/documentation";
 export function DocumentationContent() {
   return (
     <div className="documentation-content">
-      <section className="panel">
+      <aside className="documentation-nav">
+        <p className="eyebrow">ON THIS PAGE</p>
+        <nav aria-label="Documentation contents">
+          {documentationSections.map((section, index) => (
+            <a key={section.id} href={`#${section.id}`}>
+              <span>{String(index + 1).padStart(2, "0")}</span>{section.title}
+            </a>
+          ))}
+        </nav>
+      </aside>
+
+      <div className="documentation-body">
+      <section className="documentation-principle">
         <div className="panel-heading">
           <div>
             <p className="eyebrow">PRODUCT PRINCIPLE</p>
@@ -20,19 +32,9 @@ export function DocumentationContent() {
         </p>
       </section>
 
-      <nav className="panel" aria-label="Documentation contents">
-        <p className="eyebrow">CONTENTS</p>
-        <div className="documentation-links">
-          {documentationSections.map((section) => (
-            <a key={section.id} href={`#${section.id}`}>
-              {section.title}
-            </a>
-          ))}
-        </div>
-      </nav>
-
-      {documentationSections.map((section) => (
-        <section className="panel" id={section.id} key={section.id}>
+      {documentationSections.map((section, index) => (
+        <section className="documentation-section" id={section.id} key={section.id}>
+          <span className="documentation-index">{String(index + 1).padStart(2, "0")}</span>
           <h2>{section.title}</h2>
           <p>{section.summary}</p>
           <ul>
@@ -42,6 +44,7 @@ export function DocumentationContent() {
           </ul>
         </section>
       ))}
+      </div>
     </div>
   );
 }
