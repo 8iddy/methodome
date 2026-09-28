@@ -225,14 +225,14 @@ describe("protocol extraction runtime", () => {
             response: {
               researchQuestions: [
                 {
-                  text: firstPass.researchQuestions[0].text,
+                  text: firstPass.researchQuestions[0]!.text,
                   objectiveType: "descriptive",
                   outcomes: ["eLMIS functionality levels", "data use patterns"],
                   predictors: [],
                   covariates: [],
                   estimand: null
                 },
-                firstPass.researchQuestions[1]
+                firstPass.researchQuestions[1]!
               ]
             }
           };
