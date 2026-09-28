@@ -38,6 +38,23 @@ export function createAuth(env: Env) {
       modelName: "auth_verification",
       storeIdentifier: "hashed"
     },
+    rateLimit: {
+      enabled: true,
+      window: 60,
+      max: 60,
+      storage: "database",
+      modelName: "auth_rate_limit",
+      customRules: {
+        "/sign-up/email": {
+          window: 60,
+          max: 3
+        },
+        "/sign-in/email": {
+          window: 10,
+          max: 5
+        }
+      }
+    },
     advanced: {
       database: {
         generateId: "uuid",
