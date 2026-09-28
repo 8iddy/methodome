@@ -22,6 +22,7 @@ import type { ProjectProcessingPolicy } from "@methodome/policy-engine";
 import { compareDatasetSchemas } from "@methodome/schema-harmonisation";
 import { requireAuth } from "./auth";
 import { createAuth } from "./better-auth";
+import { consumeAnalysisQueue } from "./analysis-worker";
 import type { Env, Variables } from "./env";
 import { makeId } from "./id";
 import {
@@ -43,6 +44,7 @@ import {
   getProjectPolicy,
   getStudySpecification,
   getLatestAnalysisPlan,
+  listAnalysisHistory,
   listAuditEvents,
   listDatasetVersions,
   listVariableMappings,
@@ -156,6 +158,19 @@ const createProjectSchema = z.object({
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).optional(),
   researchType: z.enum(["quantitative", "qualitative", "mixed_methods"])
+});
+
+app.get("/methods", (c) => {
+  return c.json({
+    registryVersion,
+    methods: Object.values(methodRegistry)
+  });
+});
+
+app.get("/analysis-history", async (c) => {
+  return c.json({
+    analyses: await listAnalysisHistory(c.env.DB, getUserId(c))
+  });
 });
 
 app.get("/projects", async (c) => {
@@ -1198,4 +1213,7 @@ app.onError((error, c) => {
   );
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  queue: consumeAnalysisQueue
+} satisfies ExportedHandler<Env>;
