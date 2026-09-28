@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://methodome.com/spec/method-registry.schema.json",
+  "title": "Methodome Method Registry Entry",
+  "type": "object",
+  "required": ["id", "display_name", "family", "maturity", "eligibility", "diagnostics", "implementations"],
+  "properties": {
+    "id": {"type": "string"},
+    "display_name": {"type": "string"},
+    "family": {"type": "string"},
+    "maturity": {"type": "string", "enum": ["validated", "supported", "experimental"]},
+    "eligibility": {
+      "type": "object",
+      "properties": {
+        "outcome_types": {"type": "array", "items": {"type": "string"}},
+        "predictor_types": {"type": "array", "items": {"type": "string"}},
+        "study_designs": {"type": "array", "items": {"type": "string"}},
+        "supports_clustering": {"type": "boolean"},
+        "supports_repeated_measures": {"type": "boolean"},
+        "supports_survey_weights": {"type": "boolean"},
+        "minimum_conditions": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "assumptions": {"type": "array", "items": {"type": "string"}},
+    "diagnostics": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "alternatives": {"type": "array", "items": {"type": "string"}},
+    "implementations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["engine", "adapter"],
+        "properties": {
+          "engine": {"type": "string", "enum": ["r", "python"]},
+          "package": {"type": "string"},
+          "adapter": {"type": "string"}
+        }
+      }
+    },
+    "result_schema": {"type": "string"},
+    "reference_tests": {"type": "array", "items": {"type": "string"}}
+  }
+}
