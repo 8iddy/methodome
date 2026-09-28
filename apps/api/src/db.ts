@@ -966,3 +966,42 @@ export async function createTransformationEvent(
 
   await db.batch(statements);
 }
+
+export async function deleteProjectRecord(
+  db: D1Database,
+  projectId: string,
+  userId: string
+): Promise<boolean> {
+  const project = await db
+    .prepare(
+      "SELECT id FROM projects WHERE id = ? AND owner_id = ? LIMIT 1"
+    )
+    .bind(projectId, userId)
+    .first<{ id: string }>();
+
+  if (!project) return false;
+
+  await db.prepare("DELETE FROM projects WHERE id = ?").bind(projectId).run();
+  return true;
+}
+
+export async function userOwnsProjects(
+  db: D1Database,
+  userId: string
+): Promise<boolean> {
+  const row = await db
+    .prepare("SELECT id FROM projects WHERE owner_id = ? LIMIT 1")
+    .bind(userId)
+    .first<{ id: string }>();
+  return Boolean(row);
+}
+
+export async function deleteApplicationAndAuthUser(
+  db: D1Database,
+  userId: string
+): Promise<void> {
+  await db.batch([
+    db.prepare("DELETE FROM users WHERE id = ?").bind(userId),
+    db.prepare("DELETE FROM auth_user WHERE id = ?").bind(userId)
+  ]);
+}
