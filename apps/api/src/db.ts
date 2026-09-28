@@ -182,7 +182,7 @@ export async function createAnalysisJob(
       job.jobId,
       job.projectId,
       job.datasetVersionId,
-      job.analysisPlanVersionId ?? null,
+      job.analysisPlanId ?? null,
       job.methodId,
       job.registryVersion,
       JSON.stringify(job),
@@ -318,4 +318,98 @@ export async function listAuditEvents(
     previousHash: row.previous_hash ? String(row.previous_hash) : null,
     hash: String(row.hash)
   }));
+}
+
+export async function datasetBelongsToProject(
+  db: D1Database,
+  datasetVersionId: string,
+  projectId: string
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      "SELECT id FROM dataset_versions WHERE id = ? AND project_id = ? LIMIT 1"
+    )
+    .bind(datasetVersionId, projectId)
+    .first<{ id: string }>();
+
+  return Boolean(row);
+}
+
+export async function getFileRecord(
+  db: D1Database,
+  fileId: string,
+  userId: string
+): Promise<{ id: string; projectId: string; objectKey: string; filename: string } | null> {
+  const row = await db
+    .prepare(
+      `SELECT f.id, f.project_id, f.object_key, f.filename
+       FROM files f
+       JOIN projects p ON p.id = f.project_id
+       LEFT JOIN project_members pm ON pm.project_id = p.id
+       WHERE f.id = ? AND (p.owner_id = ? OR pm.user_id = ?)
+       LIMIT 1`
+    )
+    .bind(fileId, userId, userId)
+    .first<Record<string, unknown>>();
+
+  return row
+    ? {
+        id: String(row.id),
+        projectId: String(row.project_id),
+        objectKey: String(row.object_key),
+        filename: String(row.filename)
+      }
+    : null;
+}
+
+export async function createFileRecord(
+  db: D1Database,
+  input: {
+    id: string;
+    projectId: string;
+    fileKind: string;
+    filename: string;
+    objectKey: string;
+    mediaType?: string;
+    sizeBytes?: number;
+    checksumSha256?: string;
+    createdBy: string;
+  }
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  await db
+    .prepare(
+      `INSERT INTO files
+       (id, project_id, file_kind, filename, object_key, media_type,
+        checksum_sha256, size_bytes, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      input.id,
+      input.projectId,
+      input.fileKind,
+      input.filename,
+      input.objectKey,
+      input.mediaType ?? null,
+      input.checksumSha256 ?? "pending",
+      input.sizeBytes ?? null,
+      input.createdBy,
+      now
+    )
+    .run();
+}
+
+export async function finaliseFileChecksum(
+  db: D1Database,
+  fileId: string,
+  checksumSha256: string,
+  sizeBytes: number
+): Promise<void> {
+  await db
+    .prepare(
+      "UPDATE files SET checksum_sha256 = ?, size_bytes = ? WHERE id = ?"
+    )
+    .bind(checksumSha256, sizeBytes, fileId)
+    .run();
 }
