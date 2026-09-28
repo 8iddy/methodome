@@ -1,41 +1,143 @@
 # Methodome frontend handoff
 
-## Branch and scope
+## Current state
 
-The front end is implemented on `frontend-implementation`. It is a self-contained Next.js App Router application in `apps/web/`. No backend packages, schemas, services, or API routes were changed.
+The frontend is integrated with the Methodome backend on the `integration` branch.
 
-## Routes implemented
+The primary quantitative research workflow no longer depends on fixture data.
 
-Public routes: `/`, `/methods`, `/how-it-works`, `/documentation`, `/sign-in`, and `/sign-up`.
+## Public routes
 
-Authenticated routes: `/app/projects`, `/app/projects/new`, `/app/methods`, `/app/history`, `/app/settings`, and the project workspace routes under `/app/projects/[projectId]/`: `overview`, `protocol`, `instruments`, `data`, `data-preparation`, `study-design`, `variables`, `analysis-plan`, `analysis`, `results`, `reports`, `audit-trail`, and `settings`.
+- `/`
+- `/methods`
+- `/how-it-works`
+- `/documentation`
+- `/sign-in`
+- `/sign-up`
 
-## Components and local interactions
+## Authenticated routes
 
-The implementation provides a reusable public header, app shell, project sidebar, stage indicator, status badges, method badges, tables, forms, dataset cards, schema comparison modal, combination panel, cleaning issue panel, method catalogue, analysis plan selector, job progress representation, results tabs, diagnostic details, audit timeline, and export controls.
+- `/app/projects`
+- `/app/projects/new`
+- `/app/methods`
+- `/app/history`
+- `/app/settings`
 
-The prototype supports local interaction for search and filter, project navigation, onboarding/project type selection, method expansion, schema mapping confirmation, append or merge selection, cleaning mapping confirmation, dataset version switching, candidate method selection, plan locking, guided/manual analysis mode, warning override reasons, analysis progress display, result tabs, diagnostics expansion, and export selection.
+Project workspace routes:
 
-## Mock data and typed API boundary
+- Overview
+- Protocol
+- Instruments
+- Data
+- Data Preparation
+- Study Design
+- Variables
+- Analysis Plan
+- Analysis
+- Results
+- Reports
+- Audit Trail
+- Project Settings
 
-Fixtures are centralised in `apps/web/src/mocks/fixtures.ts`. UI code does not contain fetch logic. `apps/web/src/lib/api/index.ts` is the narrow integration boundary and currently returns typed fixture data.
+## Live backend integration
 
-The backend should provide implementations for:
+The browser API boundary is:
 
-- `getProjects`, `getProject`, `getDatasets`
-- `getStudySpecification`, `getVariableMappings`, `getAnalysisPlan`
-- `getMethods`, `getAnalysisHistory`, `getResults`, `getAuditTrail`
+`apps/web/src/lib/api/index.ts`
 
-It will also need mutation and job interfaces for project creation, uploads, versioned transformations and mappings, study specification confirmation, plan locking, analysis execution/cancellation/status, exports, profile/preferences, and project processing policies.
+The production API origin defaults to:
 
-## Known gaps
+`https://api.methodome.com/api`
 
-There is no authentication, persistence, real upload transport, analysis execution, downloads, or live job polling. All success feedback is explicitly local prototype state. The data, analysis, and policy UI must be wired to versioned backend records and deterministic registry responses before use with real research data.
+Requests use browser credentials so Better Auth sessions are sent to the API origin.
 
-## Design assets used
+The frontend currently uses live endpoints for:
 
-The visual reference was inspected from the supplied Stitch exports at `/Users/luper/methodome/stitch_methodome_research_analysis_platform/`, specifically the landing, projects directory, analysis plan builder, dataset harmonisation comparison, data preparation issue review, and `academic_instrument/DESIGN.md` assets. They remain outside this repository and were not copied into the application.
+- account sign-up
+- account sign-in
+- account sign-out
+- session validation
+- project listing
+- project creation
+- project details
+- research file listing
+- protocol upload
+- instrument and codebook upload
+- dataset upload
+- dataset registration
+- dataset listing
+- dataset profiling
+- schema comparison
+- harmonised dataset append
+- study specification
+- variable mappings
+- deterministic method candidates
+- analysis plans
+- analysis plan locking
+- analysis job submission
+- analysis job status
+- structured results
+- analysis history
+- audit trail
+- project processing policy
 
-## Workspace integration
+## Data preparation
 
-Because the repository had no root workspace configuration, `apps/web/` has its own `package.json`. A later monorepo setup may add this application as a workspace without changing its package scripts.
+The Data page supports the form-version workflow:
+
+1. upload multiple source datasets
+2. profile both datasets
+3. compare schemas
+4. inspect direct, probable and uncertain field mappings
+5. create a harmonised append
+6. store the result as a derived dataset version
+
+The Data Preparation page shows real dataset lineage and the real dataset profile.
+
+General arbitrary cleaning and recoding rules beyond the implemented harmonisation path remain a later versioned transformation feature.
+
+## Statistical execution
+
+The Analysis screen submits a real queue job.
+
+The Python statistics Worker consumes the job and stores the structured result and provenance.
+
+The Results screen reads the stored result.
+
+The current executable method boundary is intentionally smaller than the visible long term Methodome method catalogue.
+
+## Reports
+
+The Reports page exports the current structured result and audit record as JSON.
+
+Publication report generation for DOCX, PDF, HTML and LaTeX is not implemented in the integrated MVP and is labelled accordingly.
+
+## Prototype fallback
+
+A small number of future product surfaces may still reuse visual prototype components for capabilities outside the integrated MVP boundary.
+
+They must not be treated as evidence that the corresponding backend capability exists.
+
+The release boundary is documented in:
+
+`docs/13-release-readiness.md`
+
+## Cloudflare web deployment
+
+The web application is packaged through OpenNext for Cloudflare.
+
+The integration CI separately installs `apps/web` deployment dependencies before the Cloudflare package step to keep the standalone Next output independent of npm workspace hoisting.
+
+Target production origin:
+
+`https://methodome.com`
+
+## Release gate
+
+Do not merge the integrated application to `main` until:
+
+- integration CI is green
+- all Cloudflare services deploy successfully
+- the production API health endpoint passes
+- the public site responds
+- `scripts/e2e-smoke.mjs` reports `METHODOME E2E PASS`
