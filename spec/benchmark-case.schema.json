@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://methodome.com/spec/benchmark-case.schema.json",
+  "title": "Methodome Benchmark Case",
+  "type": "object",
+  "required": ["id", "title", "sources", "accepted_specifications", "accepted_method_paths"],
+  "properties": {
+    "id": {"type": "string"},
+    "title": {"type": "string"},
+    "domain": {"type": "string"},
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "reference"],
+        "properties": {
+          "type": {"type": "string", "enum": ["protocol", "instrument", "dataset", "analysis_plan", "paper"]},
+          "reference": {"type": "string"}
+        }
+      }
+    },
+    "accepted_specifications": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "accepted_method_paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["method_id"],
+        "properties": {
+          "method_id": {"type": "string"},
+          "conditions": {"type": "array", "items": {"type": "string"}},
+          "rationale": {"type": "string"}
+        }
+      }
+    },
+    "expert_review": {
+      "type": "object",
+      "properties": {
+        "statistician_a": {"type": ["string", "null"]},
+        "statistician_b": {"type": ["string", "null"]},
+        "adjudicator": {"type": ["string", "null"]},
+        "notes": {"type": ["string", "null"]}
+      }
+    }
+  }
+}
