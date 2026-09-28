@@ -494,3 +494,63 @@ def run_analysis(payload: dict[str, Any]) -> dict[str, Any]:
         return logistic_regression(rows, outcome, model_variables)
 
     raise ValueError(f"Statistical method is not implemented by the Python runner: {method}")
+
+
+def harmonise_append(payload: dict[str, Any]) -> dict[str, Any]:
+    sources = payload.get("sources")
+    mappings = payload.get("mappings")
+    if not isinstance(sources, list) or len(sources) < 2:
+        raise ValueError("Harmonised append requires at least two source datasets.")
+    if not isinstance(mappings, list) or not mappings:
+        raise ValueError("Harmonised append requires variable mappings.")
+
+    target_variables: list[str] = []
+    mapping_by_source: dict[str, list[dict[str, Any]]] = {}
+
+    for mapping in mappings:
+        source_id = str(mapping.get("sourceDatasetVersionId") or "")
+        source_variable = str(mapping.get("sourceVariable") or "")
+        target_variable = str(mapping.get("targetVariable") or "")
+        if not source_id or not source_variable or not target_variable:
+            raise ValueError("Every mapping requires sourceDatasetVersionId, sourceVariable and targetVariable.")
+        if target_variable not in target_variables:
+            target_variables.append(target_variable)
+        mapping_by_source.setdefault(source_id, []).append(mapping)
+
+    output_rows: list[dict[str, str]] = []
+
+    for source in sources:
+        source_id = str(source.get("datasetVersionId") or "")
+        csv_text = source.get("csv")
+        if not source_id or not isinstance(csv_text, str):
+            raise ValueError("Each source requires datasetVersionId and csv.")
+
+        rows = _rows(csv_text)
+        source_mappings = mapping_by_source.get(source_id, [])
+        if not source_mappings:
+            raise ValueError(f"No mappings were supplied for source dataset {source_id}.")
+
+        for row in rows:
+            output: dict[str, str] = {target: "" for target in target_variables}
+            for mapping in source_mappings:
+                source_variable = str(mapping["sourceVariable"])
+                target_variable = str(mapping["targetVariable"])
+                raw = row.get(source_variable)
+                value = "" if raw is None else str(raw)
+                category_map = mapping.get("categoryMap") or {}
+                if value in category_map:
+                    value = str(category_map[value])
+                output[target_variable] = value
+            output_rows.append(output)
+
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=target_variables, lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(output_rows)
+
+    return {
+        "csv": buffer.getvalue(),
+        "rowCount": len(output_rows),
+        "columnCount": len(target_variables),
+        "columns": target_variables,
+    }
