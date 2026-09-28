@@ -314,6 +314,21 @@ export function LiveProjectPage({
   }, [projectId]);
 
   const title = project?.name ?? "Methodome project";
+  const sectionDescriptions: Record<string, string> = {
+    overview: "Project sources, research decisions, analysis readiness and next actions.",
+    protocol: "Upload the study protocol and review the study information Methodome extracts from it.",
+    instruments: "Add questionnaires or codebooks that can provide evidence for variable mapping.",
+    data: "Upload source datasets, compare form versions and create harmonised dataset versions.",
+    "data-preparation": "Inspect dataset structure and derived versions before analysis planning.",
+    "study-design": "Review research questions and confirm the study design that constrains valid analyses.",
+    variables: "Connect confirmed research concepts to observed dataset variables using explicit evidence.",
+    "analysis-plan": "Review candidate methods for each research question and lock the approved plan.",
+    analysis: "Run the analyses recorded in the locked plan through deterministic statistical computation.",
+    results: "Review estimates, diagnostics, warnings and software details from completed analyses.",
+    reports: "Prepare research outputs from completed structured results.",
+    "audit-trail": "Inspect the record of project actions and versioned research decisions.",
+    settings: "Set the project data class, ethics reference and model-processing policy."
+  };
 
   return (
     <main className="app-content">
@@ -321,7 +336,10 @@ export function LiveProjectPage({
       <PageHeader
         eyebrow={section.replaceAll("-", " ").toUpperCase()}
         title={title}
-        description="This workspace is connected to the Methodome API."
+        description={
+          sectionDescriptions[section] ??
+          "Continue structured research work in this Methodome project."
+        }
       />
       <LiveWorkflowGuide projectId={projectId} />
       {section === "overview" && <LiveOverview projectId={projectId} project={project} />}
