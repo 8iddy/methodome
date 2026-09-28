@@ -40,6 +40,25 @@ export interface CandidateSelection {
 export const registryVersion = "0.1.0";
 
 export const methodRegistry: Record<string, MethodDefinition> = {
+  descriptive_statistics: {
+    id: "descriptive_statistics",
+    displayName: "Descriptive statistics",
+    family: "descriptive",
+    maturity: "validated",
+    executable: true,
+    outcomeTypes: [
+      "binary",
+      "categorical_nominal",
+      "categorical_ordinal",
+      "count",
+      "continuous"
+    ],
+    supportsClustering: false,
+    supportsRepeatedMeasures: false,
+    supportsSurveyWeights: false,
+    assumptions: ["variables are interpreted according to their measurement type"],
+    diagnostics: ["numeric observations available"]
+  },
   pearson_correlation: {
     id: "pearson_correlation",
     displayName: "Pearson correlation",
@@ -224,6 +243,19 @@ export function selectCandidateMethods(
       candidates: [],
       warnings: [],
       blockedReason: "Outcome type must be confirmed before methods can be selected."
+    };
+  }
+
+  if (question.objectiveType === "descriptive") {
+    return {
+      questionId,
+      candidates: [
+        candidate(
+          "descriptive_statistics",
+          "The research question is descriptive and the outcome mapping has been confirmed."
+        )
+      ],
+      warnings: []
     };
   }
 
