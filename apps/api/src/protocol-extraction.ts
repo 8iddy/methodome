@@ -140,26 +140,80 @@ const extractionJsonSchema = {
 } as const;
 
 export const PROTOCOL_EXTRACTION_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
-export const PROTOCOL_EXTRACTION_PROMPT_VERSION = "protocol-extraction-v1";
+export const PROTOCOL_EXTRACTION_PROMPT_VERSION = "protocol-extraction-v2";
+const PROTOCOL_EXTRACTION_MAX_TOKENS = 4096;
+const PROTOCOL_INPUT_CHAR_LIMIT = 68000;
 
-function modelText(result: unknown): string {
+function modelPayload(result: unknown): unknown {
   if (typeof result === "string") return result;
   if (!result || typeof result !== "object") {
     throw new Error("Workers AI returned an empty extraction response.");
   }
+
   const record = result as Record<string, unknown>;
-  if (typeof record.response === "string") return record.response;
-  if (record.response && typeof record.response === "object") return JSON.stringify(record.response);
+  if (record.response !== undefined) return record.response;
+
   if (record.result && typeof record.result === "object") {
     const nested = record.result as Record<string, unknown>;
-    if (typeof nested.response === "string") return nested.response;
+    if (nested.response !== undefined) return nested.response;
   }
+
   if (Array.isArray(record.choices)) {
     const first = record.choices[0] as Record<string, unknown> | undefined;
     const message = first?.message as Record<string, unknown> | undefined;
-    if (typeof message?.content === "string") return message.content;
+    if (message?.content !== undefined) return message.content;
   }
+
   throw new Error("Workers AI returned an unsupported extraction response.");
+}
+
+function parseModelJson(payload: unknown): unknown {
+  if (payload && typeof payload === "object") return payload;
+  if (typeof payload !== "string") {
+    throw new Error("Protocol extraction did not return structured JSON.");
+  }
+
+  const trimmed = payload
+    .trim()
+    .replace(/^\`\`\`(?:json)?\s*/i, "")
+    .replace(/\s*\`\`\`$/, "");
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start === -1 || end <= start) {
+      throw new Error("Protocol extraction did not return valid JSON.");
+    }
+    try {
+      return JSON.parse(trimmed.slice(start, end + 1));
+    } catch {
+      throw new Error("Protocol extraction returned incomplete JSON.");
+    }
+  }
+}
+
+function protocolInputWindow(text: string): string {
+  if (text.length <= PROTOCOL_INPUT_CHAR_LIMIT) return text;
+
+  const front = text.slice(0, 42000);
+  const tail = text.slice(-26000);
+  return [
+    front,
+    "\n\n[Methodome omitted the middle of this unusually long protocol to stay within the model context window.]\n\n",
+    tail
+  ].join("");
+}
+
+function validateProtocolExtraction(payload: unknown): ProtocolExtraction {
+  const parsed = protocolExtractionSchema.parse(parseModelJson(payload));
+  if (parsed.researchQuestions.length === 0) {
+    throw new Error(
+      "Methodome did not find a research question in this protocol. Review the protocol or add the study information manually."
+    );
+  }
+  return parsed;
 }
 
 export async function researchFileToText(input: {
@@ -229,46 +283,60 @@ export async function extractProtocolWithAi(
     throw new Error("The protocol contains no readable text.");
   }
 
+  const protocol = protocolInputWindow(trimmed);
   const ai = env.AI as any;
-  const response = await ai.run(PROTOCOL_EXTRACTION_MODEL, {
-    messages: [
-      {
-        role: "system",
-        content:
-          "You extract research design information from study protocols. Use only information supported by the supplied protocol. Do not invent missing fields, dataset variable names, methods, outcomes, predictors, covariates, sampling features, or design features. Use null or an empty array when the protocol does not state something. Preserve each distinct research question as a separate item. Return only the requested structured JSON."
-      },
-      {
-        role: "user",
-        content: `Extract the study information from this protocol.\n\nPROTOCOL\n${trimmed.slice(0, 120000)}`
-      }
-    ],
-    temperature: 0,
-    response_format: {
-      type: "json_schema",
-      json_schema: extractionJsonSchema
-    }
-  });
+  const systemPrompt =
+    "You extract research design information from study protocols. Use only information supported by the supplied protocol. Do not invent missing fields, dataset variable names, methods, outcomes, predictors, covariates, sampling features, or design features. Use null or an empty array when the protocol does not state something. Preserve every distinct research question as a separate item. Return only structured JSON that matches the requested schema.";
 
-  const raw = modelText(response);
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
-  } catch {
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    if (start === -1 || end <= start) {
-      throw new Error("Protocol extraction did not return valid JSON.");
-    }
-    parsed = JSON.parse(raw.slice(start, end + 1));
-  }
+    const response = await ai.run(PROTOCOL_EXTRACTION_MODEL, {
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: `Extract the study information from this protocol.\n\nPROTOCOL\n${protocol}`
+        }
+      ],
+      temperature: 0,
+      max_tokens: PROTOCOL_EXTRACTION_MAX_TOKENS,
+      response_format: {
+        type: "json_schema",
+        json_schema: extractionJsonSchema
+      }
+    });
 
-  const extraction = protocolExtractionSchema.parse(parsed);
-  if (extraction.researchQuestions.length === 0) {
-    throw new Error(
-      "Methodome did not find a research question in this protocol. Add the research question manually during study review."
-    );
+    return validateProtocolExtraction(modelPayload(response));
+  } catch (firstError) {
+    const retry = await ai.run(PROTOCOL_EXTRACTION_MODEL, {
+      messages: [
+        {
+          role: "system",
+          content:
+            systemPrompt +
+            " The previous structured extraction failed. Be concise. Do not add prose, Markdown fences, comments, or trailing text."
+        },
+        {
+          role: "user",
+          content: `Return one JSON object for this protocol with these exact top-level keys: studyTitle, objectives, hypotheses, researchQuestions, studyDesign, unitOfAnalysis, population, samplingDesign, repeatedMeasures, clustered, clusterConcept, surveyWeights, weightConcept, stratified, strataConcept, missingDataPlan, statedAnalysisPlan. Each researchQuestions item must contain text, objectiveType, outcomes, predictors, covariates, estimand.\n\nPROTOCOL\n${protocol}`
+        }
+      ],
+      temperature: 0,
+      max_tokens: PROTOCOL_EXTRACTION_MAX_TOKENS,
+      response_format: {
+        type: "json_object"
+      }
+    });
+
+    try {
+      return validateProtocolExtraction(modelPayload(retry));
+    } catch {
+      const reason =
+        firstError instanceof Error ? firstError.message : "structured extraction failed";
+      throw new Error(
+        `Methodome could not extract a complete study specification from this protocol. ${reason}`
+      );
+    }
   }
-  return extraction;
 }
 
 export interface MappingSuggestion {
@@ -368,6 +436,7 @@ export async function suggestMappingsWithAi(input: {
       }
     ],
     temperature: 0,
+    max_tokens: 2048,
     response_format: {
       type: "json_object"
     }
