@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 const API = (process.env.METHODOME_API_URL ?? "https://api.methodome.com/api").replace(/\/$/, "");
+const APP_ORIGIN = process.env.METHODOME_APP_ORIGIN ?? "https://methodome.com";
 const email = `smoke-${Date.now()}-${crypto.randomBytes(4).toString("hex")}@methodome.com`;
 const password = `Mth!${crypto.randomBytes(24).toString("base64url")}9a`;
 const cookies = new Map();
@@ -31,6 +32,7 @@ function cookieHeader() {
 
 async function request(path, init = {}, expected = [200]) {
   const headers = new Headers(init.headers ?? {});
+  if (!headers.has("origin")) headers.set("origin", APP_ORIGIN);
   const cookie = cookieHeader();
   if (cookie) headers.set("cookie", cookie);
   if (init.body != null && !headers.has("content-type")) {
@@ -77,7 +79,10 @@ async function uploadResearchFile(kind, filename, content, mediaType = "text/pla
     ? uploadPath
     : `${API.replace(/\/api$/, "")}${uploadPath}`;
 
-  const headers = new Headers({ "content-type": mediaType });
+  const headers = new Headers({
+    "content-type": mediaType,
+    origin: APP_ORIGIN
+  });
   const cookie = cookieHeader();
   if (cookie) headers.set("cookie", cookie);
 
@@ -114,7 +119,10 @@ async function uploadDataset(label, filename, csv) {
     ? uploadPath
     : `${API.replace(/\/api$/, "")}${uploadPath}`;
 
-  const headers = new Headers({ "content-type": "text/csv" });
+  const headers = new Headers({
+    "content-type": "text/csv",
+    origin: APP_ORIGIN
+  });
   const cookie = cookieHeader();
   if (cookie) headers.set("cookie", cookie);
   const uploaded = await fetch(uploadUrl, {
