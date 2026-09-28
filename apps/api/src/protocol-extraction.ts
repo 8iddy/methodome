@@ -206,6 +206,61 @@ function protocolInputWindow(text: string): string {
   ].join("");
 }
 
+function inferObjectiveType(
+  text: string
+): NonNullable<ProtocolExtraction["researchQuestions"][number]["objectiveType"]> {
+  const value = text.toLowerCase();
+
+  if (
+    /\b(effect|impact|causal|intervention|treatment effect|attributable|counterfactual)\b/.test(
+      value
+    )
+  ) {
+    return "causal";
+  }
+  if (/\b(predict|prediction|classif|forecast|risk score)\b/.test(value)) {
+    return "prediction";
+  }
+  if (
+    /\b(diagnostic|diagnos|sensitivity|specificity|screening accuracy|detect)\b/.test(
+      value
+    )
+  ) {
+    return "diagnostic";
+  }
+  if (/\b(prognos|future risk|survival|time to event|recurrence)\b/.test(value)) {
+    return "prognostic";
+  }
+  if (
+    /\b(associat|relationship|correlat|related to|difference between|differ by|determinant|factor associated)\b/.test(
+      value
+    )
+  ) {
+    return "association";
+  }
+  if (
+    /\b(prevalence|proportion|frequency|distribution|level|levels|pattern|patterns|status|current|how many|how much|what are|what is)\b/.test(
+      value
+    )
+  ) {
+    return "descriptive";
+  }
+  return "exploratory";
+}
+
+function enrichProtocolExtraction(
+  extraction: ProtocolExtraction
+): ProtocolExtraction {
+  return {
+    ...extraction,
+    researchQuestions: extraction.researchQuestions.map((question) => ({
+      ...question,
+      objectiveType:
+        question.objectiveType ?? inferObjectiveType(question.text)
+    }))
+  };
+}
+
 function validateProtocolExtraction(payload: unknown): ProtocolExtraction {
   const parsed = protocolExtractionSchema.parse(parseModelJson(payload));
   if (parsed.researchQuestions.length === 0) {
@@ -213,7 +268,7 @@ function validateProtocolExtraction(payload: unknown): ProtocolExtraction {
       "Methodome did not find a research question in this protocol. Review the protocol or add the study information manually."
     );
   }
-  return parsed;
+  return enrichProtocolExtraction(parsed);
 }
 
 export async function researchFileToText(input: {
