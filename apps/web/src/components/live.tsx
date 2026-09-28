@@ -1569,64 +1569,284 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
 }
 
 function LiveVariables({ projectId }: { projectId: string }) {
-  const [spec, setSpec] = useState<StudySpecification | null>(null);
-  const [mappings, setMappings] = useState<Array<Record<string, unknown>>>([]);
-  const [status, setStatus] = useState("");
+  type MappingRow = {
+    researchConcept: string;
+    usages: string[];
+    datasetVariable?: string;
+    mappingStatus: "direct_match" | "probable_match" | "uncertain" | "no_match";
+    evidence: string[];
+    confirmed: boolean;
+  };
 
-  async function refresh() {
-    const [s, m] = await Promise.all([
-      getStudySpecification(projectId),
-      getVariableMappings(projectId)
-    ]);
-    setSpec(s);
-    setMappings(m);
+  const [spec, setSpec] = useState<StudySpecification | null>(null);
+  const [rows, setRows] = useState<MappingRow[]>([]);
+  const [variables, setVariables] = useState<Awaited<ReturnType<typeof getVariableMappingSuggestions>>["variables"]>([]);
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  function conceptKey(value: string) {
+    return value.trim().toLowerCase();
+  }
+
+  function usagesForSpecification(specification: StudySpecification) {
+    const map = new Map<string, { concept: string; usages: string[] }>();
+    specification.researchQuestions.forEach((question, index) => {
+      const roles: Array<[string, StudySpecification["researchQuestions"][number]["outcomes"]]> = [
+        ["Outcome", question.outcomes],
+        ["Predictor", question.predictors],
+        ["Covariate", question.covariates]
+      ];
+      for (const [role, concepts] of roles) {
+        for (const variable of concepts) {
+          const key = conceptKey(variable.concept);
+          const existing = map.get(key) ?? { concept: variable.concept, usages: [] };
+          existing.usages.push(`RQ${index + 1} · ${role}`);
+          map.set(key, existing);
+        }
+      }
+    });
+    return map;
+  }
+
+  async function loadSuggestions(specification: StudySpecification, saved: VariableMapping[]) {
+    const usageMap = usagesForSpecification(specification);
+    if (usageMap.size === 0) {
+      setRows([]);
+      setStatus("No outcome, predictor or covariate concepts are defined in the study specification.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const response = await getVariableMappingSuggestions(projectId);
+      setVariables(response.variables);
+      const suggested = new Map(
+        response.suggestions.map((item) => [conceptKey(item.researchConcept), item])
+      );
+      const existing = new Map(saved.map((item) => [conceptKey(item.researchConcept), item]));
+
+      setRows(
+        Array.from(usageMap.values()).map(({ concept, usages }) => {
+          const stored = existing.get(conceptKey(concept));
+          if (stored) {
+            return {
+              researchConcept: concept,
+              usages,
+              ...(stored.datasetVariable ? { datasetVariable: stored.datasetVariable } : {}),
+              mappingStatus: stored.mappingStatus,
+              evidence: stored.evidence,
+              confirmed: Boolean(stored.confirmedBy)
+            };
+          }
+          const candidate = suggested.get(conceptKey(concept));
+          return {
+            researchConcept: concept,
+            usages,
+            ...(candidate?.datasetVariable ? { datasetVariable: candidate.datasetVariable } : {}),
+            mappingStatus: candidate?.mappingStatus ?? "no_match",
+            evidence: candidate?.evidence ?? ["No mapping suggestion is available."],
+            confirmed: false
+          };
+        })
+      );
+      setStatus(
+        saved.length
+          ? "Saved mappings loaded. Review any unconfirmed mappings."
+          : "Mapping suggestions are ready. Confirm, change, or mark each concept as not represented."
+      );
+    } catch (err) {
+      setStatus(message(err));
+    } finally {
+      setBusy(false);
+    }
   }
 
   useEffect(() => {
-    void refresh().catch((err) => setStatus(message(err)));
+    Promise.all([getStudySpecification(projectId), getVariableMappings(projectId)])
+      .then(([specification, saved]) => {
+        setSpec(specification);
+        if (!specification) {
+          setStatus("Confirm the study specification before mapping variables.");
+          return;
+        }
+        void loadSuggestions(specification, saved);
+      })
+      .catch((err) => setStatus(message(err)));
   }, [projectId]);
 
-  async function confirmFromSpecification() {
-    if (!spec) return;
-    const question = spec.researchQuestions[0];
-    const variables = [...(question?.outcomes ?? []), ...(question?.predictors ?? []), ...(question?.covariates ?? [])];
+  function updateRow(index: number, patch: Partial<MappingRow>) {
+    setRows((current) =>
+      current.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, ...patch } : row
+      )
+    );
+  }
+
+  async function confirmMappings() {
+    if (!spec || rows.length === 0) return;
+    setBusy(true);
+    setStatus("");
     try {
       await saveVariableMappings(
         projectId,
-        variables.map((variable) => ({
-          id: `map_${crypto.randomUUID().replaceAll("-", "")}`,
-          researchConcept: variable.concept,
-          ...(variable.datasetVariable ? { datasetVariable: variable.datasetVariable } : {}),
-          mappingStatus: variable.datasetVariable ? "direct_match" : "no_match",
-          evidence: ["Confirmed from the current study specification."],
+        rows.map((row) => ({
+          id: `map_${simpleHash(conceptKey(row.researchConcept))}`,
+          researchConcept: row.researchConcept,
+          ...(row.datasetVariable ? { datasetVariable: row.datasetVariable } : {}),
+          mappingStatus: row.datasetVariable ? row.mappingStatus : "no_match",
+          evidence: row.evidence,
           confirmed: true
         }))
       );
-      setStatus("Variable mappings confirmed.");
-      await refresh();
+      setRows((current) => current.map((row) => ({ ...row, confirmed: true })));
+      setStatus("Reviewed variable mappings saved and confirmed.");
     } catch (err) {
       setStatus(message(err));
+    } finally {
+      setBusy(false);
     }
+  }
+
+  function variableSummary(variableName?: string) {
+    if (!variableName) return "Not represented";
+    const variable = variables.find((item) => item.variableName === variableName);
+    if (!variable) return variableName;
+    const range = variable.range
+      ? ` · ${variable.range.min} to ${variable.range.max}`
+      : variable.responseChoices?.length
+        ? ` · ${variable.responseChoices.map((choice) => choice.label).join(", ")}`
+        : "";
+    return `${variable.dataType.replaceAll("_", " ")}${range}`;
+  }
+
+  function humanStatus(value: MappingRow["mappingStatus"]) {
+    return value.replaceAll("_", " ").replace(/^./, (character) => character.toUpperCase());
   }
 
   return (
     <section className="panel table-wrap">
-      <div className="panel-heading"><h2>Variable mappings</h2><Button onClick={() => void confirmFromSpecification()}>Confirm current mappings</Button></div>
-      <table>
-        <thead><tr><th>Research concept</th><th>Dataset variable</th><th>Status</th></tr></thead>
-        <tbody>
-          {mappings.map((mapping, index) => (
-            <tr key={String(mapping.id ?? index)}>
-              <td>{String(mapping.researchConcept ?? "")}</td>
-              <td><code>{String(mapping.datasetVariable ?? "Not represented")}</code></td>
-              <td>{String(mapping.mappingStatus ?? "")}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="panel-heading">
+        <div>
+          <h2>Variable mappings</h2>
+          <p className="muted">
+            Research concepts come from the study specification. Dataset variables come from the profiled analysis data.
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            spec
+              ? void Promise.all([getVariableMappings(projectId)]).then(([saved]) =>
+                  loadSuggestions(spec, saved)
+                )
+              : undefined
+          }
+        >
+          Refresh suggestions
+        </Button>
+      </div>
+
+      {rows.length > 0 ? (
+        <>
+          <table>
+            <thead>
+              <tr>
+                <th>Research concept</th>
+                <th>Used in</th>
+                <th>Dataset variable</th>
+                <th>Observed metadata</th>
+                <th>Status</th>
+                <th>Evidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={row.researchConcept}>
+                  <td>
+                    <strong>{row.researchConcept}</strong>
+                    {row.confirmed && <><br /><Badge kind="success">Confirmed</Badge></>}
+                  </td>
+                  <td>{row.usages.join("; ")}</td>
+                  <td>
+                    <select
+                      value={row.datasetVariable ?? ""}
+                      onChange={(event) => {
+                        const selected = event.target.value;
+                        updateRow(index, selected
+                          ? {
+                              datasetVariable: selected,
+                              mappingStatus:
+                                row.datasetVariable === selected
+                                  ? row.mappingStatus
+                                  : "uncertain",
+                              evidence:
+                                row.datasetVariable === selected
+                                  ? row.evidence
+                                  : ["Researcher selected this dataset variable during mapping review."],
+                              confirmed: false
+                            }
+                          : {
+                              datasetVariable: undefined,
+                              mappingStatus: "no_match",
+                              evidence: ["Researcher marked this concept as not represented in the dataset."],
+                              confirmed: false
+                            });
+                      }}
+                    >
+                      <option value="">Not represented</option>
+                      {variables.map((variable) => (
+                        <option key={variable.variableName} value={variable.variableName}>
+                          {variable.variableName}
+                          {variable.label && variable.label !== variable.variableName
+                            ? ` · ${variable.label}`
+                            : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>{variableSummary(row.datasetVariable)}</td>
+                  <td>
+                    <Badge
+                      kind={
+                        row.mappingStatus === "direct_match"
+                          ? "success"
+                          : row.mappingStatus === "probable_match"
+                            ? "blue"
+                            : "warning"
+                      }
+                    >
+                      {humanStatus(row.mappingStatus)}
+                    </Badge>
+                  </td>
+                  <td>{row.evidence.join(" ")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="muted">
+            Direct match is reserved for exact metadata evidence. Semantic suggestions remain probable or uncertain until you confirm them.
+          </p>
+          <Button onClick={() => void confirmMappings()}>
+            {busy ? "Working…" : "Confirm reviewed mappings"}
+          </Button>
+        </>
+      ) : (
+        <p className="muted">
+          {busy ? "Preparing mapping suggestions…" : "No mappings are available yet."}
+        </p>
+      )}
       {status && <p className="confirmation" role="status">{status}</p>}
     </section>
   );
+}
+
+function simpleHash(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
 }
 
 function LiveAnalysisPlan({ projectId }: { projectId: string }) {
