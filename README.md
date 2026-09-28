@@ -56,14 +56,20 @@ The `docs/` directory is the build source of truth.
 7. [Benchmark and validation](docs/07-benchmark-validation.md)
 8. [Build plan](docs/08-build-plan.md)
 9. [Codex build brief](docs/09-codex-build-brief.md)
+10. [Cloudflare bootstrap](docs/10-cloudflare-bootstrap.md)
+11. [Cloudflare deployment mode](docs/11-free-tier-deployment.md)
+12. [Authentication](docs/12-authentication.md)
+13. [Release readiness](docs/13-release-readiness.md)
 
 Machine-readable planning artefacts live under `spec/`.
 
 ## Current stage
 
-Planning and specification.
+Integrated MVP deployed and production validated.
 
-Application implementation should begin only after the benchmark design, study specification schema, and method registry contract are agreed.
+Methodome now has a working full-stack quantitative research workflow: authenticated research projects, private R2-backed research files and datasets, form-version profiling and harmonisation, structured study specifications, deterministic method selection, locked analysis plans, queued statistical execution, structured results, provenance, audit history, and the Next.js research workspace.
+
+The deployed production workflow passed the complete end-to-end smoke test on 28 September 2026.
 
 ## Initial infrastructure direction
 
@@ -74,7 +80,7 @@ Cloudflare-first:
 - Cloudflare D1
 - Cloudflare R2
 - Cloudflare Queues and Workflows
-- Cloudflare Containers for R/Python execution
+- Cloudflare Python Worker for the initial statistical execution engine
 - Cloudflare Workers AI or another provider behind a model adapter
 - Quarto for reproducible reporting
 

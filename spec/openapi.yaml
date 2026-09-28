@@ -1,0 +1,108 @@
+openapi: 3.1.0
+info:
+  title: Methodome API
+  version: 0.1.0
+  description: Initial integration contract for the Methodome research analysis platform.
+servers:
+  - url: /api
+paths:
+  /projects:
+    get:
+      summary: List projects available to the signed in user
+      responses:
+        "200":
+          description: Project list
+    post:
+      summary: Create a project
+      responses:
+        "201":
+          description: Project created
+  /projects/{projectId}:
+    get:
+      summary: Get project details
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project
+        "404":
+          description: Project not found
+  /projects/{projectId}/uploads:
+    post:
+      summary: Create an upload intent for a research file
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "201":
+          description: Upload intent created
+  /projects/{projectId}/study-specification:
+    get:
+      summary: Get the current structured study specification
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Current study specification
+    put:
+      summary: Save a researcher confirmed study specification
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Study specification saved
+  /projects/{projectId}/method-candidates:
+    get:
+      summary: Evaluate deterministic method candidates for the current study specification
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Candidate methods grouped by research question
+  /projects/{projectId}/analysis-jobs:
+    post:
+      summary: Create an analysis job
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "202":
+          description: Job accepted
+  /analysis-jobs/{jobId}:
+    get:
+      summary: Get analysis job state
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: Job state
+  /analysis-jobs/{jobId}/result:
+    get:
+      summary: Get structured analysis result
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: Structured result
+        "404":
+          description: Result is not available
+  /projects/{projectId}/audit:
+    get:
+      summary: List project audit events
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Audit events
+components:
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string

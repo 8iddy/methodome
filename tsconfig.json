@@ -1,0 +1,71 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@methodome/domain": [
+        "packages/domain/src/index.ts"
+      ],
+      "@methodome/study-spec": [
+        "packages/study-spec/src/index.ts"
+      ],
+      "@methodome/method-registry": [
+        "packages/method-registry/src/index.ts"
+      ],
+      "@methodome/analysis-contracts": [
+        "packages/analysis-contracts/src/index.ts"
+      ],
+      "@methodome/model-adapter": [
+        "packages/model-adapter/src/index.ts"
+      ],
+      "@methodome/policy-engine": [
+        "packages/policy-engine/src/index.ts"
+      ],
+      "@methodome/provenance": [
+        "packages/provenance/src/index.ts"
+      ],
+      "@methodome/data-pipeline": [
+        "packages/data-pipeline/src/index.ts"
+      ],
+      "@methodome/benchmark": [
+        "packages/benchmark/src/index.ts"
+      ],
+      "@methodome/analysis-plan": [
+        "packages/analysis-plan/src/index.ts"
+      ],
+      "@methodome/schema-harmonisation": [
+        "packages/schema-harmonisation/src/index.ts"
+      ]
+    },
+    "types": [
+      "@cloudflare/workers-types",
+      "node"
+    ]
+  },
+  "include": [
+    "apps/api/**/*.ts",
+    "packages/**/*.ts",
+    "services/**/*.ts",
+    "tests/**/*.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "apps/web"
+  ]
+}
