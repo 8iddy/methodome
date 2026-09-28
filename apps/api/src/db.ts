@@ -449,3 +449,143 @@ export async function updateProjectPolicy(
     )
     .run();
 }
+
+export async function createDatasetVersion(
+  db: D1Database,
+  input: {
+    id: string;
+    projectId: string;
+    label: string;
+    sourceKind: "original" | "derived";
+    objectKey: string;
+    checksumSha256: string;
+    rowCount?: number;
+    columnCount?: number;
+    createdBy: string;
+    parentVersionIds?: string[];
+  }
+): Promise<void> {
+  const now = new Date().toISOString();
+  const statements: D1PreparedStatement[] = [
+    db
+      .prepare(
+        `INSERT INTO dataset_versions
+         (id, project_id, label, source_kind, object_key, checksum_sha256,
+          row_count, column_count, created_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        input.id,
+        input.projectId,
+        input.label,
+        input.sourceKind,
+        input.objectKey,
+        input.checksumSha256,
+        input.rowCount ?? null,
+        input.columnCount ?? null,
+        input.createdBy,
+        now
+      )
+  ];
+
+  for (const parentId of input.parentVersionIds ?? []) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO dataset_version_parents
+           (dataset_version_id, parent_dataset_version_id)
+           VALUES (?, ?)`
+        )
+        .bind(input.id, parentId)
+    );
+  }
+
+  await db.batch(statements);
+}
+
+export async function listDatasetVersions(
+  db: D1Database,
+  projectId: string
+): Promise<Array<{
+  id: string;
+  projectId: string;
+  label: string;
+  sourceKind: "original" | "derived";
+  objectKey: string;
+  checksumSha256: string;
+  rowCount?: number;
+  columnCount?: number;
+  createdAt: string;
+  createdBy: string;
+  parentVersionIds: string[];
+}>> {
+  const rows = await db
+    .prepare(
+      `SELECT * FROM dataset_versions
+       WHERE project_id = ?
+       ORDER BY created_at DESC`
+    )
+    .bind(projectId)
+    .all<Record<string, unknown>>();
+
+  const output = [];
+
+  for (const row of rows.results) {
+    const parents = await db
+      .prepare(
+        `SELECT parent_dataset_version_id
+         FROM dataset_version_parents
+         WHERE dataset_version_id = ?`
+      )
+      .bind(String(row.id))
+      .all<{ parent_dataset_version_id: string }>();
+
+    output.push({
+      id: String(row.id),
+      projectId: String(row.project_id),
+      label: String(row.label),
+      sourceKind: String(row.source_kind) as "original" | "derived",
+      objectKey: String(row.object_key),
+      checksumSha256: String(row.checksum_sha256),
+      ...(row.row_count != null ? { rowCount: Number(row.row_count) } : {}),
+      ...(row.column_count != null ? { columnCount: Number(row.column_count) } : {}),
+      createdAt: String(row.created_at),
+      createdBy: String(row.created_by),
+      parentVersionIds: parents.results.map((item) => item.parent_dataset_version_id)
+    });
+  }
+
+  return output;
+}
+
+export async function getFileForDatasetRegistration(
+  db: D1Database,
+  fileId: string,
+  projectId: string
+): Promise<{
+  id: string;
+  objectKey: string;
+  checksumSha256: string;
+  fileKind: string;
+  filename: string;
+} | null> {
+  const row = await db
+    .prepare(
+      `SELECT id, object_key, checksum_sha256, file_kind, filename
+       FROM files
+       WHERE id = ? AND project_id = ?
+       LIMIT 1`
+    )
+    .bind(fileId, projectId)
+    .first<Record<string, unknown>>();
+
+  return row
+    ? {
+        id: String(row.id),
+        objectKey: String(row.object_key),
+        checksumSha256: String(row.checksum_sha256),
+        fileKind: String(row.file_kind),
+        filename: String(row.filename)
+      }
+    : null;
+}
