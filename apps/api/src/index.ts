@@ -841,6 +841,278 @@ app.post("/projects/:projectId/schema-comparison", async (c) => {
   return c.json({ comparison });
 });
 
+app.get("/projects/:projectId/protocol-extraction", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const record = await getLatestProtocolExtraction(c.env.DB, projectId);
+  if (!record) return c.json({ extraction: null });
+
+  return c.json({
+    extraction: {
+      ...protocolExtractionSchema.parse(record.extraction),
+      provenance: {
+        id: record.id,
+        protocolFileId: record.protocolFileId,
+        protocolChecksum: record.protocolChecksum,
+        provider: record.provider,
+        model: record.model,
+        promptVersion: record.promptVersion,
+        createdAt: record.createdAt
+      }
+    }
+  });
+});
+
+app.post("/projects/:projectId/protocol-extraction", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  if (!c.env.FILES) {
+    return c.json(
+      {
+        error: {
+          code: "OBJECT_STORAGE_NOT_CONFIGURED",
+          message: "Research file storage is required for protocol extraction."
+        }
+      },
+      503
+    );
+  }
+
+  if (!c.env.AI) {
+    return c.json(
+      {
+        error: {
+          code: "AI_NOT_CONFIGURED",
+          message: "Workers AI is required for protocol extraction."
+        }
+      },
+      503
+    );
+  }
+
+  const body = await c.req.json().catch(() => ({})) as { fileId?: string };
+  const protocolFiles = await listProjectFiles(c.env.DB, projectId, "protocol");
+  const fileId = body.fileId ?? protocolFiles[0]?.id;
+  if (!fileId) {
+    return c.json(
+      {
+        error: {
+          code: "PROTOCOL_REQUIRED",
+          message: "Upload a protocol before extracting study information."
+        }
+      },
+      409
+    );
+  }
+
+  const file = await getFileRecord(c.env.DB, fileId, getUserId(c));
+  if (!file || file.projectId !== projectId || file.fileKind !== "protocol") {
+    return c.json(
+      {
+        error: {
+          code: "PROTOCOL_FILE_NOT_FOUND",
+          message: "The selected protocol file was not found in this project."
+        }
+      },
+      404
+    );
+  }
+
+  if (file.checksumSha256 === "pending") {
+    return c.json(
+      {
+        error: {
+          code: "PROTOCOL_UPLOAD_INCOMPLETE",
+          message: "Finish uploading the protocol before extraction."
+        }
+      },
+      409
+    );
+  }
+
+  const object = await c.env.FILES.get(file.objectKey);
+  if (!object) {
+    return c.json(
+      {
+        error: {
+          code: "PROTOCOL_OBJECT_NOT_FOUND",
+          message: "The stored protocol file could not be read."
+        }
+      },
+      404
+    );
+  }
+
+  try {
+    const bytes = await object.arrayBuffer();
+    const text = await researchFileToText({
+      env: c.env,
+      filename: file.filename,
+      ...(file.mediaType ? { mediaType: file.mediaType } : {}),
+      bytes
+    });
+    const extraction = await extractProtocolWithAi(c.env, text);
+    const id = makeId("extract");
+    await saveProtocolExtraction(c.env.DB, {
+      id,
+      projectId,
+      protocolFileId: file.id,
+      protocolChecksum: file.checksumSha256,
+      extraction,
+      provider: "cloudflare-workers-ai",
+      model: PROTOCOL_EXTRACTION_MODEL,
+      promptVersion: PROTOCOL_EXTRACTION_PROMPT_VERSION
+    });
+    await addAudit(c, {
+      projectId,
+      action: "protocol_information_extracted",
+      objectType: "protocol_extraction",
+      objectId: id,
+      modelId: PROTOCOL_EXTRACTION_MODEL,
+      after: {
+        protocolFileId: file.id,
+        protocolChecksum: file.checksumSha256,
+        promptVersion: PROTOCOL_EXTRACTION_PROMPT_VERSION,
+        researchQuestionCount: extraction.researchQuestions.length
+      }
+    });
+
+    return c.json({
+      extraction: {
+        ...extraction,
+        provenance: {
+          id,
+          protocolFileId: file.id,
+          protocolChecksum: file.checksumSha256,
+          provider: "cloudflare-workers-ai",
+          model: PROTOCOL_EXTRACTION_MODEL,
+          promptVersion: PROTOCOL_EXTRACTION_PROMPT_VERSION,
+          createdAt: new Date().toISOString()
+        }
+      }
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: "PROTOCOL_EXTRACTION_FAILED",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Methodome could not extract study information from this protocol."
+        }
+      },
+      422
+    );
+  }
+});
+
+app.get("/projects/:projectId/variable-mapping-suggestions", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const specification = await getStudySpecification(c.env.DB, projectId);
+  if (!specification) {
+    return c.json(
+      {
+        error: {
+          code: "STUDY_SPECIFICATION_REQUIRED",
+          message: "Confirm the study specification before mapping variables."
+        }
+      },
+      409
+    );
+  }
+
+  const datasets = await listDatasetVersions(c.env.DB, projectId);
+  const preferred =
+    datasets.find((dataset) => dataset.sourceKind === "derived") ?? datasets[0];
+  if (!preferred) {
+    return c.json(
+      {
+        error: {
+          code: "DATASET_REQUIRED",
+          message: "Upload a dataset before Methodome can map study concepts."
+        }
+      },
+      409
+    );
+  }
+
+  let profile;
+  try {
+    profile = await profileDatasetForProject(c, projectId, preferred.id);
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: "DATASET_PROFILE_FAILED",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Methodome could not profile the selected dataset."
+        }
+      },
+      422
+    );
+  }
+
+  const concepts = specification.researchQuestions.flatMap((question) => [
+    ...question.outcomes.map((variable) => variable.concept),
+    ...question.predictors.map((variable) => variable.concept),
+    ...question.covariates.map((variable) => variable.concept)
+  ]);
+
+  let instrumentText = "";
+  if (c.env.FILES) {
+    const researchFiles = (await listProjectFiles(c.env.DB, projectId))
+      .filter((file) => file.fileKind === "instrument" || file.fileKind === "codebook")
+      .slice(0, 2);
+    for (const summary of researchFiles) {
+      try {
+        const record = await getFileRecord(c.env.DB, summary.id, getUserId(c));
+        if (!record) continue;
+        const object = await c.env.FILES.get(record.objectKey);
+        if (!object) continue;
+        const text = await researchFileToText({
+          env: c.env,
+          filename: record.filename,
+          ...(record.mediaType ? { mediaType: record.mediaType } : {}),
+          bytes: await object.arrayBuffer()
+        });
+        instrumentText += `\n\nFILE: ${record.filename}\n${text.slice(0, 15000)}`;
+      } catch {
+        // Instrument text is helpful evidence but is not required for mapping.
+      }
+    }
+  }
+
+  const suggestions = await suggestMappingsWithAi({
+    env: c.env,
+    concepts,
+    variables: profile.variables.map((variable) => ({
+      variableName: variable.variableName,
+      ...(variable.label ? { label: variable.label } : {}),
+      dataType: variable.dataType,
+      ...(variable.responseChoices
+        ? { responseChoices: variable.responseChoices }
+        : {})
+    })),
+    ...(instrumentText ? { instrumentText } : {})
+  });
+
+  return c.json({
+    datasetVersionId: preferred.id,
+    variables: profile.variables,
+    suggestions
+  });
+});
+
 app.get("/projects/:projectId/study-specification", async (c) => {
   const projectId = c.req.param("projectId");
   const access = await requireProject(c, projectId);
@@ -913,11 +1185,20 @@ app.get("/projects/:projectId/method-candidates", async (c) => {
     );
   }
 
-  const selections = specification.researchQuestions.map((question) =>
-    selectCandidateMethods(specification, question.id)
+  const resolved = await resolveStudySpecificationForMethods(
+    c,
+    projectId,
+    specification
+  );
+  const selections = resolved.specification.researchQuestions.map((question) =>
+    selectCandidateMethods(resolved.specification, question.id)
   );
 
-  return c.json({ selections, registryVersion });
+  return c.json({
+    selections,
+    registryVersion,
+    datasetVersionId: resolved.datasetVersionId
+  });
 });
 
 const policySchema = z.object({
