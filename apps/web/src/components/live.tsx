@@ -6,6 +6,8 @@ import { Badge, Button, PageHeader, Stage } from "@/components/ui";
 import { ProjectPage as PrototypeProjectPage } from "@/components/workspace";
 import {
   MethodomeApiError,
+  appendDatasets,
+  compareDatasetSchemas,
   createAnalysisJob,
   createAnalysisPlan,
   createProject,
@@ -15,6 +17,7 @@ import {
   getAnalysisResult,
   getAuditTrail,
   getDatasets,
+  getDatasetProfile,
   getMethodCandidates,
   getMethods,
   getAnalysisHistory,
@@ -36,6 +39,7 @@ import {
   type BackendProject,
   type CandidateSelection,
   type DatasetVersion,
+  type SchemaComparison,
   type StudySpecification
 } from "@/lib/api";
 
@@ -365,9 +369,17 @@ function LiveData({ projectId }: { projectId: string }) {
   const [label, setLabel] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [leftId, setLeftId] = useState("");
+  const [rightId, setRightId] = useState("");
+  const [comparison, setComparison] = useState<SchemaComparison | null>(null);
+  const [derivedLabel, setDerivedLabel] = useState("Harmonised dataset");
 
   async function refresh() {
-    setDatasets(await getDatasets(projectId));
+    const current = await getDatasets(projectId);
+    setDatasets(current);
+    const originals = current.filter((dataset) => dataset.sourceKind === "original");
+    setLeftId((value) => value || originals[0]?.id || "");
+    setRightId((value) => value || originals[1]?.id || "");
   }
 
   useEffect(() => {
@@ -407,6 +419,107 @@ function LiveData({ projectId }: { projectId: string }) {
     }
   }
 
+  async function compare() {
+    if (!leftId || !rightId || leftId === rightId) {
+      setStatus("Choose two different dataset versions.");
+      return;
+    }
+    setBusy(true);
+    setStatus("");
+    try {
+      const [left, right] = await Promise.all([
+        getDatasetProfile(projectId, leftId),
+        getDatasetProfile(projectId, rightId)
+      ]);
+      const result = await compareDatasetSchemas(projectId, {
+        leftDatasetVersionId: leftId,
+        rightDatasetVersionId: rightId,
+        leftVariables: left.variables.map((variable) => ({
+          variableName: variable.variableName,
+          ...(variable.label ? { label: variable.label } : {}),
+          dataType: variable.dataType,
+          ...(variable.responseChoices ? { responseChoices: variable.responseChoices } : {})
+        })),
+        rightVariables: right.variables.map((variable) => ({
+          variableName: variable.variableName,
+          ...(variable.label ? { label: variable.label } : {}),
+          dataType: variable.dataType,
+          ...(variable.responseChoices ? { responseChoices: variable.responseChoices } : {})
+        }))
+      });
+      setComparison(result);
+      setStatus("Schema comparison ready. Review uncertain mappings before combining.");
+    } catch (err) {
+      setStatus(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function harmonise() {
+    if (!comparison) return;
+    setBusy(true);
+    setStatus("");
+    try {
+      const mappings: Array<{
+        sourceDatasetVersionId: string;
+        sourceVariable: string;
+        targetVariable: string;
+      }> = [];
+
+      for (const mapping of comparison.mappings) {
+        if (!mapping.right) continue;
+        const target = mapping.right.variableName;
+        mappings.push({
+          sourceDatasetVersionId: comparison.leftDatasetVersionId,
+          sourceVariable: mapping.left.variableName,
+          targetVariable: target
+        });
+        mappings.push({
+          sourceDatasetVersionId: comparison.rightDatasetVersionId,
+          sourceVariable: mapping.right.variableName,
+          targetVariable: target
+        });
+      }
+
+      for (const variable of comparison.leftOnly) {
+        mappings.push({
+          sourceDatasetVersionId: comparison.leftDatasetVersionId,
+          sourceVariable: variable.variableName,
+          targetVariable: variable.variableName
+        });
+      }
+
+      for (const variable of comparison.rightOnly) {
+        mappings.push({
+          sourceDatasetVersionId: comparison.rightDatasetVersionId,
+          sourceVariable: variable.variableName,
+          targetVariable: variable.variableName
+        });
+      }
+
+      const created = await appendDatasets(projectId, {
+        sourceDatasetVersionIds: [
+          comparison.leftDatasetVersionId,
+          comparison.rightDatasetVersionId
+        ],
+        label: derivedLabel,
+        reason: "Researcher confirmed form-version schema harmonisation.",
+        mappings
+      });
+
+      setStatus(
+        `Created derived dataset with ${created.rowCount} rows and ${created.columnCount} variables.`
+      );
+      setComparison(null);
+      await refresh();
+    } catch (err) {
+      setStatus(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <>
       <section className="form-panel">
@@ -423,9 +536,10 @@ function LiveData({ projectId }: { projectId: string }) {
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           />
         </label>
-        <Button onClick={() => void upload()}>{busy ? "Uploading…" : "Upload dataset"}</Button>
+        <Button onClick={() => void upload()}>{busy ? "Working…" : "Upload dataset"}</Button>
         {status && <p className="confirmation" role="status">{status}</p>}
       </section>
+
       <div className="dataset-grid">
         {datasets.map((dataset) => (
           <article className="dataset-card" key={dataset.id}>
@@ -441,6 +555,90 @@ function LiveData({ projectId }: { projectId: string }) {
           </article>
         ))}
       </div>
+
+      {datasets.filter((dataset) => dataset.sourceKind === "original").length >= 2 && (
+        <section className="form-panel">
+          <p className="eyebrow">FORM VERSION HARMONISATION</p>
+          <h2>Compare and combine datasets</h2>
+          <p>Use this when fieldwork continued after a Kobo or questionnaire form changed.</p>
+          <div className="form-grid">
+            <label>
+              Earlier dataset
+              <select value={leftId} onChange={(event) => setLeftId(event.target.value)}>
+                {datasets.filter((d) => d.sourceKind === "original").map((d) => (
+                  <option key={d.id} value={d.id}>{d.label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Later dataset
+              <select value={rightId} onChange={(event) => setRightId(event.target.value)}>
+                {datasets.filter((d) => d.sourceKind === "original").map((d) => (
+                  <option key={d.id} value={d.id}>{d.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <Button variant="secondary" onClick={() => void compare()}>
+            Compare schemas
+          </Button>
+
+          {comparison && (
+            <>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Earlier field</th>
+                      <th>Later field</th>
+                      <th>Status</th>
+                      <th>Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparison.mappings.map((mapping) => (
+                      <tr key={`${mapping.left.variableName}-${mapping.right?.variableName ?? "none"}`}>
+                        <td><code>{mapping.left.variableName}</code></td>
+                        <td><code>{mapping.right?.variableName ?? "—"}</code></td>
+                        <td>
+                          <Badge kind={mapping.status === "direct_match" ? "success" : mapping.status === "probable_match" ? "blue" : "warning"}>
+                            {mapping.status.replaceAll("_", " ")}
+                          </Badge>
+                        </td>
+                        <td>{mapping.evidence.join(" ")}</td>
+                      </tr>
+                    ))}
+                    {comparison.leftOnly.map((variable) => (
+                      <tr key={`left-${variable.variableName}`}>
+                        <td><code>{variable.variableName}</code></td>
+                        <td>—</td>
+                        <td><Badge kind="warning">Earlier only</Badge></td>
+                        <td>Retained as a column with missing values for later records.</td>
+                      </tr>
+                    ))}
+                    {comparison.rightOnly.map((variable) => (
+                      <tr key={`right-${variable.variableName}`}>
+                        <td>—</td>
+                        <td><code>{variable.variableName}</code></td>
+                        <td><Badge kind="warning">Later only</Badge></td>
+                        <td>Retained as a column with missing values for earlier records.</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <label>
+                Derived dataset label
+                <input value={derivedLabel} onChange={(event) => setDerivedLabel(event.target.value)} />
+              </label>
+              <p className="muted">
+                Creating the dataset confirms the displayed field mappings. Category recoding can be reviewed in Data Preparation.
+              </p>
+              <Button onClick={() => void harmonise()}>Create harmonised dataset</Button>
+            </>
+          )}
+        </section>
+      )}
     </>
   );
 }
