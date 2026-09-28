@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Button, PageHeader, Stage } from "@/components/ui";
+import { Badge, Button, PageHeader } from "@/components/ui";
 import { ProjectPage as PrototypeProjectPage } from "@/components/workspace";
 import {
   MethodomeApiError,
@@ -309,7 +309,7 @@ export function LiveProjectPage({
 
   return (
     <main className="app-content">
-      <Stage />
+      <LiveProjectStage projectId={projectId} />
       <PageHeader
         eyebrow={section.replaceAll("-", " ").toUpperCase()}
         title={title}
@@ -344,6 +344,77 @@ export function LiveProjectPage({
         "settings"
       ].includes(section) && <PrototypeProjectPage section={section} />}
     </main>
+  );
+}
+
+function LiveProjectStage({ projectId }: { projectId: string }) {
+  const [state, setState] = useState({
+    protocol: false,
+    data: false,
+    cleaning: false,
+    design: false,
+    plan: false,
+    analysis: false
+  });
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      getProjectFiles(projectId),
+      getDatasets(projectId),
+      getStudySpecification(projectId),
+      getAnalysisPlan(projectId)
+    ])
+      .then(async ([files, datasets, specification, plan]) => {
+        let analysis = false;
+        const jobId = localStorage.getItem(`methodome:last-job:${projectId}`);
+        if (jobId) {
+          try {
+            const job = await getAnalysisJob(jobId);
+            analysis = job.state === "complete";
+          } catch {
+            analysis = false;
+          }
+        }
+        if (!active) return;
+        setState({
+          protocol: files.some((file) => file.fileKind === "protocol"),
+          data: datasets.length > 0,
+          cleaning: datasets.some((dataset) => dataset.sourceKind === "derived"),
+          design: Boolean(specification),
+          plan: Boolean(plan?.lockedAt),
+          analysis
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [projectId]);
+
+  const stages = [
+    ["Protocol", state.protocol],
+    ["Data", state.data],
+    ["Preparation", state.cleaning],
+    ["Design", state.design],
+    ["Plan", state.plan],
+    ["Analysis", state.analysis]
+  ] as const;
+
+  const firstIncomplete = stages.findIndex(([, complete]) => !complete);
+
+  return (
+    <div className="stage" aria-label="Project stage">
+      {stages.map(([label, complete], index) => (
+        <span
+          key={label}
+          className={complete ? "done" : index === firstIncomplete ? "active" : ""}
+        >
+          {complete ? "✓ " : ""}{label}
+        </span>
+      ))}
+    </div>
   );
 }
 
