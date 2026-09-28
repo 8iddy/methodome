@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
-import { parseStudySpecification } from "@methodome/study-spec";
+import { parseStudySpecification, type StudySpecification } from "@methodome/study-spec";
 import {
   methodRegistry,
   registryVersion,
@@ -26,6 +26,14 @@ import { createAuth } from "./better-auth";
 import type { Env, Variables } from "./env";
 import { makeId } from "./id";
 import {
+  extractProtocolWithAi,
+  protocolExtractionSchema,
+  PROTOCOL_EXTRACTION_MODEL,
+  PROTOCOL_EXTRACTION_PROMPT_VERSION,
+  researchFileToText,
+  suggestMappingsWithAi
+} from "./protocol-extraction";
+import {
   appendAuditEvent,
   createAnalysisJob,
   createDatasetVersion,
@@ -48,6 +56,7 @@ import {
   getProjectPolicy,
   getStudySpecification,
   getLatestAnalysisPlan,
+  getLatestProtocolExtraction,
   listAnalysisHistory,
   listAuditEvents,
   listDatasetVersions,
@@ -55,6 +64,7 @@ import {
   listVariableMappings,
   listProjects,
   saveAnalysisPlan,
+  saveProtocolExtraction,
   saveStudySpecification,
   saveVariableMappings,
   updateProjectPolicy,
@@ -158,6 +168,123 @@ async function addAudit(
   );
   await appendAuditEvent(c.env.DB, event);
   return event;
+}
+
+
+async function profileDatasetForProject(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  datasetVersionId: string
+): Promise<{
+  rowCount: number;
+  columnCount: number;
+  variables: Array<{
+    variableName: string;
+    label?: string;
+    dataType: string;
+    missingCount: number;
+    uniqueCount: number;
+    responseChoices?: Array<{ value: string | number; label: string }>;
+    range?: { min: number; max: number };
+  }>;
+}> {
+  if (!c.env.FILES || c.env.STORAGE_MODE !== "r2") {
+    throw new Error("R2 storage is required for dataset profiling.");
+  }
+  const dataset = await getDatasetVersionRecord(c.env.DB, datasetVersionId, projectId);
+  if (!dataset) throw new Error("Dataset version was not found.");
+  const object = await c.env.FILES.get(dataset.objectKey);
+  if (!object) throw new Error("Stored dataset object was not found.");
+  const response = await c.env.STATS.fetch(
+    new Request("https://methodome-stats.internal/profile", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ csv: await object.text() })
+    })
+  );
+  if (!response.ok) {
+    throw new Error(`Dataset profiling failed with HTTP ${response.status}.`);
+  }
+  return (await response.json()) as {
+    rowCount: number;
+    columnCount: number;
+    variables: Array<{
+      variableName: string;
+      label?: string;
+      dataType: string;
+      missingCount: number;
+      uniqueCount: number;
+      responseChoices?: Array<{ value: string | number; label: string }>;
+      range?: { min: number; max: number };
+    }>;
+  };
+}
+
+function normalizeConcept(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+async function resolveStudySpecificationForMethods(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  specification: StudySpecification
+): Promise<{ specification: StudySpecification; datasetVersionId?: string }> {
+  const [mappings, datasets] = await Promise.all([
+    listVariableMappings(c.env.DB, projectId),
+    listDatasetVersions(c.env.DB, projectId)
+  ]);
+  const confirmed = new Map(
+    mappings
+      .filter((mapping) => mapping.confirmedBy && mapping.datasetVariable)
+      .map((mapping) => [normalizeConcept(mapping.researchConcept), mapping])
+  );
+  const preferred =
+    datasets.find((dataset) => dataset.sourceKind === "derived") ?? datasets[0];
+  if (!preferred) return { specification };
+
+  let profile: Awaited<ReturnType<typeof profileDatasetForProject>>;
+  try {
+    profile = await profileDatasetForProject(c, projectId, preferred.id);
+  } catch {
+    return { specification, datasetVersionId: preferred.id };
+  }
+  const byName = new Map(profile.variables.map((variable) => [variable.variableName, variable]));
+
+  const resolved = structuredClone(specification);
+  for (const question of resolved.researchQuestions) {
+    for (const variable of [
+      ...question.outcomes,
+      ...question.predictors,
+      ...question.covariates
+    ]) {
+      const mapping = confirmed.get(normalizeConcept(variable.concept));
+      if (!mapping?.datasetVariable) continue;
+      const profiled = byName.get(mapping.datasetVariable);
+      variable.datasetVariable = mapping.datasetVariable;
+      variable.mappingStatus = mapping.mappingStatus as typeof variable.mappingStatus;
+      variable.variableType =
+        profiled?.dataType && [
+          "binary",
+          "categorical_nominal",
+          "categorical_ordinal",
+          "count",
+          "continuous",
+          "time_to_event",
+          "date",
+          "text",
+          "unknown"
+        ].includes(profiled.dataType)
+          ? (profiled.dataType as typeof variable.variableType)
+          : variable.variableType;
+    }
+  }
+
+  return { specification: resolved, datasetVersionId: preferred.id };
 }
 
 const createProjectSchema = z.object({
