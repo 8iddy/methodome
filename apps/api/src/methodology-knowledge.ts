@@ -13,6 +13,8 @@ export const objectiveTypeGuidance = {
     "Evaluates ability to detect or classify a current condition or state.",
   prognostic:
     "Estimates a future outcome, recurrence, survival, time-to-event, or future risk conditional on current characteristics.",
+  qualitative:
+    "Seeks meanings, experiences, perceptions, barriers, facilitators, processes, explanations, themes, or other non-numeric understanding where qualitative evidence is primary.",
   exploratory:
     "Open-ended pattern finding when none of the more specific analytical objectives is primary."
 } as const;
