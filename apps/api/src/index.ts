@@ -373,6 +373,67 @@ app.post("/projects/:projectId/datasets", async (c) => {
 });
 
 
+app.get("/projects/:projectId/datasets/:datasetVersionId/profile", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  if (!c.env.FILES || c.env.STORAGE_MODE !== "r2") {
+    return c.json(
+      {
+        error: {
+          code: "OBJECT_STORAGE_NOT_CONFIGURED",
+          message: "R2 storage is required for dataset profiling."
+        }
+      },
+      503
+    );
+  }
+
+  const dataset = await getDatasetVersionRecord(
+    c.env.DB,
+    c.req.param("datasetVersionId"),
+    projectId
+  );
+  if (!dataset) {
+    return c.json(
+      { error: { code: "DATASET_NOT_FOUND", message: "Dataset version was not found." } },
+      404
+    );
+  }
+
+  const object = await c.env.FILES.get(dataset.objectKey);
+  if (!object) {
+    return c.json(
+      { error: { code: "DATASET_OBJECT_NOT_FOUND", message: "Stored dataset object was not found." } },
+      404
+    );
+  }
+
+  const response = await c.env.STATS.fetch(
+    new Request("https://methodome-stats.internal/profile", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ csv: await object.text() })
+    })
+  );
+
+  if (!response.ok) {
+    return c.json(
+      {
+        error: {
+          code: "DATASET_PROFILE_FAILED",
+          message: "Methodome could not profile this dataset.",
+          details: await response.text()
+        }
+      },
+      response.status >= 500 ? 502 : 400
+    );
+  }
+
+  return c.json({ profile: await response.json() });
+});
+
 const harmonisedAppendSchema = z.object({
   sourceDatasetVersionIds: z.array(z.string().min(1)).min(2),
   label: z.string().trim().min(1).max(300),
