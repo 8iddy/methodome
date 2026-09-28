@@ -573,7 +573,13 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
 }
 
 function LiveWorkflowGuide({ projectId }: { projectId: string }) {
-  const [next, setNext] = useState({
+  const [next, setNext] = useState<{
+    label: string;
+    detail: string;
+    href: string;
+    secondaryLabel?: string;
+    secondaryHref?: string;
+  }>({
     label: "Loading project guidance",
     detail: "Checking the research records in this project.",
     href: ""
@@ -606,15 +612,18 @@ function LiveWorkflowGuide({ projectId }: { projectId: string }) {
           });
         }
         if (
-          datasets.length === 0 &&
           !files.some(
             (file) => file.fileKind === "instrument" || file.fileKind === "codebook"
           )
         ) {
           return setNext({
-            label: "Add an instrument or continue to data",
-            detail: "Instrument or codebook metadata can improve variable mapping. If you do not have one, continue to Data and upload the dataset.",
-            href: `${base}/instruments`
+            label: "Add an instrument or codebook",
+            detail: "Recommended next: add the questionnaire, XLSForm or codebook so Methodome has stronger evidence for later variable mapping. You can skip this step if you do not have one.",
+            href: `${base}/instruments`,
+            secondaryLabel: datasets.length > 0 ? "Skip to study design" : "Skip to data",
+            secondaryHref: datasets.length > 0
+              ? `${base}/study-design`
+              : `${base}/data`
           });
         }
         if (datasets.length === 0) {
@@ -689,7 +698,14 @@ function LiveWorkflowGuide({ projectId }: { projectId: string }) {
       <p className="eyebrow">NEXT RECOMMENDED ACTION</p>
       <h2>{next.label}</h2>
       <p>{next.detail}</p>
-      {next.href && <Button href={next.href}>Continue</Button>}
+      <div className="action-row">
+        {next.href && <Button href={next.href}>Continue</Button>}
+        {next.secondaryHref && next.secondaryLabel && (
+          <Button href={next.secondaryHref} variant="quiet">
+            {next.secondaryLabel}
+          </Button>
+        )}
+      </div>
     </section>
   );
 }
@@ -990,9 +1006,17 @@ function LiveProjectFiles({
         )}
         {status && <p className="confirmation" role="status">{status}</p>}
         {mode === "instruments" && (
-          <Button href={`/app/projects/${projectId}/data`} variant="quiet">
-            Continue without an instrument
-          </Button>
+          <div className="action-row">
+            {files.length > 0 ? (
+              <Button href={`/app/projects/${projectId}/data`}>
+                Continue to data
+              </Button>
+            ) : (
+              <Button href={`/app/projects/${projectId}/data`} variant="quiet">
+                Continue without an instrument
+              </Button>
+            )}
+          </div>
         )}
       </section>
 
@@ -1031,9 +1055,14 @@ function LiveProjectFiles({
           <p className="muted">
             Extraction is a proposal from the research layer. Confirm or correct it on Study Design before it becomes the project study specification.
           </p>
-          <Button href={`/app/projects/${projectId}/study-design`} variant="secondary">
-            Review study information
-          </Button>
+          <div className="action-row">
+            <Button href={`/app/projects/${projectId}/instruments`}>
+              Continue to instruments
+            </Button>
+            <Button href={`/app/projects/${projectId}/study-design`} variant="quiet">
+              Review study information now
+            </Button>
+          </div>
         </section>
       )}
 
