@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Button, PageHeader } from "@/components/ui";
 import { ProjectPage as PrototypeProjectPage } from "@/components/workspace";
 import {
@@ -92,6 +92,9 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
 
 export function LiveAuthPage({ signup }: { signup: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
+  const destination = next?.startsWith("/") ? next : "/app/projects";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -108,7 +111,7 @@ export function LiveAuthPage({ signup }: { signup: boolean }) {
       } else {
         await signIn({ email, password });
       }
-      router.push("/app/projects");
+      router.push(destination);
     } catch (err) {
       setError(message(err));
     } finally {
@@ -161,7 +164,7 @@ export function LiveAuthPage({ signup }: { signup: boolean }) {
         {error && <p className="confirmation" role="alert">{error}</p>}
         <p className="muted">
           {signup ? "Already have an account? " : "Need an account? "}
-          <a href={signup ? "/sign-in" : "/sign-up"}>
+          <a href={`${signup ? "/sign-in" : "/sign-up"}?next=${encodeURIComponent(destination)}`}>
             {signup ? "Sign in" : "Create one"}
           </a>
         </p>
@@ -310,6 +313,7 @@ export function LiveProjectPage({
   return (
     <main className="app-content">
       <LiveProjectStage projectId={projectId} />
+      <LiveWorkflowGuide projectId={projectId} />
       <PageHeader
         eyebrow={section.replaceAll("-", " ").toUpperCase()}
         title={title}
@@ -416,6 +420,28 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
       ))}
     </div>
   );
+}
+
+function LiveWorkflowGuide({ projectId }: { projectId: string }) {
+  const [next, setNext] = useState({ label: "Loading project guidance", detail: "Checking the research records in this project.", href: "" });
+
+  useEffect(() => {
+    Promise.all([getProjectFiles(projectId), getDatasets(projectId), getStudySpecification(projectId), getVariableMappings(projectId), getAnalysisPlan(projectId)])
+      .then(([files, datasets, specification, mappings, plan]) => {
+        const base = `/app/projects/${projectId}`;
+        if (!files.some((file) => file.fileKind === "protocol")) return setNext({ label: "Add a protocol", detail: "Upload a protocol so Methodome can keep the study rationale with this project.", href: `${base}/protocol` });
+        if (!files.some((file) => file.fileKind === "instrument" || file.fileKind === "codebook")) return setNext({ label: "Add an instrument or codebook", detail: "Instrument context helps a researcher review later mappings.", href: `${base}/instruments` });
+        if (datasets.length === 0) return setNext({ label: "Upload a dataset", detail: "Upload a CSV dataset before Methodome can profile variables or map study concepts.", href: `${base}/data` });
+        if (!specification) return setNext({ label: "Review study design", detail: "Confirm research questions and study-level design before mapping them to data fields.", href: `${base}/study-design` });
+        if (mappings.length === 0 || mappings.some((mapping) => !mapping.confirmedBy)) return setNext({ label: "Review variable mappings", detail: "Confirm evidence-backed links between research concepts and dataset variables.", href: `${base}/variables` });
+        if (!plan) return setNext({ label: "Build an analysis plan", detail: "Review deterministic method candidates for each confirmed research question.", href: `${base}/analysis-plan` });
+        if (!plan.lockedAt) return setNext({ label: "Approve and lock the plan", detail: "Locking records a timestamp and SHA-256 hash before analysis.", href: `${base}/analysis-plan` });
+        return setNext({ label: "Run analysis", detail: "The approved plan is ready for deterministic execution.", href: `${base}/analysis` });
+      })
+      .catch(() => setNext({ label: "Review project records", detail: "Methodome could not determine the next step. Review the available project records.", href: `/app/projects/${projectId}/overview` }));
+  }, [projectId]);
+
+  return <section className="panel workflow-guide"><p className="eyebrow">NEXT RECOMMENDED ACTION</p><h2>{next.label}</h2><p>{next.detail}</p>{next.href && <Button href={next.href}>Continue</Button>}</section>;
 }
 
 function LiveOverview({
