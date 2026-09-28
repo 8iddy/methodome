@@ -57,6 +57,9 @@ jobs:
           uv sync --group dev
           uv run --group dev pywrangler deploy --dry-run --config wrangler.jsonc
 
+      - name: Install frontend deployment dependencies locally
+        run: npm --prefix apps/web install --workspaces=false
+
       - name: Frontend TypeScript
         run: npm run web:typecheck
 
