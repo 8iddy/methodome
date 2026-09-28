@@ -6,28 +6,5 @@
   "compatibility_flags": [
     "python_workers"
   ],
-  "workers_dev": false,
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "methodome",
-      "database_id": "2a7e2a38-14fb-4fca-882b-8bac86d44536"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "FILES",
-      "bucket_name": "methodome-files"
-    }
-  ],
-  "queues": {
-    "consumers": [
-      {
-        "queue": "methodome-analysis",
-        "max_batch_size": 1,
-        "max_batch_timeout": 5,
-        "max_retries": 3
-      }
-    ]
-  }
+  "workers_dev": false
 }
