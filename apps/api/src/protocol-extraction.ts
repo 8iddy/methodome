@@ -16,6 +16,7 @@ export const protocolExtractionSchema = z.object({
         "causal",
         "diagnostic",
         "prognostic",
+        "qualitative",
         "exploratory"
       ]).nullable().default(null),
       outcomes: z.array(z.string()).default([]),
@@ -73,6 +74,7 @@ const extractionJsonSchema = {
               "causal",
               "diagnostic",
               "prognostic",
+              "qualitative",
               "exploratory",
               null
             ]
@@ -231,6 +233,13 @@ function inferObjectiveType(
   }
   if (/\b(prognos|future risk|survival|time to event|recurrence)\b/.test(value)) {
     return "prognostic";
+  }
+  if (
+    /\b(perception|perceptions|experience|experiences|barrier|barriers|facilitator|facilitators|theme|themes|meaning|meanings|perspective|perspectives|acceptability|feasibility|why do|how do stakeholders|how do participants)\b/.test(
+      value
+    )
+  ) {
+    return "qualitative";
   }
   if (
     /\b(associat|relationship|correlat|related to|difference between|differ by|determinant|factor associated)\b/.test(
