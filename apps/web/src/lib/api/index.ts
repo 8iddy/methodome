@@ -332,14 +332,45 @@ export interface AnalysisResult {
   };
 }
 
+export interface AuthConfig {
+  turnstileRequired: boolean;
+  turnstileSiteKey: string | null;
+  emailVerificationRequired: boolean;
+}
+
+export async function getAuthConfig() {
+  return request<AuthConfig>("/auth-config");
+}
+
 export async function signUp(input: {
   name: string;
   email: string;
   password: string;
+  turnstileToken?: string;
 }) {
   return request<unknown>("/auth/sign-up/email", {
     method: "POST",
     body: JSON.stringify(input)
+  });
+}
+
+export async function verifyEmailOtp(input: {
+  email: string;
+  otp: string;
+}) {
+  return request<unknown>("/auth/email-otp/verify-email", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export async function resendEmailVerificationOtp(email: string) {
+  return request<unknown>("/auth/email-otp/send-verification-otp", {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      type: "email-verification"
+    })
   });
 }
 
