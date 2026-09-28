@@ -444,7 +444,7 @@ export async function suggestMappingsWithAi(input: {
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(modelText(response));
+    parsed = parseModelJson(modelPayload(response));
   } catch {
     parsed = [];
   }
