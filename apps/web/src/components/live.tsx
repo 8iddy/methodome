@@ -374,10 +374,9 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
       getStudySpecification(projectId),
       getVariableMappings(projectId),
       getAnalysisPlan(projectId),
-      getAnalysisHistory(),
-      getProtocolExtraction(projectId)
+      getAnalysisHistory()
     ])
-      .then(([files, datasets, specification, mappings, plan, history, extraction]) => {
+      .then(([files, datasets, specification, mappings, plan, history]) => {
         if (!active) return;
         setState({
           protocol: files.some((file) => file.fileKind === "protocol"),
@@ -440,9 +439,10 @@ function LiveWorkflowGuide({ projectId }: { projectId: string }) {
       getStudySpecification(projectId),
       getVariableMappings(projectId),
       getAnalysisPlan(projectId),
-      getAnalysisHistory()
+      getAnalysisHistory(),
+      getProtocolExtraction(projectId)
     ])
-      .then(([files, datasets, specification, mappings, plan, history]) => {
+      .then(([files, datasets, specification, mappings, plan, history, extraction]) => {
         const base = `/app/projects/${projectId}`;
         if (!files.some((file) => file.fileKind === "protocol")) {
           return setNext({
