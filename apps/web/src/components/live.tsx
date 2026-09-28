@@ -699,6 +699,11 @@ function LiveProjectFiles({
           </Button>
         )}
         {status && <p className="confirmation" role="status">{status}</p>}
+        {mode === "instruments" && (
+          <Button href={`/app/projects/${projectId}/data`} variant="quiet">
+            Continue without an instrument
+          </Button>
+        )}
       </section>
 
       {mode === "protocol" && extraction && (
@@ -940,6 +945,9 @@ function LiveData({ projectId }: { projectId: string }) {
           Dataset label
           <input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Day 1 Kobo export" />
         </label>
+        <p className="muted">
+          Supported in this release: CSV. Excel workbooks are not accepted yet.
+        </p>
         <label>
           CSV file
           <input
