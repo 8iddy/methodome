@@ -128,6 +128,7 @@ app.all("/auth/*", async (c) => {
 app.use("*", async (c, next) => {
   if (
     c.req.path === "/api/health" ||
+    c.req.path === "/api/methods" ||
     c.req.path.startsWith("/api/auth/")
   ) {
     return next();
