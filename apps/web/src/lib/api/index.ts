@@ -600,3 +600,29 @@ export async function deleteProject(projectId: string) {
 export async function deleteAccount() {
   return request<void>("/account", { method: "DELETE" });
 }
+
+
+export interface DatasetProfile {
+  rowCount: number;
+  columnCount: number;
+  variables: Array<{
+    variableName: string;
+    label?: string;
+    dataType: string;
+    missingCount: number;
+    uniqueCount: number;
+    responseChoices?: Array<{ value: string | number; label: string }>;
+    range?: { min: number; max: number };
+  }>;
+}
+
+export async function getDatasetProfile(
+  projectId: string,
+  datasetVersionId: string
+) {
+  return (
+    await request<{ profile: DatasetProfile }>(
+      `/projects/${projectId}/datasets/${datasetVersionId}/profile`
+    )
+  ).profile;
+}
