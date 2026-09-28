@@ -144,11 +144,23 @@ export async function processAnalysisMessage(
   });
 }
 
+function isAnalysisQueueMessage(value: unknown): value is AnalysisQueueMessage {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.jobId === "string" && typeof record.projectId === "string";
+}
+
 export async function consumeAnalysisQueue(
-  batch: MessageBatch<AnalysisQueueMessage>,
+  batch: MessageBatch<unknown>,
   env: Env
 ): Promise<void> {
   for (const message of batch.messages) {
+    if (!isAnalysisQueueMessage(message.body)) {
+      console.error("Invalid analysis queue message", message.body);
+      message.ack();
+      continue;
+    }
+
     try {
       await processAnalysisMessage(message.body, env);
       message.ack();
