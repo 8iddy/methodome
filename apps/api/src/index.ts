@@ -438,6 +438,18 @@ function safeFilename(filename: string): string {
 }
 
 app.post("/projects/:projectId/uploads", async (c) => {
+  if (!c.env.FILES || c.env.STORAGE_MODE === "disabled") {
+    return c.json(
+      {
+        error: {
+          code: "OBJECT_STORAGE_NOT_CONFIGURED",
+          message: "Research file storage is not configured for this deployment."
+        }
+      },
+      503
+    );
+  }
+
   const projectId = c.req.param("projectId");
   const access = await requireProject(c, projectId);
   if ("response" in access) return access.response;
@@ -498,6 +510,18 @@ app.post("/projects/:projectId/uploads", async (c) => {
 });
 
 app.put("/files/:fileId/content", async (c) => {
+  if (!c.env.FILES || c.env.STORAGE_MODE === "disabled") {
+    return c.json(
+      {
+        error: {
+          code: "OBJECT_STORAGE_NOT_CONFIGURED",
+          message: "Research file storage is not configured for this deployment."
+        }
+      },
+      503
+    );
+  }
+
   const record = await getFileRecord(c.env.DB, c.req.param("fileId"), getUserId(c));
   if (!record) {
     return c.json(
