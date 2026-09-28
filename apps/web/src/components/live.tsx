@@ -2293,57 +2293,130 @@ function LiveAnalysis({ projectId }: { projectId: string }) {
 }
 
 function LiveResults({ projectId }: { projectId: string }) {
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [status, setStatus] = useState("");
+  const [results, setResults] = useState<AnalysisResult[]>([]);
+  const [status, setStatus] = useState("Loading results…");
 
   useEffect(() => {
-    const jobId = localStorage.getItem(`methodome:last-job:${projectId}`);
-    if (!jobId) {
-      setStatus("Run an analysis first.");
-      return;
-    }
-    getAnalysisResult(jobId).then(setResult).catch((err) => setStatus(message(err)));
+    getAnalysisHistory()
+      .then(async (history) => {
+        const completeJobs = history.filter(
+          (item) =>
+            String(item.projectId ?? "") === projectId &&
+            String(item.state ?? "") === "complete"
+        );
+        if (completeJobs.length === 0) {
+          setResults([]);
+          setStatus("No completed analyses are available for this project.");
+          return;
+        }
+        const loaded = await Promise.all(
+          completeJobs.map((item) => getAnalysisResult(String(item.jobId)))
+        );
+        setResults(loaded);
+        setStatus("");
+      })
+      .catch((err) => setStatus(message(err)));
   }, [projectId]);
 
-  if (!result) return <section className="panel"><p>{status || "Loading result…"}</p></section>;
+  if (results.length === 0) {
+    return (
+      <section className="panel">
+        <h2>Analysis results</h2>
+        <p>{status}</p>
+        <Button href={`/app/projects/${projectId}/analysis`} variant="secondary">
+          Go to analysis
+        </Button>
+      </section>
+    );
+  }
 
   return (
-    <section className="panel">
-      <div className="panel-heading">
-        <div><p className="eyebrow">STRUCTURED RESULT</p><h2>{result.methodId.replaceAll("_", " ")}</h2></div>
-        <Badge kind="success">{result.software.engine}</Badge>
-      </div>
-      <p><b>N:</b> {result.n}</p>
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>Term</th><th>Estimate</th><th>SE</th><th>95% CI</th><th>p</th><th>Exp.</th></tr></thead>
-          <tbody>
-            {result.estimates.map((estimate) => (
-              <tr key={estimate.term}>
-                <td>{estimate.term}</td>
-                <td>{estimate.estimate.toPrecision(5)}</td>
-                <td>{estimate.standardError?.toPrecision(5) ?? "—"}</td>
-                <td>{estimate.confidenceInterval ? `${estimate.confidenceInterval.lower.toPrecision(4)} to ${estimate.confidenceInterval.upper.toPrecision(4)}` : "—"}</td>
-                <td>{estimate.pValue != null ? estimate.pValue.toPrecision(4) : "—"}</td>
-                <td>{estimate.exponentiatedEstimate?.toPrecision(5) ?? "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <h3>Diagnostics</h3>
-      <div className="method-list">
-        {result.diagnostics.map((diagnostic) => (
-          <div className="method-card" key={diagnostic.id}>
-            <Badge kind={diagnostic.status === "passed" ? "success" : diagnostic.status === "failed" ? "danger" : "warning"}>{diagnostic.status}</Badge>
-            <strong>{diagnostic.label}</strong>
-            {diagnostic.value != null && <p>{String(diagnostic.value)}</p>}
-            {diagnostic.message && <small>{diagnostic.message}</small>}
+    <div className="method-list">
+      {results.map((result, resultIndex) => (
+        <section className="panel" key={result.jobId}>
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">RESULT {resultIndex + 1}</p>
+              <h2>{result.methodId.replaceAll("_", " ")}</h2>
+            </div>
+            <Badge kind="success">{result.software.engine}</Badge>
           </div>
-        ))}
-      </div>
-      <p className="muted">Executed with {result.software.package} {result.software.packageVersion} on {result.software.engine}.</p>
-    </section>
+          <div className="spec-grid">
+            <div><span>Complete observations</span><strong>{result.n}</strong></div>
+            <div><span>Engine</span><strong>{result.software.engine}</strong></div>
+            <div><span>Package</span><strong>{result.software.package}</strong></div>
+            <div><span>Version</span><strong>{result.software.packageVersion}</strong></div>
+          </div>
+
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Term</th>
+                  <th>Estimate</th>
+                  <th>SE</th>
+                  <th>95% CI</th>
+                  <th>p</th>
+                  <th>Exponentiated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.estimates.map((estimate) => (
+                  <tr key={estimate.term}>
+                    <td>{estimate.term}</td>
+                    <td>{estimate.estimate.toPrecision(5)}</td>
+                    <td>{estimate.standardError?.toPrecision(5) ?? "—"}</td>
+                    <td>
+                      {estimate.confidenceInterval
+                        ? `${estimate.confidenceInterval.lower.toPrecision(4)} to ${estimate.confidenceInterval.upper.toPrecision(4)}`
+                        : "—"}
+                    </td>
+                    <td>{estimate.pValue != null ? estimate.pValue.toPrecision(4) : "—"}</td>
+                    <td>{estimate.exponentiatedEstimate?.toPrecision(5) ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Diagnostics</h3>
+          <div className="method-list">
+            {result.diagnostics.map((diagnostic) => (
+              <div className="method-card" key={diagnostic.id}>
+                <Badge
+                  kind={
+                    diagnostic.status === "passed"
+                      ? "success"
+                      : diagnostic.status === "failed"
+                        ? "danger"
+                        : "warning"
+                  }
+                >
+                  {diagnostic.status.replaceAll("_", " ")}
+                </Badge>
+                <strong>{diagnostic.label}</strong>
+                {diagnostic.value != null && <p>{String(diagnostic.value)}</p>}
+                {diagnostic.message && <small>{diagnostic.message}</small>}
+              </div>
+            ))}
+          </div>
+
+          {result.warnings.length > 0 && (
+            <div className="warning-panel">
+              <b>Warnings</b>
+              {result.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+            </div>
+          )}
+          <p className="muted">
+            Job <code>{result.jobId}</code>. Executed with {result.software.package} {result.software.packageVersion}.
+          </p>
+        </section>
+      ))}
+      <Button href={`/app/projects/${projectId}/reports`} variant="secondary">
+        Continue to reports
+      </Button>
+      {status && <p className="confirmation" role="status">{status}</p>}
+    </div>
   );
 }
 
