@@ -4,6 +4,8 @@ export interface Env {
   ANALYSIS_QUEUE: Queue<AnalysisQueueMessage>;
   APP_ENV: string;
   AUTH_MODE: string;
+  BETTER_AUTH_SECRET?: string;
+  BETTER_AUTH_URL?: string;
   ALLOWED_ORIGINS?: string;
   MAX_DIRECT_UPLOAD_BYTES?: string;
   STORAGE_MODE?: string;
