@@ -322,6 +322,62 @@ describe("mapping evidence rules", () => {
     ]);
   });
 
+  it("keeps dataset review available when semantic mapping fails", async () => {
+    const suggestions = await suggestMappingsWithAi({
+      env: {
+        AI: {
+          run: async () => {
+            throw new Error("assert");
+          }
+        }
+      } as never,
+      concepts: ["Medicine stockout status"],
+      variables: [
+        {
+          variableName: "stockout_status",
+          label: "Stockout in previous 30 days",
+          dataType: "binary"
+        }
+      ]
+    });
+
+    expect(suggestions).toHaveLength(1);
+    expect(suggestions[0]?.mappingStatus).toBe("no_match");
+    expect(suggestions[0]?.evidence.join(" ")).toContain(
+      "dataset profile is still available"
+    );
+  });
+
+  it("returns deterministic mappings when project policy disables model assistance", async () => {
+    const suggestions = await suggestMappingsWithAi({
+      env: {} as never,
+      allowModelAssist: false,
+      concepts: ["Reporting completeness", "Medicine availability"],
+      variables: [
+        {
+          variableName: "reporting_completeness",
+          label: "Reporting completeness",
+          dataType: "continuous"
+        },
+        {
+          variableName: "stockout_status",
+          label: "Stockout status",
+          dataType: "binary"
+        }
+      ]
+    });
+
+    expect(suggestions.find((item) => item.researchConcept === "Reporting completeness"))
+      .toMatchObject({
+        datasetVariable: "reporting_completeness",
+        mappingStatus: "direct_match"
+      });
+    expect(suggestions.find((item) => item.researchConcept === "Medicine availability"))
+      .toMatchObject({
+        mappingStatus: "no_match"
+      });
+  });
+
   it("does not promote an unsupported semantic guess to direct match", async () => {
     const suggestions = await suggestMappingsWithAi({
       env: {} as never,
