@@ -20,6 +20,7 @@ import {
 import type { Project } from "@methodome/domain";
 import type { ProjectProcessingPolicy } from "@methodome/policy-engine";
 import { requireAuth } from "./auth";
+import { createAuth } from "./better-auth";
 import type { Env, Variables } from "./env";
 import { makeId } from "./id";
 import {
@@ -76,6 +77,7 @@ app.use(
       "x-methodome-user-email"
     ],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    credentials: true,
     maxAge: 86400
   })
 );
@@ -88,8 +90,29 @@ app.get("/health", (c) =>
   })
 );
 
+app.all("/auth/*", async (c) => {
+  if (c.env.AUTH_MODE !== "better_auth" || !c.env.BETTER_AUTH_SECRET) {
+    return c.json(
+      {
+        error: {
+          code: "AUTH_NOT_CONFIGURED",
+          message: "Production authentication has not been enabled."
+        }
+      },
+      503
+    );
+  }
+
+  return createAuth(c.env).handler(c.req.raw);
+});
+
 app.use("*", async (c, next) => {
-  if (c.req.path === "/api/health") return next();
+  if (
+    c.req.path === "/api/health" ||
+    c.req.path.startsWith("/api/auth/")
+  ) {
+    return next();
+  }
   return requireAuth(c, next);
 });
 
