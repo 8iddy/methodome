@@ -100,7 +100,7 @@ General arbitrary cleaning and recoding rules beyond the implemented harmonisati
 
 The Analysis screen submits a real queue job.
 
-The Python statistics Worker consumes the job and stores the structured result and provenance.
+The API Worker consumes the queue job and calls the Python statistics Worker through a service binding. The API Worker stores the structured result and provenance after Python returns the deterministic calculation.
 
 The Results screen reads the stored result.
 
@@ -132,12 +132,12 @@ Target production origin:
 
 `https://methodome.com`
 
-## Release gate
+## Release status
 
-Do not merge the integrated application to `main` until:
+The integrated application passed its production release gate on 28 September 2026.
 
-- integration CI is green
-- all Cloudflare services deploy successfully
-- the production API health endpoint passes
-- the public site responds
-- `scripts/e2e-smoke.mjs` reports `METHODOME E2E PASS`
+- integration CI passed
+- Cloudflare services deployed successfully
+- the production API health endpoint passed
+- the public site responded
+- `scripts/e2e-smoke.mjs` reported `METHODOME E2E PASS`
