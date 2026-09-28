@@ -318,12 +318,12 @@ export function LiveProjectPage({
   return (
     <main className="app-content">
       <LiveProjectStage projectId={projectId} />
-      <LiveWorkflowGuide projectId={projectId} />
       <PageHeader
         eyebrow={section.replaceAll("-", " ").toUpperCase()}
         title={title}
         description="This workspace is connected to the Methodome API."
       />
+      <LiveWorkflowGuide projectId={projectId} />
       {section === "overview" && <LiveOverview projectId={projectId} project={project} />}
       {section === "protocol" && <LiveProjectFiles projectId={projectId} mode="protocol" />}
       {section === "instruments" && <LiveProjectFiles projectId={projectId} mode="instruments" />}
@@ -359,7 +359,6 @@ export function LiveProjectPage({
 function LiveProjectStage({ projectId }: { projectId: string }) {
   const [state, setState] = useState({
     protocol: false,
-    instruments: false,
     data: false,
     design: false,
     mappings: false,
@@ -381,9 +380,6 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
         if (!active) return;
         setState({
           protocol: files.some((file) => file.fileKind === "protocol"),
-          instruments: files.some(
-            (file) => file.fileKind === "instrument" || file.fileKind === "codebook"
-          ),
           data: datasets.length > 0,
           design: Boolean(specification),
           mappings:
@@ -406,7 +402,6 @@ function LiveProjectStage({ projectId }: { projectId: string }) {
 
   const stages = [
     ["Protocol", state.protocol],
-    ["Instruments", state.instruments],
     ["Data", state.data],
     ["Design", state.design],
     ["Mappings", state.mappings],
@@ -455,10 +450,15 @@ function LiveWorkflowGuide({ projectId }: { projectId: string }) {
             href: `${base}/protocol`
           });
         }
-        if (!files.some((file) => file.fileKind === "instrument" || file.fileKind === "codebook")) {
+        if (
+          datasets.length === 0 &&
+          !files.some(
+            (file) => file.fileKind === "instrument" || file.fileKind === "codebook"
+          )
+        ) {
           return setNext({
-            label: "Add an instrument or codebook",
-            detail: "Question text and codebook metadata improve later variable mapping.",
+            label: "Add an instrument or continue to data",
+            detail: "Instrument or codebook metadata can improve variable mapping. If you do not have one, continue to Data and upload the dataset.",
             href: `${base}/instruments`
           });
         }
