@@ -61,5 +61,14 @@ class Default(WorkerEntrypoint):
                 await mark_failed(message.body, self.env, str(exc))
                 message.ack()
             except Exception as exc:
-                print(f"Transient analysis queue failure: {exc}")
-                message.retry()
+                attempts = int(getattr(message, "attempts", 1) or 1)
+                print(f"Transient analysis queue failure on attempt {attempts}: {exc}")
+                if attempts >= 3:
+                    await mark_failed(
+                        message.body,
+                        self.env,
+                        f"Analysis execution failed after {attempts} attempts: {exc}",
+                    )
+                    message.ack()
+                else:
+                    message.retry()
