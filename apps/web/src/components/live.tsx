@@ -583,6 +583,7 @@ function LiveProjectFiles({
   );
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [extraction, setExtraction] = useState<ProtocolExtraction | null>(null);
 
   async function refresh() {
     const current = await getProjectFiles(projectId);
@@ -593,6 +594,9 @@ function LiveProjectFiles({
           : item.fileKind === "instrument" || item.fileKind === "codebook"
       )
     );
+    if (mode === "protocol") {
+      setExtraction(await getProtocolExtraction(projectId));
+    }
   }
 
   useEffect(() => {
@@ -612,8 +616,40 @@ function LiveProjectFiles({
       });
       await uploadFile(intent.uploadPath, file, file.type || "application/octet-stream");
       setFile(null);
-      setStatus("Research file uploaded.");
+
+      if (mode === "protocol") {
+        setStatus("Protocol uploaded. Extracting study information…");
+        try {
+          const extracted = await extractProtocol(projectId, intent.fileId);
+          setExtraction(extracted);
+          setStatus(
+            `Protocol uploaded and study information extracted. Review ${extracted.researchQuestions.length} research question${extracted.researchQuestions.length === 1 ? "" : "s"} before analysis planning.`
+          );
+        } catch (err) {
+          setStatus(
+            `Protocol uploaded. Automatic extraction needs review: ${message(err)}`
+          );
+        }
+      } else {
+        setStatus("Research file uploaded.");
+      }
       await refresh();
+    } catch (err) {
+      setStatus(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reExtract() {
+    const latest = files[0];
+    if (!latest) return;
+    setBusy(true);
+    setStatus("Extracting study information…");
+    try {
+      const extracted = await extractProtocol(projectId, latest.id);
+      setExtraction(extracted);
+      setStatus("Study information extracted from the latest protocol.");
     } catch (err) {
       setStatus(message(err));
     } finally {
@@ -626,6 +662,15 @@ function LiveProjectFiles({
       <section className="form-panel">
         <p className="eyebrow">{mode === "protocol" ? "PROTOCOL SOURCE" : "RESEARCH INSTRUMENTS"}</p>
         <h2>{mode === "protocol" ? "Upload protocol" : "Upload instrument or codebook"}</h2>
+        {mode === "protocol" ? (
+          <p className="muted">
+            Text-based PDF, DOCX, TXT and Markdown protocols can be converted to text for study-information extraction.
+          </p>
+        ) : (
+          <p className="muted">
+            Instruments and codebooks provide question text and labels that Methodome can use as evidence during variable mapping.
+          </p>
+        )}
         {mode === "instruments" && (
           <label>
             File type
@@ -639,12 +684,63 @@ function LiveProjectFiles({
           Research file
           <input
             type="file"
+            accept={
+              mode === "protocol"
+                ? ".pdf,.docx,.txt,.md,.markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+                : undefined
+            }
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           />
         </label>
-        <Button onClick={() => void upload()}>{busy ? "Uploading…" : "Upload file"}</Button>
+        <Button onClick={() => void upload()}>{busy ? "Working…" : "Upload file"}</Button>
+        {mode === "protocol" && files.length > 0 && (
+          <Button variant="secondary" onClick={() => void reExtract()}>
+            Re-extract latest protocol
+          </Button>
+        )}
         {status && <p className="confirmation" role="status">{status}</p>}
       </section>
+
+      {mode === "protocol" && extraction && (
+        <section className="panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">EXTRACTED FROM PROTOCOL</p>
+              <h2>{extraction.studyTitle || "Study information"}</h2>
+            </div>
+            <Badge kind="blue">Needs researcher review</Badge>
+          </div>
+          <div className="spec-grid">
+            <div>
+              <span>Study design</span>
+              <strong>{extraction.studyDesign?.replaceAll("_", " ") || "Not stated"}</strong>
+            </div>
+            <div>
+              <span>Unit of analysis</span>
+              <strong>{extraction.unitOfAnalysis || "Not stated"}</strong>
+            </div>
+            <div>
+              <span>Research questions</span>
+              <strong>{extraction.researchQuestions.length}</strong>
+            </div>
+            <div>
+              <span>Sampling</span>
+              <strong>{extraction.samplingDesign || "Not stated"}</strong>
+            </div>
+          </div>
+          <ol>
+            {extraction.researchQuestions.map((question, index) => (
+              <li key={`${index}-${question.text}`}>{question.text}</li>
+            ))}
+          </ol>
+          <p className="muted">
+            Extraction is a proposal from the research layer. Confirm or correct it on Study Design before it becomes the project study specification.
+          </p>
+          <Button href={`/app/projects/${projectId}/study-design`} variant="secondary">
+            Review study information
+          </Button>
+        </section>
+      )}
 
       <section className="panel table-wrap">
         <div className="panel-heading">
@@ -667,7 +763,13 @@ function LiveProjectFiles({
             ))}
           </tbody>
         </table>
-        {files.length === 0 && <p className="muted">No files uploaded yet.</p>}
+        {files.length === 0 && (
+          <p className="muted">
+            {mode === "protocol"
+              ? "No protocol uploaded yet."
+              : "No instrument or codebook uploaded yet. You can continue without one, but mappings may have less evidence."}
+          </p>
+        )}
       </section>
     </>
   );
