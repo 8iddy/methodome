@@ -10,8 +10,31 @@ import { Badge, Button, Mark, MethodBadge, PageHeader } from "@/components/ui";
 
 function StartProjectButton() { const router = useRouter(); return <Button onClick={() => void getSession().then((session) => router.push(session?.user ? "/app/projects/new" : "/sign-in?next=/app/projects/new")).catch(() => router.push("/sign-in?next=/app/projects/new"))}>Start a project</Button>; }
 function PublicHeader() { return <header className="public-header"><Mark /><nav><Link href="/methods">Methods</Link><Link href="/how-it-works">How it works</Link><Link href="/documentation">Documentation</Link></nav><div><StartProjectButton /></div></header>; }
-export function Landing() { return <><PublicHeader /><main className="landing"><section className="hero"><div><p className="eyebrow">RESEARCH WORKSPACE</p><h1>Research analysis,<br />brought together.</h1><p className="hero-copy">Clean data, define your study, build an analysis plan, run statistical methods, review diagnostics and produce reproducible results from one research workspace.</p><div className="hero-actions"><StartProjectButton /><Button href="/methods" variant="secondary">Explore methods</Button></div></div><ResearchMockup /></section><Workflow /><section className="method-family-section"><div className="section-intro"><div><p className="eyebrow">METHODS LIBRARY</p><h2>Your methods in one place.</h2></div><Button href="/methods" variant="secondary">Explore all methods</Button></div><div className="family-grid">{families.map((name, i) => <article key={name}><span>0{i + 1}</span><h3>{name}</h3><p>{familyCopy(name)}</p></article>)}</div></section><section className="two-column-copy"><article><p className="eyebrow">REPRODUCIBILITY</p><h2>Every result has a record.</h2><p>Trace a result to its dataset version, transformations, analysis plan, method, code, package versions and diagnostics.</p></article><article><p className="eyebrow">DATA CONTROL</p><h2>Researchers control processing.</h2><p>Set project data rules before any model assisted extraction or qualitative processing takes place.</p></article></section><section className="final-cta"><p className="eyebrow">READY TO BEGIN</p><h2>Create your first<br />Methodome project.</h2><StartProjectButton /></section></main><PublicFooter /></>; }
+export function Landing() { return <><PublicHeader /><main className="landing"><section className="hero"><div><p className="eyebrow">RESEARCH WORKSPACE</p><h1>Research analysis,<br />brought together.</h1><p className="hero-copy">Clean data, define your study, build an analysis plan, run statistical methods, review diagnostics and produce reproducible results from one research workspace.</p><div className="hero-actions"><StartProjectButton /><Button href="/methods" variant="secondary">Explore methods</Button></div></div><ResearchMockup /></section><WorkflowStrip /><section className="method-family-section"><div className="section-intro"><div><p className="eyebrow">METHODS LIBRARY</p><h2>Your methods in one place.</h2></div><Button href="/methods" variant="secondary">Explore all methods</Button></div><div className="family-grid">{families.map((name, i) => <article key={name}><span>0{i + 1}</span><h3>{name}</h3><p>{familyCopy(name)}</p></article>)}</div></section><section className="two-column-copy"><article><p className="eyebrow">REPRODUCIBILITY</p><h2>Every result has a record.</h2><p>Trace a result to its dataset version, transformations, analysis plan, method, code, package versions and diagnostics.</p></article><article><p className="eyebrow">DATA CONTROL</p><h2>Researchers control processing.</h2><p>Set project data rules before any model assisted extraction or qualitative processing takes place.</p></article></section><section className="final-cta"><p className="eyebrow">READY TO BEGIN</p><h2>Create your first<br />Methodome project.</h2><StartProjectButton /></section></main><PublicFooter /></>; }
 function ResearchMockup() { return <div className="research-mockup"><div className="mock-top"><span>Analysis plan</span><Badge kind="success">Planned before analysis</Badge></div><p className="mono">RESEARCH QUESTION 3</p><h3>Is reporting completeness associated with medicine stockout?</h3><div className="mock-grid"><div><span>Outcome</span><code>stockout_status</code></div><div><span>Outcome type</span><strong>Binary</strong></div><div><span>Design</span><strong>Cross sectional</strong></div><div><span>Clustering</span><code>district</code></div></div><p className="mono">CANDIDATE METHODS</p><div className="method-option"><strong>Mixed effects logistic regression</strong><small>Cluster specific estimate</small></div><div className="method-option"><strong>GEE logistic regression</strong><small>Population average estimate</small></div><a href="#methods">Why are there two options?</a></div>; }
+function WorkflowStrip() {
+  const labels = ["Protocol", "Data", "Define", "Map", "Plan", "Analyse", "Review", "Report"];
+  return (
+    <section className="workflow">
+      <div className="section-intro compact-workflow-intro">
+        <div>
+          <p className="eyebrow">FROM PROTOCOL TO RESULTS</p>
+          <h2>A defined research workflow.</h2>
+        </div>
+        <Button href="/how-it-works" variant="secondary">See how it works</Button>
+      </div>
+      <div>
+        {labels.map((label, index) => (
+          <span key={label}>
+            <b>{String(index + 1).padStart(2, "0")}</b>
+            {label}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function Workflow() {
   return (
     <section className="workflow-explainer">
