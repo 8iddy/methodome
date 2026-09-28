@@ -238,19 +238,12 @@ export async function researchFileToText(input: {
   }
 
   const ai = input.env.AI as any;
-  const converted = await ai.toMarkdown(
-    {
-      name: input.filename,
-      blob: new Blob([input.bytes], {
-        type: input.mediaType || "application/octet-stream"
-      })
-    },
-    {
-      conversionOptions: {
-        output: { format: "text" }
-      }
-    }
-  );
+  const converted = await ai.toMarkdown({
+    name: input.filename,
+    blob: new Blob([input.bytes], {
+      type: input.mediaType || "application/octet-stream"
+    })
+  });
 
   const first = Array.isArray(converted) ? converted[0] : converted;
   if (!first || first.format === "error") {
