@@ -56,7 +56,7 @@ The API submits jobs to:
 
 `methodome-analysis`
 
-The Python Worker consumes the queue, loads the dataset from R2, executes deterministic Python statistics, persists the structured result and provenance in D1, records an audit event, and marks the job complete.
+The API Worker consumes the queue, loads the dataset from R2, and orchestrates the analysis job. It calls the Python Worker through a Cloudflare service binding for deterministic statistical computation, then persists the structured result and provenance in D1, records an audit event, and marks the job complete.
 
 Interactive dataset profiling and harmonisation use the API to Python Worker service binding.
 
@@ -93,7 +93,7 @@ The deployed smoke test must prove all of the following with temporary data:
 15. An analysis plan can be created.
 16. The analysis plan can be locked and receives a deterministic hash.
 17. A statistical analysis job can be submitted to the queue.
-18. The Python Worker consumes and executes the job.
+18. The API Worker consumes the queue job and calls the Python Worker for statistical execution.
 19. The structured result is stored and returned.
 20. A known linear-regression reference result is recovered.
 21. The audit trail includes harmonisation and analysis completion events.
@@ -212,6 +212,12 @@ The deployment command is:
 bash scripts/deploy-production.sh
 ```
 
-Do not merge `integration` into `main` until the production smoke test reports:
+Production validation passed on 28 September 2026.
+
+The deployed workflow reported:
 
 `METHODOME E2E PASS`
+
+The production smoke test confirmed authentication, private research file storage, multiple dataset versions, profiling, form-version schema comparison, harmonised append, study specification, variable mapping, deterministic method selection, analysis plan locking, queued Python statistical execution, structured statistical output, audit provenance, cleanup, and session invalidation.
+
+The release gate for merging `integration` into `main` is satisfied.
