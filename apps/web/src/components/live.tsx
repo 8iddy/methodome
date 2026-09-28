@@ -1137,6 +1137,14 @@ function LiveData({ projectId }: { projectId: string }) {
         ))}
       </div>
 
+      {datasets.length > 0 && (
+        <div className="action-row">
+          <Button href={`/app/projects/${projectId}/data-preparation`}>
+            Review dataset profile
+          </Button>
+        </div>
+      )}
+
       {datasets.filter((dataset) => dataset.sourceKind === "original").length >= 2 && (
         <section className="form-panel">
           <p className="eyebrow">FORM VERSION HARMONISATION</p>
@@ -1327,6 +1335,13 @@ function LiveDataPreparation({ projectId }: { projectId: string }) {
             Form-version field harmonisation is available on the Data page. General interactive cleaning rules will be added as versioned transformations in a later release.
           </p>
         </section>
+      )}
+      {profile && (
+        <div className="action-row">
+          <Button href={`/app/projects/${projectId}/study-design`}>
+            Continue to study design
+          </Button>
+        </div>
       )}
     </>
   );
@@ -1731,8 +1746,15 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
         />
       </label>
 
-      <Button onClick={() => void save()}>{busy ? "Saving…" : "Confirm study specification"}</Button>
-      {status && <p className="confirmation" role="status">{status}</p>}
+      <div className="action-row">
+        <Button onClick={() => void save()}>{busy ? "Saving…" : "Confirm study specification"}</Button>
+        {source === "saved" && (
+          <Button href={`/app/projects/${projectId}/variables`} variant="secondary">
+            Continue to variable mapping
+          </Button>
+        )}
+      </div>
+      {status && <p className="confirmation" role="status">{status}</p>
     </section>
   );
 }
@@ -2003,6 +2025,13 @@ function LiveVariables({ projectId }: { projectId: string }) {
         <p className="muted">
           {busy ? "Preparing mapping suggestions…" : "No mappings are available yet."}
         </p>
+      )}
+      {rows.length > 0 && rows.every((row) => row.confirmed) && (
+        <div className="action-row">
+          <Button href={`/app/projects/${projectId}/analysis-plan`}>
+            Continue to analysis plan
+          </Button>
+        </div>
       )}
       {status && <p className="confirmation" role="status">{status}</p>}
     </section>
