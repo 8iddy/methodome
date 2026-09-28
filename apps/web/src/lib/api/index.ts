@@ -239,6 +239,20 @@ export interface SchemaComparison {
   rightOnly: DatasetVariableSchema[];
 }
 
+export interface MethodRegistryEntry {
+  id: string;
+  displayName: string;
+  family: string;
+  maturity: "validated" | "supported" | "experimental";
+  executable: boolean;
+  outcomeTypes: string[];
+  supportsClustering: boolean;
+  supportsRepeatedMeasures: boolean;
+  supportsSurveyWeights: boolean;
+  assumptions: string[];
+  diagnostics: string[];
+}
+
 export interface CandidateMethod {
   methodId: string;
   displayName: string;
@@ -575,7 +589,7 @@ export async function getMethodCandidates(projectId: string) {
 export async function getMethods() {
   return request<{
     registryVersion: string;
-    methods: Array<Record<string, unknown>>;
+    methods: MethodRegistryEntry[];
   }>("/methods");
 }
 
