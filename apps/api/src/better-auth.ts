@@ -6,8 +6,19 @@ export function emailVerificationEnabled(env: Env): boolean {
   return Boolean(env.EMAIL) && env.EMAIL_VERIFICATION_REQUIRED === "true";
 }
 
+export interface MethodomeAuthSession {
+  user: {
+    id: string;
+    email: string;
+    name: string;
+  };
+}
+
 export interface MethodomeAuthHandler {
   handler(request: Request): Promise<Response>;
+  api: {
+    getSession(input: { headers: Headers }): Promise<MethodomeAuthSession | null>;
+  };
 }
 
 export function createAuth(env: Env): MethodomeAuthHandler {
@@ -115,7 +126,7 @@ export function createAuth(env: Env): MethodomeAuthHandler {
         joins: false
       }
     }
-  });
+  }) as unknown as MethodomeAuthHandler;
 }
 
 export type MethodomeAuth = ReturnType<typeof createAuth>;
