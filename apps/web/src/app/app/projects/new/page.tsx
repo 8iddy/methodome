@@ -1,2 +1,5 @@
-import { NewProjectPage } from "@/components/workspace";
-export default function Page() { return <NewProjectPage />; }
+import { LiveNewProjectPage } from "@/components/live";
+
+export default function Page() {
+  return <LiveNewProjectPage />;
+}
