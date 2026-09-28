@@ -1,15 +1,47 @@
 import { Badge } from "@/components/ui";
-
-const sections = [
-  ["What Methodome does", "Methodome is a quantitative research workspace. It keeps research intent, data decisions, deterministic method rules, computation, and provenance connected without treating a language model as the source of a statistical result."],
-  ["Core research workflow", "Create a project, add protocol and instrument files, upload immutable source datasets, review profiles and form-version differences, confirm a study specification, map research concepts to data fields, create and lock an analysis plan, run an approved analysis, then inspect results and provenance."],
-  ["Files, datasets, and lineage", "Protocol, instrument, codebook, and dataset files are stored privately. Original datasets remain immutable. Profiling describes variables and observed values. Form-version harmonisation creates a new derived dataset with recorded parent versions and transformation evidence. This release supports CSV datasets."],
-  ["Study specification and mapping", "A study specification records research questions, outcomes, predictors, covariates, design, sampling features, and stated analysis choices. Variable mapping then connects research concepts to profiled dataset fields. Mapping evidence and researcher confirmation are recorded separately from the study concept."],
-  ["Method selection and plans", "The method registry classifies methods as Validated, Supported, or Experimental. Only executable methods that satisfy deterministic eligibility rules can run automatically. An analysis plan records the selected dataset, methods, checks, and warnings. Locking a plan records a timestamp and SHA-256 hash; later additions are exploratory."],
-  ["Execution and results", "An analysis job moves through the Methodome queue to the API Worker, which invokes the Python statistics Worker for deterministic computation. Results include estimates, diagnostics, warnings, software details, and provenance. The current executable methods are descriptive statistics, Pearson and Spearman correlation, chi square, Fisher exact test, linear regression, and binary logistic regression."],
-  ["Audit, policy, and model use", "Project processing policy controls permitted processors and identifiable-data handling. Audit events record changes and analysis completion. Language models may extract, suggest mappings, or explain. They do not calculate statistical values, bypass method rules, silently change data, or replace researcher approval."]
-] as const;
+import { documentationSections } from "@/content/documentation";
 
 export function DocumentationContent() {
-  return <div className="documentation-content">{sections.map(([title, body]) => <section className="panel" key={title}><h2>{title}</h2><p>{body}</p></section>)}<section className="panel"><div className="panel-heading"><h2>Current MVP limits</h2><Badge kind="warning">Planned work is labelled</Badge></div><p>Automated protocol extraction, email verification, password reset, XLSX ingestion, broad data-cleaning operations, qualitative analysis, mixed methods, advanced survey methods, mixed effects models, survival analysis, Bayesian methods, SEM, and publication-ready report generation are not available in the released MVP.</p></section></div>;
+  return (
+    <div className="documentation-content">
+      <section className="panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">PRODUCT PRINCIPLE</p>
+            <h2>Research interpretation and statistical computation are separate.</h2>
+          </div>
+          <Badge kind="teal">Methodome</Badge>
+        </div>
+        <p>
+          Methodome connects protocol, instruments, datasets, research decisions,
+          deterministic method rules, analysis execution and provenance. Language
+          models may extract, map, suggest and explain. Statistical values come from
+          deterministic statistical software.
+        </p>
+      </section>
+
+      <nav className="panel" aria-label="Documentation contents">
+        <p className="eyebrow">CONTENTS</p>
+        <div className="documentation-links">
+          {documentationSections.map((section) => (
+            <a key={section.id} href={`#${section.id}`}>
+              {section.title}
+            </a>
+          ))}
+        </div>
+      </nav>
+
+      {documentationSections.map((section) => (
+        <section className="panel" id={section.id} key={section.id}>
+          <h2>{section.title}</h2>
+          <p>{section.summary}</p>
+          <ul>
+            {section.points.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
 }
