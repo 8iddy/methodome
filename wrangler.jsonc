@@ -11,18 +11,14 @@
     "APP_ENV": "development",
     "AUTH_MODE": "disabled",
     "ALLOWED_ORIGINS": "https://methodome.com,http://localhost:3000",
-    "MAX_DIRECT_UPLOAD_BYTES": "26214400"
+    "MAX_DIRECT_UPLOAD_BYTES": "26214400",
+    "STORAGE_MODE": "disabled"
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "methodome",
       "migrations_dir": "migrations"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "FILES"
     }
   ],
   "queues": {
