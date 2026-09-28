@@ -308,13 +308,6 @@ export async function suggestMappingsWithAi(input: {
   );
 
   if (uniqueConcepts.length === 0) return [];
-  if (!input.env.AI) {
-    return uniqueConcepts.map((researchConcept) => ({
-      researchConcept,
-      mappingStatus: "no_match",
-      evidence: ["Workers AI is not configured for semantic mapping."]
-    }));
-  }
 
   const exact = new Map<string, string>();
   for (const variable of input.variables) {
@@ -345,6 +338,17 @@ export async function suggestMappingsWithAi(input: {
     }));
 
   if (unresolved.length === 0) return output;
+
+  if (!input.env.AI) {
+    output.push(
+      ...unresolved.map((researchConcept) => ({
+        researchConcept,
+        mappingStatus: "no_match" as const,
+        evidence: ["Workers AI is not configured for semantic mapping."]
+      }))
+    );
+    return output;
+  }
 
   const ai = input.env.AI as any;
   const response = await ai.run(PROTOCOL_EXTRACTION_MODEL, {
