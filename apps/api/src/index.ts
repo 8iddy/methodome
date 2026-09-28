@@ -1594,6 +1594,55 @@ app.post("/projects/:projectId/analysis-plan", async (c) => {
   );
 
   for (const analysis of parsed.data.analyses) {
+    const question = resolvedForPlan.specification.researchQuestions.find(
+      (item) => item.id === analysis.researchQuestionId
+    );
+    if (!question) {
+      return c.json(
+        {
+          error: {
+            code: "RESEARCH_QUESTION_NOT_FOUND",
+            message: "An analysis references a research question that is not in the current study specification."
+          }
+        },
+        409
+      );
+    }
+
+    const mappedOutcomes = new Set(
+      question.outcomes.flatMap((item) =>
+        item.datasetVariable ? [item.datasetVariable] : []
+      )
+    );
+    const mappedPredictors = new Set(
+      question.predictors.flatMap((item) =>
+        item.datasetVariable ? [item.datasetVariable] : []
+      )
+    );
+    const mappedCovariates = new Set(
+      question.covariates.flatMap((item) =>
+        item.datasetVariable ? [item.datasetVariable] : []
+      )
+    );
+
+    if (
+      !mappedOutcomes.has(analysis.outcome) ||
+      analysis.predictors.some((item) => !mappedPredictors.has(item)) ||
+      analysis.covariates.some((item) => !mappedCovariates.has(item))
+    ) {
+      return c.json(
+        {
+          error: {
+            code: "ANALYSIS_PLAN_VARIABLE_MISMATCH",
+            message:
+              "Planned variables must come from confirmed mappings for the referenced research question.",
+            details: { researchQuestionId: analysis.researchQuestionId }
+          }
+        },
+        409
+      );
+    }
+
     const selection = selectCandidateMethods(
       resolvedForPlan.specification,
       analysis.researchQuestionId
