@@ -3,6 +3,15 @@ import type { AnalysisJob, AnalysisPlan, AnalysisResult, JobState } from "@metho
 import type { CandidateSelection } from "@methodome/method-registry";
 import type { StudySpecification } from "@methodome/study-spec";
 import type {
+  QualitativeAnalysisRecord,
+  QualitativeCodebook,
+  QualitativeCodebookVersion,
+  QualitativeCoding,
+  QualitativeSegment,
+  QualitativeThemeSet,
+  QualitativeThemeVersion
+} from "@methodome/qualitative-analysis";
+import type {
   OrchestratorAutomaticAction,
   OrchestratorView,
   ProjectReadiness
@@ -101,10 +110,7 @@ export interface GetProjectOrchestratorResponse {
 }
 
 export interface AdvanceProjectOrchestratorRequest {
-  action?: Extract<
-    OrchestratorAutomaticAction,
-    "extract_protocol" | "create_draft_plan" | "run_analyses"
-  >;
+  action?: OrchestratorAutomaticAction;
 }
 
 export interface AdvanceProjectOrchestratorResponse {
@@ -112,7 +118,17 @@ export interface AdvanceProjectOrchestratorResponse {
   mutation?:
     | { action: "extract_protocol"; researchQuestionCount: number }
     | { action: "create_draft_plan"; planId: string; analysisCount: number }
-    | { action: "run_analyses"; queuedJobIds: string[] };
+    | { action: "run_analyses"; queuedJobIds: string[] }
+    | { action: "prepare_qualitative_analysis"; analysisId: string; segmentCount: number }
+    | { action: "propose_qualitative_codebook"; analysisId: string; version: number; codeCount: number }
+    | {
+        action: "propose_qualitative_codings";
+        analysisId: string;
+        proposedSegments: number;
+        proposedCodingCount?: number;
+        remainingUncoded: number;
+      }
+    | { action: "propose_qualitative_themes"; analysisId: string; version: number; themeCount: number };
   orchestrator: OrchestratorView;
   readiness: ProjectReadiness;
   datasetVersionId?: string;
@@ -128,4 +144,55 @@ export interface UpdateAnalysisPlanMethodsRequest {
 
 export interface UpdateAnalysisPlanMethodsResponse {
   plan: AnalysisPlan;
+}
+
+
+export interface QualitativeAnalysisDetail {
+  analysis: QualitativeAnalysisRecord;
+  segments: QualitativeSegment[];
+  codebookVersions: QualitativeCodebookVersion[];
+  latestCodebook: QualitativeCodebookVersion | null;
+  codings: QualitativeCoding[];
+  themeVersions: QualitativeThemeVersion[];
+  latestThemes: QualitativeThemeVersion | null;
+}
+
+export interface ListQualitativeAnalysesResponse {
+  analyses: QualitativeAnalysisRecord[];
+}
+
+export interface CreateQualitativeAnalysisRequest {
+  researchQuestionId: string;
+  sourceFileIds?: string[];
+}
+
+export interface QualitativeAnalysisDetailResponse {
+  detail: QualitativeAnalysisDetail | null;
+}
+
+export interface ConfirmQualitativeCodebookRequest {
+  codebook: QualitativeCodebook;
+}
+
+export interface ProposeQualitativeCodingRequest {
+  segmentIds?: string[];
+}
+
+export interface ReviewQualitativeCodingRequest {
+  decisions?: Array<{
+    segmentId: string;
+    codeId: string;
+    status: "confirmed" | "rejected";
+    rationale?: string;
+  }>;
+  manualAssignments?: Array<{
+    segmentId: string;
+    codeId: string;
+    rationale?: string;
+  }>;
+  reviewedSegmentIds?: string[];
+}
+
+export interface ConfirmQualitativeThemesRequest {
+  themeSet: QualitativeThemeSet;
 }
