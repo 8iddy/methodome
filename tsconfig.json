@@ -49,6 +49,9 @@
       ],
       "@methodome/schema-harmonisation": [
         "packages/schema-harmonisation/src/index.ts"
+      ],
+      "@methodome/workflow-engine": [
+        "packages/workflow-engine/src/index.ts"
       ]
     },
     "types": [
