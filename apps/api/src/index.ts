@@ -386,6 +386,8 @@ async function resolveStudySpecificationForMethods(
         ].includes(profiled.dataType)
           ? (profiled.dataType as typeof variable.variableType)
           : variable.variableType;
+      variable.observedLevelCount =
+        profiled?.uniqueCount ?? variable.observedLevelCount;
     }
   }
 
