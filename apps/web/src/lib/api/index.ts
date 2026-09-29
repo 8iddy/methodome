@@ -106,6 +106,8 @@ export interface OrchestratorDecision {
   prompt: string;
   questionId?: string;
   analysisId?: string;
+  concept?: string;
+  role?: "outcome" | "predictor" | "covariate";
   options?: Array<{ id: string; label: string; detail?: string }>;
   blocking: boolean;
 }
@@ -999,6 +1001,31 @@ export async function sendProjectConversationMessage(
   return request<{ messageId: string; runId: string | null; queued: boolean }>(
     `/projects/${projectId}/conversation/messages`,
     { method: "POST", body: JSON.stringify({ content, attachmentFileIds }) }
+  );
+}
+
+
+export async function resolveProjectConversationDecision(
+  projectId: string,
+  decisionId: string,
+  response: {
+    choiceId?: string;
+    datasetVariable?: string;
+    confirmNotRepresented?: boolean;
+    approved?: boolean;
+  }
+) {
+  return request<{
+    resolved: boolean;
+    decisionId: string;
+    runId: string | null;
+    message: string;
+  }>(
+    `/projects/${projectId}/conversation/decisions/${encodeURIComponent(decisionId)}`,
+    {
+      method: "POST",
+      body: JSON.stringify(response)
+    }
   );
 }
 
