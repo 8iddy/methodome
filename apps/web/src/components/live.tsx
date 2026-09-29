@@ -906,7 +906,13 @@ function LiveProjectFiles({
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [activity, setActivity] = useState<
-    "idle" | "preparing" | "uploading" | "extracting" | "complete" | "error"
+    | "idle"
+    | "preparing"
+    | "uploading"
+    | "extracting"
+    | "complete"
+    | "upload_error"
+    | "extraction_error"
   >("idle");
   const [extraction, setExtraction] = useState<ProtocolExtraction | null>(null);
 
@@ -956,7 +962,7 @@ function LiveProjectFiles({
             `Protocol uploaded and study information extracted. Methodome found ${extracted.researchQuestions.length} research question${extracted.researchQuestions.length === 1 ? "" : "s"}.`
           );
         } catch (err) {
-          setActivity("error");
+          setActivity("extraction_error");
           setStatus(
             `The protocol upload completed, but study extraction needs attention: ${message(err)}`
           );
@@ -967,7 +973,7 @@ function LiveProjectFiles({
       }
       await refresh();
     } catch (err) {
-      setActivity("error");
+      setActivity("upload_error");
       setStatus(message(err));
     } finally {
       setBusy(false);
@@ -986,7 +992,7 @@ function LiveProjectFiles({
       setActivity("complete");
       setStatus("Study information extracted from the latest protocol.");
     } catch (err) {
-      setActivity("error");
+      setActivity("extraction_error");
       setStatus(message(err));
     } finally {
       setBusy(false);
@@ -1054,10 +1060,10 @@ function LiveProjectFiles({
         )}
         {activity !== "idle" && (
           <div className="activity-flow" aria-live="polite">
-            <div className={activity === "error" && activity !== "extracting" ? "activity-step error" : "activity-step"}>
+            <div className={activity === "upload_error" ? "activity-step error" : "activity-step"}>
               {activity === "preparing" || activity === "uploading" ? (
                 <ActivitySpinner label="Uploading research file" />
-              ) : activity === "error" && !extraction ? (
+              ) : activity === "upload_error" ? (
                 <span className="activity-step-mark error">!</span>
               ) : (
                 <span className="activity-step-mark complete">✓</span>
@@ -1074,12 +1080,12 @@ function LiveProjectFiles({
               </span>
             </div>
             {mode === "protocol" && (
-              <div className={`activity-step ${activity === "error" ? "error" : ""}`}>
+              <div className={`activity-step ${activity === "extraction_error" ? "error" : ""}`}>
                 {activity === "extracting" ? (
                   <ActivitySpinner label="Extracting study information" />
                 ) : activity === "complete" ? (
                   <span className="activity-step-mark complete">✓</span>
-                ) : activity === "error" ? (
+                ) : activity === "extraction_error" ? (
                   <span className="activity-step-mark error">!</span>
                 ) : (
                   <span className="activity-step-mark">2</span>
@@ -1091,7 +1097,7 @@ function LiveProjectFiles({
                       ? "Reading research questions, objectives and study design"
                       : activity === "complete"
                         ? "Extraction complete"
-                        : activity === "error"
+                        : activity === "extraction_error"
                           ? "Extraction needs attention"
                           : "Starts automatically after upload"}
                   </small>
