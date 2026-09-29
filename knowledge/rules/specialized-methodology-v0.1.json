@@ -3,47 +3,6 @@
   "status": "draft",
   "rules": [
     {
-      "rule_id": "fisher-exact-001",
-      "topic": "fisher_exact",
-      "decision": "Use an exact contingency-table method rather than relying on the chi-square approximation when a 2x2 independent-sample table is sparse or the sample is small.",
-      "conditions": [
-        "Two independent groups or samples",
-        "Binary/discrete outcome or two mutually exclusive response classes",
-        "2x2 contingency table",
-        "Small sample or inadequate chi-square expected-count approximation"
-      ],
-      "action": "Consider Fisher exact test and report the exact p-value; do not use the ordinary chi-square approximation solely for convenience.",
-      "assumptions": [
-        "Independent sampling/observations",
-        "Fixed observed 2x2 counts"
-      ],
-      "diagnostics": [
-        "Observed cell counts",
-        "Expected cell counts",
-        "Sample size"
-      ],
-      "warnings": [
-        "Do not use Fisher exact to repair dependence caused by repeated or clustered observations.",
-        "Do not force higher-dimensional tables into a 2x2 rule without an explicitly supported exact procedure."
-      ],
-      "exceptions": [],
-      "source_evidence": [
-        {
-          "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
-          "support": "NIST identifies Fisher exact probability testing as an excellent exact choice for small independent samples with two mutually exclusive outcome classes.",
-          "section": "7.3.3 Comparing two proportions",
-          "page": null
-        },
-        {
-          "source_id": "src-074-principles-of-epidemiology-in-public-health-practice-3rd-ed",
-          "support": "CDC notes Fisher exact may be more appropriate than chi-square for smaller studies.",
-          "section": "Lesson Six",
-          "page": "6-44"
-        }
-      ],
-      "validation_status": "draft"
-    },
-    {
       "rule_id": "diagnostic-accuracy-001",
       "topic": "diagnostic_accuracy",
       "decision": "Do not treat a diagnostic-accuracy question as an ordinary association question.",
