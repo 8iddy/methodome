@@ -134,7 +134,7 @@
       "topic": "multiple_imputation",
       "need": "The intended White, Royston & Wood (2011) general MICE guidance source for imputation-model construction, variable-type handling, number of imputations, diagnostics and practical failure modes.",
       "reason": "The Drive file named multiple-imputation-by-chained-equations-for-systematically-ygzclny7dt.pdf is not White, Royston & Wood (2011). It is Resche-Rigon & White (2018), a specialist multilevel MICE paper. Sterne et al. (2009) supports general MI safeguards, but the planned deeper general MICE source is still absent.",
-      "status": "open",
+      "status": "deferred",
       "candidate_sources": [
         {
           "title": "Multiple imputation using chained equations: Issues and guidance for practice",
@@ -149,7 +149,9 @@
       "related_sources": [
         "src-084-sterne-multiple-imputation-potential-and-pitfalls",
         "src-085-resche-rigon-white-multilevel-mice"
-      ]
+      ],
+      "non_blocking_for_release": true,
+      "resolution_note": "Methodome v1 has sufficient source-backed safeguards from Sterne et al. (2009), Royston & White (2011 implementation paper), and Resche-Rigon & White (2018) to proceed. White, Royston & Wood (2011) remains a desirable v1.1 enrichment source for deeper generic MICE implementation guidance, but it is not a release blocker."
     }
   ]
 }
