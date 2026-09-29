@@ -420,6 +420,74 @@ describe("project orchestrator view", () => {
     expect(orchestrator.automaticAction).toBe("run_analyses");
   });
 
+  it("turns a missing protocol into one conversational input checkpoint", () => {
+    const readiness = assessProjectReadiness(
+      snapshot({
+        hasProtocol: false,
+        hasProtocolExtraction: false,
+        specification: null,
+        mappings: [],
+        selections: [],
+        datasetCount: 0
+      })
+    );
+    const orchestrator = buildOrchestratorView(readiness, null);
+
+    expect(readiness.nextAction.code).toBe("add_protocol");
+    expect(orchestrator.status).toBe("waiting_for_researcher");
+    expect(orchestrator.decisions).toHaveLength(1);
+    expect(orchestrator.decisions[0]?.kind).toBe("provide_input");
+  });
+
+  it("carries mapping evidence into one focused conversational decision", () => {
+    const readiness = assessProjectReadiness(
+      snapshot({
+        mappings: [
+          mapping(
+            "stockout frequency",
+            "stockout_days",
+            false,
+            "probable_match",
+            [AUTO_MAPPING_EVIDENCE_MARKER]
+          ),
+          mapping("routine data use", "data_use_score")
+        ]
+      })
+    );
+    const orchestrator = buildOrchestratorView(readiness, null);
+    const decision = orchestrator.decisions.find(
+      (item) => item.kind === "review_mapping"
+    );
+
+    expect(orchestrator.status).toBe("waiting_for_researcher");
+    expect(decision?.concept).toBe("stockout frequency");
+    expect(decision?.role).toBe("outcome");
+    expect(decision?.options?.[0]?.id).toBe("stockout_days");
+  });
+
+  it("offers objective intent choices in conversation when intent is genuinely unresolved", () => {
+    const spec = specification(null);
+    const readiness = assessProjectReadiness(
+      snapshot({
+        specification: spec,
+        mappings: [
+          mapping("stockout frequency", "stockout_days"),
+          mapping("routine data use", "data_use_score")
+        ],
+        selections: [selection(false, "Objective type is required.")]
+      })
+    );
+    const orchestrator = buildOrchestratorView(readiness, null);
+    const decision = orchestrator.decisions.find(
+      (item) => item.kind === "confirm_study_design"
+    );
+
+    expect(orchestrator.status).toBe("waiting_for_researcher");
+    expect(decision?.questionId).toBe("rq1");
+    expect(decision?.options?.map((item) => item.id)).toContain("association");
+    expect(decision?.options?.map((item) => item.id)).toContain("qualitative");
+  });
+
   it("routes qualitative-only work to the qualitative branch rather than quantitative planning", () => {
     const qualitative = specification("qualitative");
     qualitative.researchQuestions[0]!.outcomes = [

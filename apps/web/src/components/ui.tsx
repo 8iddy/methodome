@@ -193,19 +193,19 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
 
               <nav className="project-primary-nav" aria-label="Project navigation">
-                <Nav href={`${projectBase}/overview`} label="Workspace" active={path.endsWith("/overview")} />
-                <Nav href={`${projectBase}/protocol`} label="Sources" active={path.endsWith("/protocol") || path.endsWith("/instruments")} />
-                <Nav href={`${projectBase}/data`} label="Data" active={path.endsWith("/data") || path.endsWith("/data-preparation")} />
-                <Nav href={`${projectBase}/analysis`} label="Analysis" active={path.endsWith("/analysis") || path.endsWith("/analysis-plan")} />
+                <Nav href={`${projectBase}/overview`} label="Conversation" active={path.endsWith("/overview")} />
+                <Nav href={`${projectBase}/protocol`} label="Project record" active={["protocol", "instruments", "data", "data-preparation"].some((slug) => path.endsWith(`/${slug}`))} />
                 <Nav href={`${projectBase}/results`} label="Results" active={path.endsWith("/results") || path.endsWith("/reports")} />
               </nav>
 
-              <details className="inspect-nav" open={["study-design", "variables", "audit-trail", "settings"].some((slug) => path.endsWith(`/${slug}`))}>
-                <summary>Inspect study record</summary>
+              <details className="inspect-nav" open={["study-design", "variables", "analysis-plan", "analysis", "audit-trail", "settings"].some((slug) => path.endsWith(`/${slug}`))}>
+                <summary>Technical inspection</summary>
                 <nav>
+                  <Nav href={`${projectBase}/data`} label="Data and sources" active={path.endsWith("/data") || path.endsWith("/data-preparation")} />
                   <Nav href={`${projectBase}/study-design`} label="Study design" active={path.endsWith("/study-design")} />
                   <Nav href={`${projectBase}/variables`} label="Variable mapping" active={path.endsWith("/variables")} />
                   <Nav href={`${projectBase}/analysis-plan`} label="Analysis plan" active={path.endsWith("/analysis-plan")} />
+                  <Nav href={`${projectBase}/analysis`} label="Analysis workbench" active={path.endsWith("/analysis")} />
                   <Nav href={`${projectBase}/audit-trail`} label="Audit record" active={path.endsWith("/audit-trail")} />
                   <Nav href={`${projectBase}/settings`} label="Project settings" active={path.endsWith("/settings")} />
                 </nav>

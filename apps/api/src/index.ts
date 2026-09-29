@@ -37,11 +37,15 @@ import {
   buildOrchestratorView,
   type WorkflowSection
 } from "@methodome/workflow-engine";
+import {
+  methodologyKnowledgeVersion,
+  retrieveMethodologyGuidance
+} from "@methodome/methodology-knowledge";
 import { requireAuth } from "./auth";
-import { consumeAnalysisQueue } from "./analysis-worker";
+import { isAnalysisQueueMessage, processAnalysisMessage } from "./analysis-worker";
 import { createAuth, emailVerificationEnabled } from "./better-auth";
 import { turnstileConfigurationIncomplete, turnstileEnabled, validateTurnstile } from "./auth-security";
-import type { Env, Variables } from "./env";
+import type { Env, MethodomeQueueMessage, OrchestrationQueueMessage, Variables } from "./env";
 import { makeId } from "./id";
 import {
   extractProtocolWithAi,
@@ -114,7 +118,17 @@ import {
   saveVariableMappings,
   updateProjectPolicy,
   updateStoredAnalysisPlan,
-  userOwnsProjects
+  userOwnsProjects,
+  appendProjectMessage,
+  completeWaitingOrchestrationRuns,
+  createOrchestrationRun,
+  ensureProjectThread,
+  getProjectConversationDecision,
+  listProjectMessages,
+  resolveProjectConversationDecision,
+  syncConversationDecisions,
+  updateOrchestrationRun,
+  updateProjectFileKind
 } from "./db";
 
 type AppBindings = { Bindings: Env; Variables: Variables };
@@ -562,6 +576,65 @@ async function computeProjectReadiness(
 }
 
 
+function studySpecificationFromProtocolExtraction(
+  extraction: z.infer<typeof protocolExtractionSchema>
+): StudySpecification | null {
+  if (
+    !extraction.studyDesign ||
+    !extraction.unitOfAnalysis?.trim() ||
+    extraction.researchQuestions.length === 0
+  ) {
+    return null;
+  }
+
+  return parseStudySpecification({
+    version: `protocol-${Date.now()}`,
+    researchQuestions: extraction.researchQuestions.map((question, index) => ({
+      id: `rq${index + 1}`,
+      text: question.text,
+      objectiveType: question.objectiveType,
+      outcomes: question.outcomes.map((concept) => ({
+        concept,
+        datasetVariable: null,
+        variableType: null,
+        mappingStatus: null
+      })),
+      predictors: question.predictors.map((concept) => ({
+        concept,
+        datasetVariable: null,
+        variableType: null,
+        mappingStatus: null
+      })),
+      covariates: question.covariates.map((concept) => ({
+        concept,
+        datasetVariable: null,
+        variableType: null,
+        mappingStatus: null
+      })),
+      estimand: question.estimand
+    })),
+    studyDesign: extraction.studyDesign,
+    unitOfAnalysis: extraction.unitOfAnalysis.trim(),
+    repeatedMeasures: extraction.repeatedMeasures ?? false,
+    paired: extraction.paired ?? false,
+    clustered: extraction.clustered ?? false,
+    clusterVariable: extraction.clustered
+      ? extraction.clusterConcept?.trim() || null
+      : null,
+    surveyWeights: extraction.surveyWeights ?? false,
+    weightVariable: extraction.surveyWeights
+      ? extraction.weightConcept?.trim() || null
+      : null,
+    stratified: extraction.stratified ?? false,
+    strataVariable: extraction.stratified
+      ? extraction.strataConcept?.trim() || null
+      : null,
+    samplingDesign: extraction.samplingDesign?.trim() || null,
+    missingDataPlan: extraction.missingDataPlan?.trim() || null,
+    statedAnalysisPlan: extraction.statedAnalysisPlan?.trim() || null
+  });
+}
+
 async function runProtocolExtractionForProject(
   c: import("hono").Context<AppBindings>,
   projectId: string
@@ -631,6 +704,45 @@ async function runProtocolExtractionForProject(
       researchQuestionCount: extraction.researchQuestions.length
     }
   });
+
+  const existingSpecification = await getStudySpecification(c.env.DB, projectId);
+  const interpretedSpecification = existingSpecification
+    ? null
+    : studySpecificationFromProtocolExtraction(extraction);
+
+  if (interpretedSpecification) {
+    const specificationId = makeId("spec");
+    await saveStudySpecification(
+      c.env.DB,
+      specificationId,
+      projectId,
+      interpretedSpecification,
+      undefined,
+      {
+        source: "protocol_interpretation",
+        provider: "cloudflare-workers-ai",
+        model: PROTOCOL_EXTRACTION_MODEL,
+        promptVersion: PROTOCOL_EXTRACTION_PROMPT_VERSION,
+        extractionId: id,
+        methodologyKnowledgeVersion
+      }
+    );
+    await addAudit(c, {
+      projectId,
+      action: "orchestrator_study_specification_interpreted",
+      objectType: "study_specification",
+      objectId: specificationId,
+      modelId: PROTOCOL_EXTRACTION_MODEL,
+      after: {
+        version: interpretedSpecification.version,
+        researchQuestionCount: interpretedSpecification.researchQuestions.length,
+        studyDesign: interpretedSpecification.studyDesign,
+        unitOfAnalysis: interpretedSpecification.unitOfAnalysis,
+        methodologyKnowledgeVersion,
+        researcherConfirmed: false
+      }
+    });
+  }
 
   return extraction;
 }
@@ -2267,6 +2379,1261 @@ const orchestratorAdvanceSchema = z.object({
   ]).optional()
 });
 
+type ApiContext = import("hono").Context<AppBindings>;
+
+function backgroundContext(
+  env: Env,
+  userId: string,
+  userEmail?: string
+): ApiContext {
+  return {
+    env,
+    get: (key: string) => key === "userId" ? userId : key === "userEmail" ? userEmail : undefined
+  } as unknown as ApiContext;
+}
+
+async function executeAutomaticOrchestratorAction(
+  c: ApiContext,
+  projectId: string,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>,
+  action: NonNullable<ReturnType<typeof buildOrchestratorView>["automaticAction"]>
+): Promise<Record<string, unknown>> {
+  if (action === "extract_protocol") {
+    const extraction = await runProtocolExtractionForProject(c, projectId);
+    return { action, researchQuestionCount: extraction.researchQuestions.length };
+  }
+  if (action === "map_variables") {
+    return { action, ...(await orchestratorMapVariables(c, projectId, state)) };
+  }
+  if (action === "create_draft_plan") {
+    const plan = await createOrchestratedDraftPlan(c, projectId, state);
+    return { action, planId: plan.id, analysisCount: plan.analyses.length };
+  }
+  if (action === "run_analyses") {
+    if (!state.plan) throw new Error("The locked analysis plan could not be loaded.");
+    return { action, queuedJobIds: await enqueueOrchestratedPlan(c, projectId, state.plan) };
+  }
+  if (action === "prepare_qualitative_analysis") {
+    return { action, ...(await orchestratorPrepareQualitativeAnalysis(c, projectId, state)) };
+  }
+  if (action === "propose_qualitative_codebook") {
+    return { action, ...(await orchestratorProposeQualitativeCodebook(c, projectId, state)) };
+  }
+  if (action === "propose_qualitative_codings") {
+    return { action, ...(await orchestratorProposeQualitativeCodings(c, projectId, state)) };
+  }
+  return { action, ...(await orchestratorProposeQualitativeThemes(c, projectId, state)) };
+}
+
+function formatNumber(value: number): string {
+  if (!Number.isFinite(value)) return String(value);
+  const absolute = Math.abs(value);
+  if ((absolute > 0 && absolute < 0.001) || absolute >= 100000) {
+    return value.toExponential(3);
+  }
+  return Number(value.toPrecision(5)).toString();
+}
+
+function deterministicResultSummary(
+  methodId: string,
+  result: NonNullable<Awaited<ReturnType<typeof getAnalysisResult>>>
+): string {
+  const methodName = methodRegistry[methodId]?.displayName ?? methodId.replaceAll("_", " ");
+  const estimates = result.estimates
+    .slice(0, 8)
+    .map((estimate) => {
+      const pieces = [
+        `${estimate.term}: ${formatNumber(estimate.estimate)}`
+      ];
+      if (estimate.confidenceInterval) {
+        pieces.push(
+          `${Math.round(estimate.confidenceInterval.level * 100)}% CI ${formatNumber(
+            estimate.confidenceInterval.lower
+          )} to ${formatNumber(estimate.confidenceInterval.upper)}`
+        );
+      }
+      if (typeof estimate.pValue === "number") {
+        pieces.push(`p=${formatNumber(estimate.pValue)}`);
+      }
+      return pieces.join(", ");
+    });
+  const diagnosticReview = result.diagnostics.filter(
+    (item) => item.status === "review" || item.status === "failed"
+  );
+
+  return [
+    `${methodName} (n=${result.n})`,
+    estimates.length > 0
+      ? estimates.join("; ")
+      : "The method returned no coefficient-level estimates.",
+    ...(diagnosticReview.length > 0
+      ? [
+          `Diagnostics needing review: ${diagnosticReview
+            .map((item) => item.label)
+            .join(", ")}.`
+        ]
+      : [])
+  ].join(". ");
+}
+
+async function completedConversationResult(
+  c: ApiContext,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+): Promise<{
+  content: string;
+  analysisJobIds: string[];
+  methodologyRuleIds: string[];
+  evidenceIds: string[];
+  sourceIds: string[];
+}> {
+  if (!state.plan) {
+    return {
+      content: "The currently supported research work is complete and ready for review.",
+      analysisJobIds: [],
+      methodologyRuleIds: [],
+      evidenceIds: [],
+      sourceIds: []
+    };
+  }
+
+  const jobs = await listAnalysisJobsForPlan(
+    c.env.DB,
+    state.plan.projectId,
+    state.plan.id
+  );
+  const completed = jobs.filter((item) => item.state === "complete");
+  const results = (
+    await Promise.all(
+      completed.map(({ job }) =>
+        getAnalysisResult(c.env.DB, job.jobId, getUserId(c))
+      )
+    )
+  ).filter(
+    (
+      result
+    ): result is NonNullable<Awaited<ReturnType<typeof getAnalysisResult>>> =>
+      Boolean(result)
+  );
+
+  const studyDesign = state.resolvedSpecification?.studyDesign;
+  const objectiveTypes =
+    state.resolvedSpecification?.researchQuestions
+      .map((question) => question.objectiveType)
+      .filter(Boolean) ?? [];
+  const reportingQuery =
+    objectiveTypes.includes("diagnostic")
+      ? "diagnostic accuracy reporting results precision missing indeterminate"
+      : objectiveTypes.some(
+            (value) => value === "prediction" || value === "prognostic"
+          )
+        ? "prediction model reporting validation calibration discrimination"
+        : studyDesign === "trial"
+          ? "randomized trial reporting analysis population protocol SAP estimates precision"
+          : "observational reporting confounding missing data adjusted estimates precision";
+
+  const guidance = retrieveMethodologyGuidance({
+    query: reportingQuery,
+    limit: 6
+  });
+
+  const summaries = completed.flatMap(({ job }) => {
+    const found = results.find((result) => result.jobId === job.jobId);
+    return found ? [deterministicResultSummary(job.methodId, found)] : [];
+  });
+
+  return {
+    content:
+      summaries.length > 0
+        ? [
+            "The approved analyses are complete.",
+            ...summaries,
+            "These values come from Methodome's deterministic statistical runner. Open the result details for full diagnostics and provenance."
+          ].join("\n\n")
+        : "The approved analyses are complete and the structured outputs are ready for review.",
+    analysisJobIds: completed.map(({ job }) => job.jobId),
+    methodologyRuleIds: guidance.rules.map((rule) => rule.ruleId),
+    evidenceIds: guidance.evidenceIds,
+    sourceIds: guidance.sourceIds
+  };
+}
+
+async function runConversationOrchestrator(
+  env: Env,
+  message: OrchestrationQueueMessage
+): Promise<void> {
+  const c = backgroundContext(env, message.userId, message.userEmail);
+  const now = new Date().toISOString();
+  const threadId = await ensureProjectThread(env.DB, message.projectId, `thread_${message.projectId}`, now);
+  let iterations = 0;
+  await updateOrchestrationRun(env.DB, message.runId, { status: "running", iterationCount: 0 });
+
+  try {
+    for (; iterations < 12; iterations += 1) {
+      const state = await computeProjectReadiness(c, message.projectId);
+      const view = buildOrchestratorView(state.readiness, state.plan);
+      await syncConversationDecisions(env.DB, {
+        projectId: message.projectId,
+        threadId,
+        decisions: view.decisions.filter((decision) => decision.blocking).map((decision) => ({
+          id: decision.id,
+          kind: decision.kind,
+          prompt: decision.prompt,
+          ...(decision.options ? { options: decision.options } : {}),
+          context: {
+            questionId: decision.questionId ?? null,
+            analysisId: decision.analysisId ?? null,
+            concept: decision.concept ?? null,
+            role: decision.role ?? null
+          }
+        })),
+        now: new Date().toISOString()
+      });
+
+      if (!view.automaticAction) {
+        const waiting = view.status === "waiting_for_researcher";
+        const completedResult =
+          view.status === "complete"
+            ? await completedConversationResult(c, state)
+            : null;
+        await appendProjectMessage(env.DB, {
+          id: makeId("msg"), threadId, projectId: message.projectId,
+          role: "methodome", messageKind: waiting ? "checkpoint" : view.status === "complete" ? "result" : "message",
+          content:
+            completedResult?.content ??
+            (waiting && view.decisions[0] ? view.decisions[0].prompt : view.summary),
+          metadata: {
+            workflowStatus: view.status,
+            decisions: view.decisions,
+            methodologyKnowledgeVersion,
+            ...(completedResult
+              ? {
+                  analysisJobIds: completedResult.analysisJobIds,
+                  methodologyRuleIds: completedResult.methodologyRuleIds,
+                  evidenceIds: completedResult.evidenceIds,
+                  sourceIds: completedResult.sourceIds
+                }
+              : {})
+          },
+          attachmentFileIds: [], createdAt: new Date().toISOString(),
+          deduplicationKey: `${message.runId}:stop:${view.status}:${view.decisions[0]?.id ?? "none"}`
+        });
+        await updateOrchestrationRun(env.DB, message.runId, {
+          status: waiting ? "waiting" : "complete",
+          iterationCount: iterations,
+          stopReason: view.status
+        });
+        return;
+      }
+
+      const mutation = await executeAutomaticOrchestratorAction(
+        c, message.projectId, state, view.automaticAction
+      );
+      await appendProjectMessage(env.DB, {
+        id: makeId("msg"), threadId, projectId: message.projectId,
+        role: "activity", messageKind: "activity",
+        content: `${view.nextAction.label} completed.`,
+        metadata: { mutation, methodologyKnowledgeVersion }, attachmentFileIds: [],
+        createdAt: new Date().toISOString(),
+        deduplicationKey: `${message.runId}:iteration:${iterations}:${view.automaticAction}`
+      });
+
+      if (view.automaticAction === "run_analyses") {
+        await updateOrchestrationRun(env.DB, message.runId, {
+          status: "waiting", iterationCount: iterations + 1,
+          stopReason: "waiting_for_async_analysis"
+        });
+        return;
+      }
+    }
+
+    await updateOrchestrationRun(env.DB, message.runId, {
+      status: "waiting", iterationCount: iterations,
+      stopReason: "safe_iteration_limit"
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Methodome could not continue safely.";
+    await appendProjectMessage(env.DB, {
+      id: makeId("msg"), threadId, projectId: message.projectId,
+      role: "methodome", messageKind: "error", content: errorMessage,
+      metadata: { runId: message.runId }, attachmentFileIds: [],
+      createdAt: new Date().toISOString(), deduplicationKey: `${message.runId}:error`
+    });
+    await updateOrchestrationRun(env.DB, message.runId, {
+      status: "failed", iterationCount: iterations, stopReason: "unrecoverable_error", errorMessage
+    });
+    throw error;
+  }
+}
+
+const conversationMessageSchema = z.object({
+  content: z.string().trim().min(1).max(8000),
+  attachmentFileIds: z.array(z.string().min(1)).max(20).default([])
+});
+
+function inferResearchFileKindFromName(file: {
+  filename: string;
+  mediaType?: string;
+}) {
+  const name = file.filename.toLowerCase();
+  const mediaType = file.mediaType?.toLowerCase() ?? "";
+  if (/protocol|proposal|research.plan|study.plan/.test(name)) {
+    return "protocol" as const;
+  }
+  if (/transcript|interview|focus.group|fgd|field.note/.test(name)) {
+    return "transcript" as const;
+  }
+  if (/codebook|data.dictionary|variable.dictionary/.test(name)) {
+    return "codebook" as const;
+  }
+  if (
+    /questionnaire|instrument|survey.form|case.report.form|\bcrf\b/.test(name)
+  ) {
+    return "instrument" as const;
+  }
+  if (/\.csv$/.test(name) || mediaType.includes("csv")) {
+    return "dataset" as const;
+  }
+  return "other" as const;
+}
+
+async function inferResearchFileKind(
+  c: ApiContext,
+  projectId: string,
+  file: {
+    filename: string;
+    mediaType?: string;
+    objectKey: string;
+    checksumSha256: string;
+  }
+) {
+  const named = inferResearchFileKindFromName(file);
+  if (named !== "other") return named;
+  if (!c.env.FILES || file.checksumSha256 === "pending") {
+    return "other" as const;
+  }
+
+  const object = await c.env.FILES.get(file.objectKey);
+  if (!object) return "other" as const;
+
+  let text = "";
+  try {
+    const lower = file.filename.toLowerCase();
+    const direct =
+      lower.endsWith(".txt") ||
+      lower.endsWith(".md") ||
+      lower.endsWith(".markdown") ||
+      file.mediaType?.startsWith("text/");
+    if (direct) {
+      text = (await object.text()).slice(0, 24000);
+    } else if (
+      lower.endsWith(".pdf") ||
+      lower.endsWith(".docx") ||
+      lower.endsWith(".doc")
+    ) {
+      const policy = await getProjectPolicy(c.env.DB, projectId);
+      if (policy) {
+        assertModelRequestAllowed(policy, {
+          processorId: "workers-ai",
+          providerKind: "internal",
+          payloadKind: "document_text",
+          containsIdentifiers: policy.containsIdentifiableData
+        });
+      }
+      text = (
+        await researchFileToText({
+          env: c.env,
+          filename: file.filename,
+          ...(file.mediaType ? { mediaType: file.mediaType } : {}),
+          bytes: await object.arrayBuffer()
+        })
+      ).slice(0, 24000);
+    }
+  } catch {
+    return "other" as const;
+  }
+
+  const normalized = text.toLowerCase();
+  if (!normalized.trim()) return "other" as const;
+
+  const protocolScore = [
+    "research question",
+    "study design",
+    "study objective",
+    "specific objective",
+    "methodology",
+    "sampling",
+    "sample size",
+    "hypothesis"
+  ].filter((term) => normalized.includes(term)).length;
+  const transcriptScore = [
+    "interviewer:",
+    "respondent:",
+    "participant:",
+    "moderator:",
+    "focus group",
+    "interview transcript"
+  ].filter((term) => normalized.includes(term)).length;
+  const codebookScore = [
+    "variable name",
+    "variable label",
+    "value label",
+    "data dictionary",
+    "codebook"
+  ].filter((term) => normalized.includes(term)).length;
+  const instrumentScore = [
+    "questionnaire",
+    "response option",
+    "skip pattern",
+    "select one",
+    "select all",
+    "section a",
+    "section b"
+  ].filter((term) => normalized.includes(term)).length;
+
+  const ranked = [
+    ["protocol", protocolScore] as const,
+    ["transcript", transcriptScore] as const,
+    ["codebook", codebookScore] as const,
+    ["instrument", instrumentScore] as const
+  ].sort((a, b) => b[1] - a[1]);
+
+  return ranked[0]![1] >= 2 ? ranked[0]![0] : ("other" as const);
+}
+
+async function ensureConversationDatasetRegistered(
+  c: ApiContext,
+  projectId: string,
+  file: {
+    id: string;
+    filename: string;
+    objectKey: string;
+    checksumSha256: string;
+  }
+): Promise<string> {
+  const existing = await c.env.DB.prepare(
+    "SELECT id FROM dataset_versions WHERE project_id = ? AND object_key = ? LIMIT 1"
+  )
+    .bind(projectId, file.objectKey)
+    .first<{ id: string }>();
+  if (existing) return existing.id;
+
+  const datasetVersionId = makeId("dsv");
+  await createDatasetVersion(c.env.DB, {
+    id: datasetVersionId,
+    projectId,
+    label: file.filename,
+    sourceKind: "original",
+    objectKey: file.objectKey,
+    checksumSha256: file.checksumSha256,
+    createdBy: getUserId(c),
+    parentVersionIds: []
+  });
+  await addAudit(c, {
+    projectId,
+    action: "conversation_dataset_registered",
+    objectType: "dataset_version",
+    objectId: datasetVersionId,
+    after: {
+      sourceFileId: file.id,
+      filename: file.filename,
+      checksumSha256: file.checksumSha256
+    }
+  });
+  return datasetVersionId;
+}
+
+app.get("/projects/:projectId/conversation", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+  const state = await computeProjectReadiness(c, projectId);
+  return c.json({
+    messages: await listProjectMessages(c.env.DB, projectId),
+    orchestrator: buildOrchestratorView(state.readiness, state.plan),
+    methodologyKnowledgeVersion
+  });
+});
+
+app.post("/projects/:projectId/conversation/messages", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+  const parsed = conversationMessageSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ error: { code: "INVALID_CONVERSATION_MESSAGE", message: "Write a message or attach research files.", details: parsed.error.flatten() } }, 400);
+  }
+
+  const files = await listProjectFiles(c.env.DB, projectId);
+  const projectFileIds = new Set(files.map((file) => file.id));
+  if (
+    parsed.data.attachmentFileIds.some(
+      (fileId) => !projectFileIds.has(fileId)
+    )
+  ) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_CONVERSATION_ATTACHMENT",
+          message: "One or more attachments do not belong to this project."
+        }
+      },
+      400
+    );
+  }
+
+  const classifiedAttachments: Array<{
+    fileId: string;
+    filename: string;
+    fileKind: string;
+  }> = [];
+  for (const summary of files.filter((item) =>
+    parsed.data.attachmentFileIds.includes(item.id)
+  )) {
+    const file = await getFileRecord(c.env.DB, summary.id, getUserId(c));
+    if (!file) continue;
+
+    const inferred =
+      file.fileKind === "other"
+        ? await inferResearchFileKind(c, projectId, file)
+        : (file.fileKind as
+            | "protocol"
+            | "instrument"
+            | "codebook"
+            | "dataset"
+            | "transcript"
+            | "other");
+    if (file.fileKind === "other" && inferred !== "other") {
+      await updateProjectFileKind(c.env.DB, projectId, file.id, inferred);
+    }
+    if (inferred === "dataset") {
+      await ensureConversationDatasetRegistered(c, projectId, file);
+    }
+    classifiedAttachments.push({
+      fileId: file.id,
+      filename: file.filename,
+      fileKind: inferred
+    });
+  }
+
+  const now = new Date().toISOString();
+  const threadId = await ensureProjectThread(
+    c.env.DB,
+    projectId,
+    makeId("thread"),
+    now
+  );
+  const messageId = makeId("msg");
+  await appendProjectMessage(c.env.DB, {
+    id: messageId,
+    threadId,
+    projectId,
+    role: "researcher",
+    messageKind: "message",
+    content: parsed.data.content,
+    metadata: { classifiedAttachments },
+    attachmentFileIds: parsed.data.attachmentFileIds,
+    createdBy: getUserId(c),
+    createdAt: now
+  });
+
+  for (const attachment of classifiedAttachments) {
+    await appendProjectMessage(c.env.DB, {
+      id: makeId("msg"),
+      threadId,
+      projectId,
+      role: "activity",
+      messageKind: "activity",
+      content:
+        attachment.fileKind === "other"
+          ? `${attachment.filename} was uploaded. I could not safely infer its research role yet.`
+          : `${attachment.filename} was uploaded and identified as ${attachment.fileKind.replaceAll("_", " ")}.`,
+      metadata: {
+        fileId: attachment.fileId,
+        fileKind: attachment.fileKind
+      },
+      attachmentFileIds: [attachment.fileId],
+      createdAt: new Date().toISOString(),
+      deduplicationKey: `attachment-classified:${attachment.fileId}`
+    });
+  }
+
+  if (parsed.data.attachmentFileIds.length === 0 && c.env.AI) {
+    const currentState = await computeProjectReadiness(c, projectId);
+    const currentView = buildOrchestratorView(
+      currentState.readiness,
+      currentState.plan
+    );
+    const policy = await getProjectPolicy(c.env.DB, projectId);
+    let assistantAllowed = true;
+    if (policy) {
+      try {
+        assertModelRequestAllowed(policy, {
+          processorId: "workers-ai",
+          providerKind: "internal",
+          payloadKind: "metadata",
+          containsIdentifiers: policy.containsIdentifiableData
+        });
+      } catch {
+        assistantAllowed = false;
+      }
+    }
+
+    if (assistantAllowed) {
+      try {
+        const priorMessages = (await listProjectMessages(c.env.DB, projectId))
+          .filter(
+            (item) =>
+              item.id !== messageId &&
+              (item.role === "researcher" || item.role === "methodome")
+          )
+          .slice(-8)
+          .map((item) => ({
+            role: item.role === "researcher" ? ("user" as const) : ("assistant" as const),
+            content: item.content
+          }));
+        const methodology = retrieveMethodologyGuidance({
+          query: parsed.data.content,
+          topics: currentState.selections.flatMap((selection) =>
+            selection.candidates.map((candidate) => candidate.methodId)
+          ),
+          limit: 10
+        });
+        const assistant = await answerProjectAssistant({
+          env: c.env,
+          message: parsed.data.content,
+          history: priorMessages,
+          context: {
+            project: {
+              name: access.project.name,
+              description: access.project.description ?? null,
+              researchType: access.project.researchType
+            },
+            workflow: {
+              status: currentView.status,
+              summary: currentView.summary,
+              nextAction: currentView.nextAction,
+              decisions: currentView.decisions.map((decision) => ({
+                id: decision.id,
+                kind: decision.kind,
+                prompt: decision.prompt,
+                questionId: decision.questionId ?? null,
+                options: decision.options ?? []
+              }))
+            },
+            researchQuestions: currentState.readiness.questions.map(
+              (question) => ({
+                id: question.questionId,
+                text: question.text,
+                mode: question.mode,
+                objectiveType: question.objectiveType,
+                status: question.status,
+                blockers: question.blockers.map((blocker) => blocker.message),
+                warnings: question.warnings,
+                candidates: question.candidates
+                  .filter((candidate) => candidate.executable)
+                  .map((candidate) => ({
+                    methodId: candidate.methodId,
+                    displayName: candidate.displayName,
+                    rationale: candidate.rationale,
+                    decisionRequired: candidate.decisionRequired ?? null
+                  }))
+              })
+            ),
+            plan: currentState.plan
+              ? {
+                  locked: Boolean(currentState.plan.lockedAt),
+                  analyses: currentState.plan.analyses
+                }
+              : null
+          },
+          methodology
+        });
+
+        await appendProjectMessage(c.env.DB, {
+          id: makeId("msg"),
+          threadId,
+          projectId,
+          role: "methodome",
+          messageKind: "message",
+          content: assistant.reply,
+          metadata: {
+            intent: assistant.intent,
+            methodologyKnowledgeVersion,
+            methodologyRuleIds: assistant.methodologyRuleIds,
+            evidenceIds: methodology.evidenceIds,
+            sourceIds: methodology.sourceIds
+          },
+          attachmentFileIds: [],
+          createdAt: new Date().toISOString()
+        });
+
+        await addAudit(c, {
+          projectId,
+          action: "conversation_assistant_responded",
+          objectType: "project_conversation",
+          objectId: messageId,
+          modelId: PROJECT_ASSISTANT_MODEL,
+          after: {
+            intent: assistant.intent,
+            methodologyKnowledgeVersion,
+            methodologyRuleIds: assistant.methodologyRuleIds
+          }
+        });
+
+        const conversationalOnly =
+          assistant.intent.requestedAction === "none" ||
+          assistant.intent.requestedAction === "show_results" ||
+          assistant.intent.requestedAction === "resolve_decision" ||
+          assistant.intent.requestedAction === "update_study" ||
+          assistant.intent.kind === "explain" ||
+          assistant.intent.kind === "inspect_results" ||
+          assistant.intent.kind === "unknown";
+
+        if (conversationalOnly) {
+          return c.json(
+            {
+              messageId,
+              runId: null,
+              queued: false,
+              assistantReply: assistant.reply
+            },
+            202
+          );
+        }
+      } catch {
+        // If grounded conversation fails, preserve the researcher message and
+        // allow the deterministic orchestrator to decide whether work can continue.
+      }
+    }
+  }
+
+  const runId = makeId("run");
+  const queued = await createOrchestrationRun(c.env.DB, {
+    id: runId, projectId, triggerMessageId: messageId, createdBy: getUserId(c), now
+  });
+  if (queued) {
+    await c.env.ANALYSIS_QUEUE.send({
+      type: "orchestration", runId, projectId, userId: getUserId(c),
+      ...(c.get("userEmail") ? { userEmail: c.get("userEmail") } : {})
+    });
+  }
+  return c.json({ messageId, runId: queued ? runId : null, queued }, 202);
+});
+
+const conversationDecisionResponseSchema = z.object({
+  choiceId: z.string().trim().min(1).optional(),
+  datasetVariable: z.string().trim().min(1).optional(),
+  confirmNotRepresented: z.boolean().optional(),
+  approved: z.boolean().optional()
+});
+
+async function queueConversationContinuation(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  triggerMessageId?: string
+) {
+  await completeWaitingOrchestrationRuns(
+    c.env.DB,
+    projectId,
+    "researcher_response_received"
+  );
+  const now = new Date().toISOString();
+  const runId = makeId("run");
+  const queued = await createOrchestrationRun(c.env.DB, {
+    id: runId,
+    projectId,
+    ...(triggerMessageId ? { triggerMessageId } : {}),
+    createdBy: getUserId(c),
+    now
+  });
+  if (queued) {
+    await c.env.ANALYSIS_QUEUE.send({
+      type: "orchestration",
+      runId,
+      projectId,
+      userId: getUserId(c),
+      ...(c.get("userEmail") ? { userEmail: c.get("userEmail") } : {})
+    });
+  }
+  return queued ? runId : null;
+}
+
+app.post(
+  "/projects/:projectId/conversation/decisions/:decisionId",
+  async (c) => {
+    const projectId = c.req.param("projectId");
+    const access = await requireProject(c, projectId);
+    if ("response" in access) return access.response;
+
+    const decisionId = c.req.param("decisionId");
+    const parsed = conversationDecisionResponseSchema.safeParse(
+      await c.req.json().catch(() => ({}))
+    );
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_CONVERSATION_DECISION",
+            message: "That research decision response is invalid.",
+            details: parsed.error.flatten()
+          }
+        },
+        400
+      );
+    }
+
+    const stored = await getProjectConversationDecision(
+      c.env.DB,
+      projectId,
+      decisionId
+    );
+    if (!stored) {
+      return c.json(
+        {
+          error: {
+            code: "CONVERSATION_DECISION_NOT_FOUND",
+            message: "That research decision is no longer available."
+          }
+        },
+        404
+      );
+    }
+    if (stored.status !== "open") {
+      return c.json(
+        {
+          error: {
+            code: "CONVERSATION_DECISION_ALREADY_RESOLVED",
+            message: "That research decision has already been resolved."
+          }
+        },
+        409
+      );
+    }
+
+    const state = await computeProjectReadiness(c, projectId);
+    const view = buildOrchestratorView(state.readiness, state.plan);
+    const decision = view.decisions.find(
+      (item) => item.id === decisionId && item.blocking
+    );
+    if (!decision) {
+      return c.json(
+        {
+          error: {
+            code: "CONVERSATION_DECISION_STALE",
+            message:
+              "The project has changed since this question was created. Methodome refreshed the current research state instead."
+          }
+        },
+        409
+      );
+    }
+
+    const response = parsed.data;
+    let responseSummary = "Research decision recorded.";
+
+    if (decision.kind === "select_method") {
+      if (!state.plan || !decision.analysisId || !response.choiceId) {
+        return c.json(
+          {
+            error: {
+              code: "METHOD_SELECTION_REQUIRED",
+              message: "Choose one of Methodome's defensible analysis options."
+            }
+          },
+          400
+        );
+      }
+      if (
+        !decision.options?.some((option) => option.id === response.choiceId)
+      ) {
+        return c.json(
+          {
+            error: {
+              code: "METHOD_SELECTION_OUTSIDE_CANDIDATES",
+              message: "The selected option is outside the current defensible method set."
+            }
+          },
+          409
+        );
+      }
+      const method = methodRegistry[response.choiceId];
+      if (!method?.executable) {
+        return c.json(
+          {
+            error: {
+              code: "METHOD_NOT_EXECUTABLE",
+              message: "That method is not executable in the current Methodome runtime."
+            }
+          },
+          409
+        );
+      }
+
+      const updated = updateAnalysisMethodSelections(state.plan, [
+        {
+          analysisId: decision.analysisId,
+          methodId: response.choiceId
+        }
+      ]);
+      await updateStoredAnalysisPlan(c.env.DB, updated);
+      await addAudit(c, {
+        projectId,
+        action: "conversation_analysis_method_selected",
+        objectType: "analysis_plan",
+        objectId: updated.id,
+        before: state.plan,
+        after: {
+          decisionId,
+          analysisId: decision.analysisId,
+          methodId: response.choiceId,
+          methodologyKnowledgeVersion
+        }
+      });
+      responseSummary = `Use ${method.displayName} for this research question.`;
+    } else if (decision.kind === "approve_plan") {
+      if (!state.plan || response.approved !== true) {
+        return c.json(
+          {
+            error: {
+              code: "PLAN_APPROVAL_REQUIRED",
+              message: "Confirm that Methodome should run the proposed analysis plan."
+            }
+          },
+          400
+        );
+      }
+      if (!state.plan.lockedAt || !state.plan.lockHash) {
+        const locked = await lockAnalysisPlan(
+          state.plan,
+          new Date().toISOString()
+        );
+        await updateStoredAnalysisPlan(c.env.DB, locked);
+        await addAudit(c, {
+          projectId,
+          action: "conversation_analysis_plan_approved",
+          objectType: "analysis_plan",
+          objectId: locked.id,
+          before: state.plan,
+          after: {
+            decisionId,
+            lockedAt: locked.lockedAt,
+            lockHash: locked.lockHash,
+            methodologyKnowledgeVersion
+          }
+        });
+      }
+      responseSummary = "Run the proposed analysis plan.";
+    } else if (
+      decision.kind === "review_mapping" ||
+      decision.kind === "resolve_mapping_gap"
+    ) {
+      const concept = decision.concept ?? String(stored.context.concept ?? "");
+      if (!concept) {
+        return c.json(
+          {
+            error: {
+              code: "MAPPING_CONCEPT_NOT_AVAILABLE",
+              message: "Methodome could not identify the concept attached to this decision."
+            }
+          },
+          409
+        );
+      }
+
+      const datasetVariable = response.datasetVariable ?? response.choiceId;
+      const confirmAbsent = response.confirmNotRepresented === true;
+      if (!datasetVariable && !confirmAbsent) {
+        return c.json(
+          {
+            error: {
+              code: "MAPPING_RESPONSE_REQUIRED",
+              message:
+                "Choose the matching dataset field, or confirm that the concept is not represented."
+            }
+          },
+          400
+        );
+      }
+
+      if (datasetVariable) {
+        if (!state.resolvedDatasetVersionId) {
+          return c.json(
+            {
+              error: {
+                code: "DATASET_REQUIRED",
+                message: "Methodome needs an analysis dataset before confirming this mapping."
+              }
+            },
+            409
+          );
+        }
+        const profile = await profileDatasetForProject(
+          c,
+          projectId,
+          state.resolvedDatasetVersionId
+        );
+        if (
+          !profile.variables.some(
+            (variable) => variable.variableName === datasetVariable
+          )
+        ) {
+          return c.json(
+            {
+              error: {
+                code: "MAPPING_VARIABLE_NOT_FOUND",
+                message: "That field is not present in the current analysis dataset."
+              }
+            },
+            409
+          );
+        }
+      }
+
+      const specificationRecord = await getCurrentStudySpecificationRecord(
+        c.env.DB,
+        projectId
+      );
+      if (!specificationRecord) {
+        return c.json(
+          {
+            error: {
+              code: "STUDY_SPECIFICATION_REQUIRED",
+              message: "The study model is required before resolving variables."
+            }
+          },
+          409
+        );
+      }
+
+      const existing = state.mappings.find(
+        (mapping) =>
+          normalizeConcept(mapping.researchConcept) ===
+          normalizeConcept(concept)
+      );
+      const priorEvidence = existing?.evidence ?? [];
+      const mappingStatus = confirmAbsent
+        ? "no_match"
+        : existing &&
+            existing.datasetVariable === datasetVariable &&
+            ["direct_match", "probable_match", "uncertain"].includes(
+              existing.mappingStatus
+            )
+          ? (existing.mappingStatus as
+              | "direct_match"
+              | "probable_match"
+              | "uncertain")
+          : "uncertain";
+
+      await saveVariableMappings(c.env.DB, {
+        projectId,
+        studySpecificationId: specificationRecord.id,
+        mappings: [
+          {
+            id: existing?.id ?? stableMappingId(concept),
+            researchConcept: concept,
+            ...(confirmAbsent ? {} : { datasetVariable: datasetVariable! }),
+            mappingStatus,
+            evidence: [
+              ...priorEvidence,
+              confirmAbsent
+                ? "Researcher confirmed in the Methodome conversation that this concept is not represented in the selected dataset."
+                : `Researcher confirmed in the Methodome conversation that “${datasetVariable}” represents this concept.`
+            ],
+            confirmedBy: getUserId(c)
+          }
+        ]
+      });
+      await addAudit(c, {
+        projectId,
+        action: "conversation_variable_mapping_resolved",
+        objectType: "variable_mapping",
+        objectId: existing?.id ?? stableMappingId(concept),
+        after: {
+          decisionId,
+          concept,
+          datasetVariable: confirmAbsent ? null : datasetVariable,
+          confirmedNotRepresented: confirmAbsent,
+          methodologyKnowledgeVersion
+        }
+      });
+      responseSummary = confirmAbsent
+        ? `“${concept}” is not represented in the selected dataset.`
+        : `Use “${datasetVariable}” for “${concept}”.`;
+    } else if (decision.kind === "confirm_study_design") {
+      if (decision.questionId && response.choiceId && state.specification) {
+        const allowedObjectiveTypes = new Set([
+          "descriptive",
+          "association",
+          "prediction",
+          "causal",
+          "diagnostic",
+          "prognostic",
+          "qualitative",
+          "exploratory"
+        ]);
+        if (!allowedObjectiveTypes.has(response.choiceId)) {
+          return c.json(
+            {
+              error: {
+                code: "OBJECTIVE_TYPE_INVALID",
+                message: "Choose one of Methodome's supported research objective types."
+              }
+            },
+            400
+          );
+        }
+        const updatedSpecification = parseStudySpecification({
+          ...state.specification,
+          version: `conversation-${Date.now()}`,
+          researchQuestions: state.specification.researchQuestions.map(
+            (question) =>
+              question.id === decision.questionId
+                ? { ...question, objectiveType: response.choiceId }
+                : question
+          )
+        });
+        await saveStudySpecification(
+          c.env.DB,
+          makeId("spec"),
+          projectId,
+          updatedSpecification,
+          getUserId(c)
+        );
+        responseSummary = "Use that analytical interpretation for this research question.";
+      } else {
+        if (response.approved !== true || !state.extraction) {
+          return c.json(
+            {
+              error: {
+                code: "STUDY_DESIGN_CONFIRMATION_REQUIRED",
+                message:
+                  "Confirm Methodome's protocol interpretation, or review the study model before continuing."
+              }
+            },
+            400
+          );
+        }
+        const extraction = protocolExtractionSchema.parse(
+          state.extraction.extraction
+        );
+        const specification = studySpecificationFromProtocolExtraction(
+          extraction
+        );
+        if (!specification) {
+          return c.json(
+            {
+              error: {
+                code: "STUDY_DESIGN_CLARIFICATION_REQUIRED",
+                message:
+                  "The protocol does not contain enough information to confirm the study model automatically. Review the missing design details."
+              }
+            },
+            409
+          );
+        }
+        await saveStudySpecification(
+          c.env.DB,
+          makeId("spec"),
+          projectId,
+          specification,
+          getUserId(c),
+          {
+            source: "protocol_interpretation_confirmed_in_conversation",
+            extractionId: state.extraction.id,
+            methodologyKnowledgeVersion
+          }
+        );
+        responseSummary = "Continue with Methodome's interpretation of the protocol.";
+      }
+
+      await addAudit(c, {
+        projectId,
+        action: "conversation_study_interpretation_confirmed",
+        objectType: "study_specification",
+        objectId: decision.questionId ?? "study",
+        after: {
+          decisionId,
+          choiceId: response.choiceId ?? null,
+          approved: response.approved ?? null,
+          methodologyKnowledgeVersion
+        }
+      });
+    } else {
+      return c.json(
+        {
+          error: {
+            code: "CONVERSATION_DECISION_REQUIRES_DETAILED_REVIEW",
+            message:
+              "This checkpoint requires detailed source review. Open the project record to complete it safely."
+          }
+        },
+        409
+      );
+    }
+
+    const now = new Date().toISOString();
+    const resolved = await resolveProjectConversationDecision(c.env.DB, {
+      projectId,
+      decisionKey: decisionId,
+      response,
+      resolvedBy: getUserId(c),
+      now
+    });
+    if (!resolved) {
+      return c.json(
+        {
+          error: {
+            code: "CONVERSATION_DECISION_ALREADY_RESOLVED",
+            message: "That research decision was resolved while the project was updating."
+          }
+        },
+        409
+      );
+    }
+
+    const threadId = await ensureProjectThread(
+      c.env.DB,
+      projectId,
+      `thread_${projectId}`,
+      now
+    );
+    const messageId = makeId("msg");
+    await appendProjectMessage(c.env.DB, {
+      id: messageId,
+      threadId,
+      projectId,
+      role: "researcher",
+      messageKind: "message",
+      content: responseSummary,
+      metadata: {
+        decisionId,
+        decisionKind: decision.kind,
+        response
+      },
+      attachmentFileIds: [],
+      createdBy: getUserId(c),
+      createdAt: now,
+      deduplicationKey: `decision-response:${decisionId}`
+    });
+
+    const runId = await queueConversationContinuation(
+      c,
+      projectId,
+      messageId
+    );
+
+    return c.json(
+      {
+        resolved: true,
+        decisionId,
+        runId,
+        message: responseSummary
+      },
+      202
+    );
+  }
+);
+
 app.get("/projects/:projectId/orchestrator", async (c) => {
   const projectId = c.req.param("projectId");
   const access = await requireProject(c, projectId);
@@ -2412,11 +3779,18 @@ app.post("/projects/:projectId/assistant", async (c) => {
   };
 
   try {
-    const reply = await answerProjectAssistant({
+    const assistant = await answerProjectAssistant({
       env: c.env,
       message: parsed.data.message,
       history: parsed.data.history,
-      context
+      context,
+      methodology: retrieveMethodologyGuidance({
+        query: parsed.data.message,
+        topics: state.selections.flatMap((selection) =>
+          selection.candidates.map((candidate) => candidate.methodId)
+        ),
+        limit: 10
+      })
     });
     await addAudit(c, {
       projectId,
@@ -2431,7 +3805,12 @@ app.post("/projects/:projectId/assistant", async (c) => {
       }
     });
     return c.json({
-      reply,
+      reply: assistant.reply,
+      intent: assistant.intent,
+      methodology: {
+        version: methodologyKnowledgeVersion,
+        ruleIds: assistant.methodologyRuleIds
+      },
       grounded: true,
       modelUsed: true
     });
@@ -5007,7 +6386,32 @@ app.onError((error, c) => {
   );
 });
 
+async function consumeMethodomeQueue(
+  batch: MessageBatch<unknown>,
+  env: Env
+): Promise<void> {
+  for (const message of batch.messages) {
+    try {
+      if (isAnalysisQueueMessage(message.body)) {
+        await processAnalysisMessage(message.body, env);
+      } else if (
+        message.body && typeof message.body === "object" &&
+        (message.body as Record<string, unknown>).type === "orchestration"
+      ) {
+        await runConversationOrchestrator(env, message.body as OrchestrationQueueMessage);
+      } else {
+        console.error("Invalid Methodome queue message", message.body);
+      }
+      message.ack();
+    } catch (error) {
+      console.error("Methodome queue processing failed", error);
+      if (message.attempts >= 3) message.ack();
+      else message.retry();
+    }
+  }
+}
+
 export default {
   fetch: app.fetch,
-  queue: consumeAnalysisQueue
+  queue: consumeMethodomeQueue
 } satisfies ExportedHandler<Env>;

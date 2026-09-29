@@ -4,6 +4,7 @@ import type { AnalysisQueueMessage, Env } from "./env";
 import { makeId } from "./id";
 import {
   appendAuditEvent,
+  createOrchestrationRun,
   getAnalysisJobForWorker,
   getAuditHeadHash,
   getDatasetVersionRecord,
@@ -17,6 +18,30 @@ async function markFailed(
   completedAt = new Date().toISOString()
 ): Promise<void> {
   await updateAnalysisJobState(env.DB, jobId, "failed", { completedAt });
+}
+
+
+async function queueOrchestrationResume(
+  env: Env,
+  job: Awaited<ReturnType<typeof getAnalysisJobForWorker>>
+): Promise<void> {
+  if (!job) return;
+  const now = new Date().toISOString();
+  const runId = makeId("run");
+  const queued = await createOrchestrationRun(env.DB, {
+    id: runId,
+    projectId: job.projectId,
+    createdBy: job.requestedBy,
+    now
+  });
+  if (!queued) return;
+
+  await env.ANALYSIS_QUEUE.send({
+    type: "orchestration",
+    runId,
+    projectId: job.projectId,
+    userId: job.requestedBy
+  });
 }
 
 export async function processAnalysisMessage(
@@ -43,6 +68,7 @@ export async function processAnalysisMessage(
     await updateAnalysisJobState(env.DB, job.jobId, "complete", {
       completedAt: new Date().toISOString()
     });
+    await queueOrchestrationResume(env, job);
     return;
   }
 
@@ -155,12 +181,17 @@ export async function processAnalysisMessage(
   await updateAnalysisJobState(env.DB, job.jobId, "complete", {
     completedAt: new Date().toISOString()
   });
+
+  // Resume the project server-side. The browser does not need to remain open
+  // while deterministic analysis is running.
+  await queueOrchestrationResume(env, job);
 }
 
-function isAnalysisQueueMessage(value: unknown): value is AnalysisQueueMessage {
+export function isAnalysisQueueMessage(value: unknown): value is AnalysisQueueMessage {
   if (!value || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
   return (
+    record.type !== "orchestration" &&
     typeof record.jobId === "string" &&
     typeof record.projectId === "string"
   );

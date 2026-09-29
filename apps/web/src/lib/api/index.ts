@@ -106,6 +106,8 @@ export interface OrchestratorDecision {
   prompt: string;
   questionId?: string;
   analysisId?: string;
+  concept?: string;
+  role?: "outcome" | "predictor" | "covariate";
   options?: Array<{ id: string; label: string; detail?: string }>;
   blocking: boolean;
 }
@@ -970,6 +972,61 @@ export async function getProjectOrchestrator(projectId: string) {
     registryVersion: string;
     datasetVersionId?: string;
   }>(`/projects/${projectId}/orchestrator`);
+}
+
+export interface ProjectConversationMessage {
+  id: string;
+  projectId: string;
+  role: "researcher" | "methodome" | "activity" | "system";
+  messageKind: "message" | "checkpoint" | "result" | "activity" | "error";
+  content: string;
+  metadata: Record<string, unknown>;
+  attachmentFileIds: string[];
+  createdAt: string;
+}
+
+export async function getProjectConversation(projectId: string) {
+  return request<{
+    messages: ProjectConversationMessage[];
+    orchestrator: OrchestratorView;
+    methodologyKnowledgeVersion: string;
+  }>(`/projects/${projectId}/conversation`);
+}
+
+export async function sendProjectConversationMessage(
+  projectId: string,
+  content: string,
+  attachmentFileIds: string[] = []
+) {
+  return request<{ messageId: string; runId: string | null; queued: boolean }>(
+    `/projects/${projectId}/conversation/messages`,
+    { method: "POST", body: JSON.stringify({ content, attachmentFileIds }) }
+  );
+}
+
+
+export async function resolveProjectConversationDecision(
+  projectId: string,
+  decisionId: string,
+  response: {
+    choiceId?: string;
+    datasetVariable?: string;
+    confirmNotRepresented?: boolean;
+    approved?: boolean;
+  }
+) {
+  return request<{
+    resolved: boolean;
+    decisionId: string;
+    runId: string | null;
+    message: string;
+  }>(
+    `/projects/${projectId}/conversation/decisions/${encodeURIComponent(decisionId)}`,
+    {
+      method: "POST",
+      body: JSON.stringify(response)
+    }
+  );
 }
 
 export async function askProjectAssistant(

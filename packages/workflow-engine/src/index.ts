@@ -844,6 +844,8 @@ export interface OrchestratorDecision {
   prompt: string;
   questionId?: string;
   analysisId?: string;
+  concept?: string;
+  role?: "outcome" | "predictor" | "covariate";
   options?: Array<{
     id: string;
     label: string;
@@ -909,8 +911,19 @@ function mappingDecisions(readiness: ProjectReadiness): OrchestratorDecision[] {
         output.push({
           id: `decision:intent:${blocker.questionId}`,
           kind: "confirm_study_design",
-          prompt: blocker.message,
+          prompt:
+            "I need one clarification about the analytical intent of this research question before I can choose methods safely.",
           questionId: blocker.questionId,
+          options: [
+            { id: "descriptive", label: "Describe or summarise" },
+            { id: "association", label: "Assess an association or difference" },
+            { id: "prediction", label: "Predict an outcome" },
+            { id: "causal", label: "Estimate a causal effect" },
+            { id: "diagnostic", label: "Evaluate diagnostic accuracy" },
+            { id: "prognostic", label: "Estimate future risk or prognosis" },
+            { id: "qualitative", label: "Understand experiences, barriers or meanings" },
+            { id: "exploratory", label: "Explore patterns without a prespecified target" }
+          ],
           blocking: true
         });
         continue;
@@ -934,6 +947,19 @@ function mappingDecisions(readiness: ProjectReadiness): OrchestratorDecision[] {
             ? `Methodome matched “${blocker.concept}” to dataset field “${variable.datasetVariable}”, but the evidence is not strong enough to accept silently. Confirm or change this one mapping.`
             : `Methodome could not resolve “${blocker.concept}” from the available dataset metadata and research instruments. Choose the field only if you can identify it, or leave the concept unresolved.`,
           questionId: blocker.questionId,
+          ...(blocker.concept ? { concept: blocker.concept } : {}),
+          ...(blocker.role ? { role: blocker.role } : {}),
+          ...(variable?.datasetVariable
+            ? {
+                options: [
+                  {
+                    id: variable.datasetVariable,
+                    label: variable.datasetVariable,
+                    detail: "Methodome's current evidence-backed suggestion."
+                  }
+                ]
+              }
+            : {}),
           blocking: true
         });
         continue;
@@ -947,6 +973,8 @@ function mappingDecisions(readiness: ProjectReadiness): OrchestratorDecision[] {
           kind: "resolve_mapping_gap",
           prompt: blocker.message,
           questionId: blocker.questionId,
+          ...(blocker.concept ? { concept: blocker.concept } : {}),
+          ...(blocker.role ? { role: blocker.role } : {}),
           blocking: true
         });
         continue;
@@ -1023,6 +1051,35 @@ export function buildOrchestratorView(
     readiness.nextAction.code === "map_variables"
       ? []
       : mappingDecisions(readiness);
+
+  if (readiness.nextAction.code === "confirm_study_design") {
+    decisions.push({
+      id: "decision:study-design",
+      kind: "confirm_study_design",
+      prompt:
+        "I have reconstructed the research questions and study structure from the protocol. Continue with this interpretation, or review it if something is wrong.",
+      blocking: true
+    });
+  }
+
+
+  if (
+    decisions.length === 0 &&
+    [
+      "add_protocol",
+      "upload_dataset",
+      "prepare_qualitative_analysis",
+      "review_project"
+    ].includes(readiness.nextAction.code) &&
+    readiness.nextAction.requiresResearcher
+  ) {
+    decisions.push({
+      id: `decision:input:${readiness.nextAction.code}`,
+      kind: "provide_input",
+      prompt: readiness.nextAction.detail,
+      blocking: true
+    });
+  }
 
   if (plan && !plan.lockedAt) {
     for (const analysis of plan.analyses) {

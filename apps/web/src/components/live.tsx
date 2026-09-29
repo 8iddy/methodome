@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActivitySpinner, Badge, Button, PageHeader, ThemeToggle } from "@/components/ui";
 import { ProjectPage as PrototypeProjectPage } from "@/components/workspace";
-import { ResearchAnalysisSurface, ResearchSectionContext, ResearchWorkspaceHome } from "@/components/research-workspace";
+import { ResearchAnalysisSurface, ResearchSectionContext } from "@/components/research-workspace";
+import { ConversationWorkspace } from "@/components/conversation-workspace";
 import {
   MethodomeApiError,
   appendDatasets,
@@ -448,7 +449,7 @@ export function LiveProjectPage({
   if (section === "overview") {
     return (
       <main className="app-content workspace-page">
-        <ResearchWorkspaceHome projectId={projectId} project={project} />
+        <ConversationWorkspace projectId={projectId} project={project} />
       </main>
     );
   }

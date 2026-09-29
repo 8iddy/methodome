@@ -15,7 +15,7 @@ export interface Env {
   TURNSTILE_SECRET_KEY?: string;
   EMAIL_VERIFICATION_REQUIRED?: string;
   EMAIL_FROM?: string;
-  ANALYSIS_QUEUE: Queue<AnalysisQueueMessage>;
+  ANALYSIS_QUEUE: Queue<MethodomeQueueMessage>;
   STATS: Fetcher;
   APP_ENV: string;
   AUTH_MODE: string;
@@ -27,9 +27,20 @@ export interface Env {
 }
 
 export interface AnalysisQueueMessage {
+  type?: "analysis";
   jobId: string;
   projectId: string;
 }
+
+export interface OrchestrationQueueMessage {
+  type: "orchestration";
+  runId: string;
+  projectId: string;
+  userId: string;
+  userEmail?: string;
+}
+
+export type MethodomeQueueMessage = AnalysisQueueMessage | OrchestrationQueueMessage;
 
 export interface Variables {
   userId: string;

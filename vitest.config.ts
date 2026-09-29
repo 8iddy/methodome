@@ -22,7 +22,8 @@ export default defineConfig({
       "@methodome/analysis-plan": root + "packages/analysis-plan/src/index.ts",
       "@methodome/schema-harmonisation": root + "packages/schema-harmonisation/src/index.ts",
       "@methodome/workflow-engine": root + "packages/workflow-engine/src/index.ts",
-      "@methodome/qualitative-analysis": root + "packages/qualitative-analysis/src/index.ts"
+      "@methodome/qualitative-analysis": root + "packages/qualitative-analysis/src/index.ts",
+      "@methodome/methodology-knowledge": root + "packages/methodology-knowledge/src/index.ts"
     }
   }
 });

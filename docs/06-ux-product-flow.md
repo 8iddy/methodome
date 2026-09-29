@@ -1,95 +1,59 @@
 # Methodome UX and Product Flow
 
-## Design character
+## Product model
 
-Methodome should feel like serious research software that is easy to use.
+Methodome should feel like working with a careful research analyst. The ordinary researcher should not have to operate a statistics workflow, understand Methodome's internal stages, or know the names of methods before asking a research question.
 
-Use a warm paper background, academic blue, muted teal, Source Serif 4 for major editorial headings, IBM Plex Sans for application text, IBM Plex Mono for technical output, fine borders, modest radius, tables, working surfaces, and side panels.
+A project therefore opens into one primary research conversation. The researcher explains what they want to investigate and attaches the available protocol, instruments, codebooks, datasets and qualitative sources. Methodome reads the material, reconstructs the study, performs safe analytical work in the background and returns only the decisions that genuinely require scientific judgment.
 
-Avoid generic AI gradients, robot imagery, floating chat as the main interaction, glass effects, oversized rounded cards, and vanity dashboard metrics.
+## Conversation
 
-## Colours
+The conversation is the control plane. It contains researcher messages, attached research files, visible processing activity, focused scientific questions and completed results. A persistent composer remains available at the bottom of the workspace.
 
-Background #F7F8F6
-Surface #FFFFFF
-Primary text #17202A
-Secondary text #667085
-Brand blue #274C77
-Interactive blue #3D6FB4
-Accent teal #2A7F78
+Attachments should show meaningful progress such as uploading, uploaded, reading or profiling, and ready for Methodome. One generic Working state should not represent several different operations.
 
-## Public pages
+Methodome writes in concise prose. It should explain the research meaning of a decision before exposing technical terminology.
 
-Landing, Methods, How it works, Documentation, Sign in, Create account.
+## Researcher checkpoints
 
-Primary CTA: Start a project.
+Routine mechanics do not require confirmation. Exact variable matches, safe source processing, plan construction and deterministic execution should continue automatically when the existing rules allow them.
 
-## Global authenticated navigation
+A checkpoint is appropriate when different answers would change the scientific meaning of the work. Examples include an ambiguous outcome definition, a choice between materially different estimands, confirmation of a consequential planned analysis, or source-level qualitative review.
 
-Projects, Methods, Analysis History, Documentation, Profile and Settings.
+These checkpoints appear inside the conversation. Method names and technical records can appear as secondary detail.
 
-## Project navigation
+## Files and study understanding
 
-Overview, Protocol, Instruments, Data, Data Preparation, Study Design, Variables, Analysis Plan, Analysis, Results, Reports, Audit Trail, Project Settings.
+Files are attached from the conversation rather than uploaded through a required sequence of Protocol, Instruments and Data pages. Methodome infers the research role when evidence is sufficient and asks one focused clarification when it is not.
 
-## Onboarding
-
-Keep onboarding short.
-
-1. What best describes your work?
-2. How do you normally analyse data?
-3. Create your first project.
-
-Use contextual guidance inside the workspace.
-
-## Projects page
-
-The main home screen shows projects and their current stage, last activity, data status, and plan status. Do not build a dashboard around meaningless activity metrics.
-
-## Data page
-
-Support several source datasets. Key actions are Inspect, Compare schemas, Prepare data, and Combine datasets.
-
-## Data preparation
-
-Use a three area layout: issue list, data table, action panel. Cleaning is structured, not chat first.
-
-## Study design
-
-The model can prefill the design form. The researcher confirms design, unit of analysis, repeated measures, clustering, weights, strata, outcome, exposure, and sampling approach.
-
-## Variables
-
-Show research concept to dataset variable mappings. Uncertain primary mappings require review.
-
-## Analysis plan
-
-Organise by research question. Show outcome, predictor, covariates, design, clustering, weights, candidate methods, diagnostics, and required decisions. Explain substantive differences when several methods are valid.
+After reading the study material, Methodome should explain its interpretation in ordinary language. Researchers can correct that interpretation, but they should not need to reconstruct the protocol manually in forms when Methodome already has adequate evidence.
 
 ## Analysis
 
-Guided mode starts from research questions and the approved study specification.
+Methodome resolves analytical variables, uses the methodology knowledge layer and deterministic registry to identify defensible methods, constructs the plan, locks approved planned work and sends supported methods to the statistics worker.
 
-Manual mode starts from a researcher selected method but still runs registry checks.
+When only one executable method is defensible, Methodome should proceed without asking the researcher to select it. When several defensible methods answer meaningfully different questions, Methodome should explain that difference in research language and request the minimum clarification needed.
 
 ## Results
 
-Use four tabs: Summary, Model, Diagnostics, Reproduce.
+Completed quantitative results return to the conversation from structured deterministic output. Numerical values must come from the statistical runner. Methodome may explain those values using the study context, diagnostics and relevant methodology or reporting guidance.
 
-Summary communicates the finding. Model shows technical estimates. Diagnostics shows assumption checks and warnings. Reproduce shows code, versions, dataset, filters, and provenance.
+Detailed estimates, diagnostics, code, versions and provenance remain available through Results and the project record.
 
-## Methods library
+## Qualitative work
 
-Each method page shows purpose, appropriate use, data requirements, assumptions, diagnostics, outputs, related methods, maturity level, and technical implementation details.
+Qualitative preparation, segmentation and proposal mechanics also belong behind the conversation. Source-linked codebooks, coding and themes remain auditable. Researcher review is surfaced when conceptual judgment is genuinely required, with the detailed workbench available as an inspection surface.
 
-## History and audit
+## Navigation
 
-Analysis History answers what analyses ran.
+The normal project navigation is deliberately small: Conversation, Project record and Results. Technical inspection can expose data and sources, study design, variable mappings, analysis plan, analysis workbench, audit record and settings.
 
-Audit Trail answers what changed in a project.
+Those pages explain and correct canonical state. They are not a wizard.
 
-Keep them separate.
+## Visual character
+
+Keep the current warm paper, restrained research-green and editorial research-document character. Prefer prose, horizontal structure and compact controls over dashboards full of cards, pills or vanity metrics.
 
 ## Writing rules
 
-Use plain English and complete sentences. Do not use em dashes. Avoid unnecessary hyphenation, filler language, inflated adjectives, and constructions such as “not just X, but Y.”
+Use plain English and complete sentences. Prefer concise prose. Use lists only when the material genuinely benefits from enumeration. Avoid em dashes, unnecessary hyphenation, inflated language and constructions such as “not just X, but Y.”

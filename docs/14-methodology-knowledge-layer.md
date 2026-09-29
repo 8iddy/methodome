@@ -2,127 +2,54 @@
 
 ## Purpose
 
-Methodome should behave like a research analyst, not like a form that asks a researcher to supply analytical knowledge the software is supposed to provide.
+Methodome's methodology corpus is an active runtime knowledge layer, not a document archive. It exists so analytical decisions can be informed by versioned, source-supported research methodology rather than relying on a language model's general memory.
 
-The methodology knowledge layer is the part of Methodome that interprets research intent before deterministic statistical selection and execution.
+The current release is `methodome-methodology-knowledge-v1` with status `source_supported`. That status means the evidence statements and operational rules are traceable to registered sources and have passed corpus consistency review. It does not mean the rules have completed the planned expert-labelled methodology benchmark.
 
-It is separate from:
+## Runtime representation
 
-- research-document storage;
-- dataset profiling;
-- variable mapping;
-- deterministic method selection;
-- statistical computation.
+The repository keeps source metadata, evidence statements, operational rules, coverage information, audits and regression cases under `knowledge/`. The runtime application bundles the operational layer through `@methodome/methodology-knowledge` so Cloudflare Workers do not need live access to Google Drive or the original literature during ordinary execution.
 
-## What the knowledge layer does
+Raw source files remain provenance material. The structured rules are the application-facing representation.
 
-The first implemented version supplies versioned methodological guidance for:
+## How Methodome uses it
 
-- research-question objective classification;
-- outcome, predictor/exposure and covariate roles;
-- estimand interpretation;
-- quantitative study-design classification;
-- sampling-design interpretation;
-- unit-of-analysis interpretation;
-- repeated-measure, cluster, survey-weight and stratification flags.
+Protocol interpretation retrieves relevant guidance about research-question intent, study design, sampling, estimands, repeated measures, clustering, survey design, causal intent, prediction and related methodological structure.
 
-The protocol interpreter uses this knowledge with the protocol text to propose a structured study specification.
+The deterministic method registry associates candidate and blocked methods with relevant operational rules. A method decision can therefore retain the methodology knowledge version together with rule, evidence and source identifiers.
 
-Researchers can edit the proposal before confirmation.
+The same layer can provide relevant diagnostics and reporting guidance after deterministic computation. It informs what should be checked and what can be claimed. It does not alter numerical output.
 
-## What it does not do
+The project conversation also receives relevant retrieved guidance when it explains why Methodome made a methodological decision. The language model explains the current study state and deterministic decision; it does not replace them.
 
-It does not calculate statistics.
+## Operational rules and evidence
 
-It does not invent dataset variables.
+Operational rules contain conditions, actions, assumptions, diagnostics, warnings, exceptions and supporting source evidence. Wherever a safeguard can be expressed deterministically, the software should enforce it in code.
 
-It does not override confirmed researcher decisions.
+Evidence records support explanation and provenance. They are not votes, and duplicate files from one source family do not count as independent methodological support.
 
-It does not treat an LLM response as methodological ground truth.
+This separation matters. A source can support a principle while the current Methodome runtime still lacks an executor for the corresponding advanced method.
 
-## Why this is not foundation-model pretraining
+## Safety boundary
 
-Methodome does not need to train a general language model from scratch.
+The knowledge layer can know more than Methodome can execute. That breadth is useful because it lets the system recognise when a simpler available method would be inappropriate.
 
-The near-term approach is:
+For example, the corpus contains safeguards against treating clustered or repeated observations as independent, turning observational adjustment into a causal claim, choosing negative-binomial regression solely because overdispersion exists, treating Mann-Whitney as a generic median test, or selecting a missing-data strategy solely from a missingness percentage.
 
-1. use a capable language model for document interpretation;
-2. provide versioned methodology knowledge in context;
-3. constrain output to the Methodome study-specification schema;
-4. apply deterministic rules for method eligibility;
-5. require researcher review before locking the analysis plan;
-6. benchmark the interpretation and method-selection decisions against expert annotations.
+If Methodome understands the methodological requirement but lacks a safe executor, it should stop or defer rather than approximate with an inappropriate supported method.
 
-This is cheaper, easier to inspect and easier to revise than pretraining or fine-tuning a model before Methodome has a labelled benchmark.
+## Conversation and provenance
 
-## Knowledge expansion
+Normal researchers should not see rule IDs during ordinary use. They should be able to ask why Methodome chose an analysis and receive a plain-language explanation grounded in the study, observed data structure, deterministic rule evaluation and source-supported methodology guidance.
 
-The methodology layer should grow into a source-backed, versioned knowledge base.
-
-Candidate content includes:
-
-- epidemiologic study design;
-- biostatistical method selection;
-- survey methodology;
-- missing-data handling;
-- repeated-measure and clustered-data analysis;
-- diagnostic and prognostic modelling;
-- causal inference;
-- survival analysis;
-- psychometrics;
-- mixed-methods design;
-- qualitative analysis.
-
-Each guidance item should record:
-
-- topic;
-- rule or decision principle;
-- scope;
-- exceptions;
-- supporting source;
-- version;
-- validation status.
-
-## Retrieval
-
-As the knowledge base grows, Methodome can retrieve only the guidance relevant to the current protocol and research question.
-
-The LLM then receives:
-
-- the protocol evidence;
-- the structured research question;
-- the relevant methodology guidance;
-- the allowed Methodome schema.
-
-This avoids stuffing an entire statistics textbook into every request.
+Advanced inspection and the audit record may expose the methodology knowledge version, applied rule IDs, evidence IDs, source IDs, registry version and model or prompt version where relevant.
 
 ## Validation
 
-Methodology knowledge is useful only if Methodome can be tested against expert decisions.
+The existing synthetic cases protect software behaviour from regression. They are not a substitute for expert methodological validation.
 
-The benchmark should contain protocols with expert-labelled:
+The next validation stage remains an expert-labelled protocol-to-analysis benchmark covering research questions, analytical roles, estimands, study design, sampling, dependence structure, acceptable method sets and unacceptable methods with reasons. The stronger `validated` label remains reserved for that stage.
 
-- research questions;
-- objective types;
-- outcomes;
-- predictors/exposures;
-- covariates;
-- estimands;
-- study design;
-- unit of analysis;
-- sampling design;
-- clustering/repeated-measure features;
-- acceptable method sets;
-- unacceptable method sets and reasons.
+## Development principle
 
-The benchmark should be versioned separately from computational reference tests.
-
-## Fine-tuning threshold
-
-Fine-tuning should be considered only when:
-
-- the benchmark is large enough to measure recurring errors;
-- prompt + retrieval + rules no longer fix those errors reliably;
-- the target behaviour is stable enough to justify model training.
-
-Until then, Methodome should improve through versioned knowledge, retrieval, deterministic rules and benchmark feedback.
+Build broad, validate narrow, and expand the validated boundary continuously. Methodome should improve through source-backed knowledge, deterministic constraints, benchmark feedback and carefully bounded model assistance before considering fine-tuning.

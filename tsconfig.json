@@ -55,6 +55,9 @@
       ],
       "@methodome/qualitative-analysis": [
         "packages/qualitative-analysis/src/index.ts"
+      ],
+      "@methodome/methodology-knowledge": [
+        "packages/methodology-knowledge/src/index.ts"
       ]
     },
     "types": [
