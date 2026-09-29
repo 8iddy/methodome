@@ -2670,15 +2670,175 @@ const conversationMessageSchema = z.object({
   attachmentFileIds: z.array(z.string().min(1)).max(20).default([])
 });
 
-function inferResearchFileKind(file: { filename: string; mediaType?: string }) {
+function inferResearchFileKindFromName(file: {
+  filename: string;
+  mediaType?: string;
+}) {
   const name = file.filename.toLowerCase();
   const mediaType = file.mediaType?.toLowerCase() ?? "";
-  if (/protocol|proposal|research.plan|study.plan/.test(name)) return "protocol" as const;
-  if (/transcript|interview|focus.group|fgd|field.note/.test(name)) return "transcript" as const;
-  if (/codebook|data.dictionary|variable.dictionary/.test(name)) return "codebook" as const;
-  if (/questionnaire|instrument|survey.form|case.report.form|\bcrf\b/.test(name)) return "instrument" as const;
-  if (/\.(csv|tsv|xlsx?|sav|dta|sas7bdat)$/.test(name) || mediaType.includes("spreadsheet") || mediaType.includes("csv")) return "dataset" as const;
+  if (/protocol|proposal|research.plan|study.plan/.test(name)) {
+    return "protocol" as const;
+  }
+  if (/transcript|interview|focus.group|fgd|field.note/.test(name)) {
+    return "transcript" as const;
+  }
+  if (/codebook|data.dictionary|variable.dictionary/.test(name)) {
+    return "codebook" as const;
+  }
+  if (
+    /questionnaire|instrument|survey.form|case.report.form|\bcrf\b/.test(name)
+  ) {
+    return "instrument" as const;
+  }
+  if (/\.csv$/.test(name) || mediaType.includes("csv")) {
+    return "dataset" as const;
+  }
   return "other" as const;
+}
+
+async function inferResearchFileKind(
+  c: ApiContext,
+  file: {
+    filename: string;
+    mediaType?: string;
+    objectKey: string;
+    checksumSha256: string;
+  }
+) {
+  const named = inferResearchFileKindFromName(file);
+  if (named !== "other") return named;
+  if (!c.env.FILES || file.checksumSha256 === "pending") {
+    return "other" as const;
+  }
+
+  const object = await c.env.FILES.get(file.objectKey);
+  if (!object) return "other" as const;
+
+  let text = "";
+  try {
+    const lower = file.filename.toLowerCase();
+    const direct =
+      lower.endsWith(".txt") ||
+      lower.endsWith(".md") ||
+      lower.endsWith(".markdown") ||
+      file.mediaType?.startsWith("text/");
+    if (direct) {
+      text = (await object.text()).slice(0, 24000);
+    } else if (
+      lower.endsWith(".pdf") ||
+      lower.endsWith(".docx") ||
+      lower.endsWith(".doc")
+    ) {
+      const policy = await getProjectPolicy(c.env.DB, c.req.param("projectId"));
+      if (policy) {
+        assertModelRequestAllowed(policy, {
+          processorId: "workers-ai",
+          providerKind: "internal",
+          payloadKind: "document_text",
+          containsIdentifiers: policy.containsIdentifiableData
+        });
+      }
+      text = (
+        await researchFileToText({
+          env: c.env,
+          filename: file.filename,
+          ...(file.mediaType ? { mediaType: file.mediaType } : {}),
+          bytes: await object.arrayBuffer()
+        })
+      ).slice(0, 24000);
+    }
+  } catch {
+    return "other" as const;
+  }
+
+  const normalized = text.toLowerCase();
+  if (!normalized.trim()) return "other" as const;
+
+  const protocolScore = [
+    "research question",
+    "study design",
+    "study objective",
+    "specific objective",
+    "methodology",
+    "sampling",
+    "sample size",
+    "hypothesis"
+  ].filter((term) => normalized.includes(term)).length;
+  const transcriptScore = [
+    "interviewer:",
+    "respondent:",
+    "participant:",
+    "moderator:",
+    "focus group",
+    "interview transcript"
+  ].filter((term) => normalized.includes(term)).length;
+  const codebookScore = [
+    "variable name",
+    "variable label",
+    "value label",
+    "data dictionary",
+    "codebook"
+  ].filter((term) => normalized.includes(term)).length;
+  const instrumentScore = [
+    "questionnaire",
+    "response option",
+    "skip pattern",
+    "select one",
+    "select all",
+    "section a",
+    "section b"
+  ].filter((term) => normalized.includes(term)).length;
+
+  const ranked = [
+    ["protocol", protocolScore] as const,
+    ["transcript", transcriptScore] as const,
+    ["codebook", codebookScore] as const,
+    ["instrument", instrumentScore] as const
+  ].sort((a, b) => b[1] - a[1]);
+
+  return ranked[0]![1] >= 2 ? ranked[0]![0] : ("other" as const);
+}
+
+async function ensureConversationDatasetRegistered(
+  c: ApiContext,
+  projectId: string,
+  file: {
+    id: string;
+    filename: string;
+    objectKey: string;
+    checksumSha256: string;
+  }
+): Promise<string> {
+  const existing = await c.env.DB.prepare(
+    "SELECT id FROM dataset_versions WHERE project_id = ? AND object_key = ? LIMIT 1"
+  )
+    .bind(projectId, file.objectKey)
+    .first<{ id: string }>();
+  if (existing) return existing.id;
+
+  const datasetVersionId = makeId("dsv");
+  await createDatasetVersion(c.env.DB, {
+    id: datasetVersionId,
+    projectId,
+    label: file.filename,
+    sourceKind: "original",
+    objectKey: file.objectKey,
+    checksumSha256: file.checksumSha256,
+    createdBy: getUserId(c),
+    parentVersionIds: []
+  });
+  await addAudit(c, {
+    projectId,
+    action: "conversation_dataset_registered",
+    objectType: "dataset_version",
+    objectId: datasetVersionId,
+    after: {
+      sourceFileId: file.id,
+      filename: file.filename,
+      checksumSha256: file.checksumSha256
+    }
+  });
+  return datasetVersionId;
 }
 
 app.get("/projects/:projectId/conversation", async (c) => {
@@ -2704,24 +2864,92 @@ app.post("/projects/:projectId/conversation/messages", async (c) => {
 
   const files = await listProjectFiles(c.env.DB, projectId);
   const projectFileIds = new Set(files.map((file) => file.id));
-  if (parsed.data.attachmentFileIds.some((fileId) => !projectFileIds.has(fileId))) {
-    return c.json({ error: { code: "INVALID_CONVERSATION_ATTACHMENT", message: "One or more attachments do not belong to this project." } }, 400);
+  if (
+    parsed.data.attachmentFileIds.some(
+      (fileId) => !projectFileIds.has(fileId)
+    )
+  ) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_CONVERSATION_ATTACHMENT",
+          message: "One or more attachments do not belong to this project."
+        }
+      },
+      400
+    );
   }
-  for (const file of files.filter((item) => parsed.data.attachmentFileIds.includes(item.id))) {
-    const inferred = inferResearchFileKind(file);
+
+  const classifiedAttachments: Array<{
+    fileId: string;
+    filename: string;
+    fileKind: string;
+  }> = [];
+  for (const summary of files.filter((item) =>
+    parsed.data.attachmentFileIds.includes(item.id)
+  )) {
+    const file = await getFileRecord(c.env.DB, summary.id, getUserId(c));
+    if (!file) continue;
+
+    const inferred =
+      file.fileKind === "other"
+        ? await inferResearchFileKind(c, file)
+        : file.fileKind;
     if (file.fileKind === "other" && inferred !== "other") {
       await updateProjectFileKind(c.env.DB, projectId, file.id, inferred);
     }
+    if (inferred === "dataset") {
+      await ensureConversationDatasetRegistered(c, projectId, file);
+    }
+    classifiedAttachments.push({
+      fileId: file.id,
+      filename: file.filename,
+      fileKind: inferred
+    });
   }
 
   const now = new Date().toISOString();
-  const threadId = await ensureProjectThread(c.env.DB, projectId, makeId("thread"), now);
+  const threadId = await ensureProjectThread(
+    c.env.DB,
+    projectId,
+    makeId("thread"),
+    now
+  );
   const messageId = makeId("msg");
   await appendProjectMessage(c.env.DB, {
-    id: messageId, threadId, projectId, role: "researcher", messageKind: "message",
-    content: parsed.data.content, metadata: {}, attachmentFileIds: parsed.data.attachmentFileIds,
-    createdBy: getUserId(c), createdAt: now
+    id: messageId,
+    threadId,
+    projectId,
+    role: "researcher",
+    messageKind: "message",
+    content: parsed.data.content,
+    metadata: { classifiedAttachments },
+    attachmentFileIds: parsed.data.attachmentFileIds,
+    createdBy: getUserId(c),
+    createdAt: now
   });
+
+  for (const attachment of classifiedAttachments) {
+    await appendProjectMessage(c.env.DB, {
+      id: makeId("msg"),
+      threadId,
+      projectId,
+      role: "activity",
+      messageKind: "activity",
+      content:
+        attachment.fileKind === "other"
+          ? `${attachment.filename} was uploaded. I could not safely infer its research role yet.`
+          : `${attachment.filename} was uploaded and identified as ${attachment.fileKind.replaceAll("_", " ")}.`,
+      metadata: {
+        fileId: attachment.fileId,
+        fileKind: attachment.fileKind
+      },
+      attachmentFileIds: [attachment.fileId],
+      createdAt: new Date().toISOString(),
+      deduplicationKey: `attachment-classified:${attachment.fileId}`
+    });
+  }
+
   const runId = makeId("run");
   const queued = await createOrchestrationRun(c.env.DB, {
     id: runId, projectId, triggerMessageId: messageId, createdBy: getUserId(c), now
