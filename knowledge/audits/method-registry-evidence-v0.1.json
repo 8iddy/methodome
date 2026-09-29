@@ -167,9 +167,11 @@
       "evidence_sources": [
         "src-013-penn-state-stat-501-regression-methods"
       ],
-      "rule_ids": [],
-      "finding": "The corpus now directly supports routing Poisson count responses away from ordinary constant-variance linear regression toward Poisson regression. It does not yet provide a complete automated rule covering exposure offsets, dispersion checks, excess zeros, or model diagnostics.",
-      "action": "Keep non-executable and outside automatic recommendation. Treat the count-outcome evidence as partial until count-regression assumptions and diagnostics are source-backed."
+      "rule_ids": [
+        "poisson-regression-001"
+      ],
+      "finding": "The corpus directly supports routing Poisson count responses away from ordinary linear regression toward Poisson regression, but the automated dispersion and adequacy checks are not yet fully source-backed.",
+      "action": "Keep non-executable. Retain Poisson as a future count-model candidate, but do not activate automatic recommendation until dispersion and model-adequacy guidance is completed and benchmarked."
     },
     {
       "method_id": "negative_binomial_regression",
@@ -179,8 +181,8 @@
       "methodology_status": "gap",
       "evidence_sources": [],
       "rule_ids": [],
-      "finding": "The current corpus has not yet yielded a sufficiently explicit negative-binomial selection rule, including overdispersion criteria.",
-      "action": "Do not activate automatic recommendation until count-regression evidence and benchmark cases are added."
+      "finding": "No sufficient source-backed negative-binomial selection rule has been extracted; the relevant major categorical-data text in the corpus is scanned and not text-extractable without selective manual inspection.",
+      "action": "Keep non-executable and do not present automatic negative-binomial recommendation as methodology-validated until the source gap is closed."
     }
   ]
 }
