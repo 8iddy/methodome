@@ -1,6 +1,6 @@
 {
   "corpus_id": "methodome-methodology-corpus-v1",
-  "family_count": 33,
+  "family_count": 35,
   "note": "Files from one textbook/course/guideline family are grouped so evidence weight is not inflated by chapter-level PDF splitting.",
   "families": [
     {
@@ -665,6 +665,46 @@
         "negative_binomial_regression",
         "overdispersion",
         "model_selection"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-separation-in-logistic-regression-causes-consequences-and-control",
+      "title": "Separation in Logistic Regression: Causes, Consequences, and Control",
+      "organization": "American Journal of Epidemiology",
+      "year": 2018,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-077-separation-in-logistic-regression-causes-consequences-and-control"
+      ],
+      "domains": [
+        "binary_logistic_regression",
+        "separation",
+        "sparse_data",
+        "small_samples",
+        "penalized_likelihood"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-no-rationale-for-one-variable-per-ten-events-logistic-regression",
+      "title": "No rationale for 1 variable per 10 events criterion for binary logistic regression analysis",
+      "organization": "BMC Medical Research Methodology",
+      "year": 2016,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-078-no-rationale-for-one-variable-per-ten-events-logistic-regression"
+      ],
+      "domains": [
+        "binary_logistic_regression",
+        "events_per_variable",
+        "small_samples",
+        "separation",
+        "firth_correction"
       ],
       "authority_tier": "A",
       "role": "primary",
