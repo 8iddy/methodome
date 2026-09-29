@@ -371,6 +371,15 @@ function normalizeConcept(value: string): string {
     .replace(/\s+/g, " ");
 }
 
+function stableMappingId(concept: string): string {
+  let hash = 2166136261;
+  for (const character of normalizeConcept(concept)) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `map_auto_${(hash >>> 0).toString(16)}`;
+}
+
 async function resolveStudySpecificationForMethods(
   c: import("hono").Context<AppBindings>,
   projectId: string,
@@ -614,6 +623,89 @@ async function runProtocolExtractionForProject(
   });
 
   return extraction;
+}
+
+async function orchestratorMapVariables(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+) {
+  if (!state.specification) {
+    throw new Error("Confirm the study specification before resolving variables.");
+  }
+  if (state.mappings.length > 0) {
+    throw new Error(
+      "Variable mappings already exist. Review only the unresolved mappings rather than replacing prior decisions."
+    );
+  }
+
+  const specificationRecord = await getCurrentStudySpecificationRecord(
+    c.env.DB,
+    projectId
+  );
+  if (!specificationRecord) {
+    throw new Error("The current study specification could not be loaded.");
+  }
+
+  const generated = await buildVariableMappingSuggestions(
+    c,
+    projectId,
+    state.specification
+  );
+
+  const mappings = generated.suggestions.map((suggestion) => ({
+    id: stableMappingId(suggestion.researchConcept),
+    researchConcept: suggestion.researchConcept,
+    ...(suggestion.datasetVariable
+      ? { datasetVariable: suggestion.datasetVariable }
+      : {}),
+    mappingStatus: suggestion.mappingStatus,
+    evidence: [
+      ...suggestion.evidence,
+      ...(suggestion.mappingStatus === "direct_match" && suggestion.datasetVariable
+        ? ["Methodome accepted this exact metadata match automatically."]
+        : [])
+    ],
+    ...(suggestion.mappingStatus === "direct_match" && suggestion.datasetVariable
+      ? { confirmedBy: "methodome:auto:exact_metadata" }
+      : {})
+  }));
+
+  await saveVariableMappings(c.env.DB, {
+    projectId,
+    studySpecificationId: specificationRecord.id,
+    mappings
+  });
+
+  const autoResolvedCount = mappings.filter(
+    (mapping) =>
+      mapping.mappingStatus === "direct_match" &&
+      Boolean(mapping.datasetVariable)
+  ).length;
+  const reviewCount = mappings.filter(
+    (mapping) =>
+      Boolean(mapping.datasetVariable) &&
+      mapping.mappingStatus !== "direct_match"
+  ).length;
+  const unresolvedCount = mappings.filter(
+    (mapping) => !mapping.datasetVariable
+  ).length;
+
+  await addAudit(c, {
+    projectId,
+    action: "orchestrator_variable_mappings_proposed",
+    objectType: "variable_mapping_set",
+    objectId: specificationRecord.id,
+    after: {
+      datasetVersionId: generated.datasetVersionId,
+      autoResolvedCount,
+      reviewCount,
+      unresolvedCount,
+      mappingCount: mappings.length
+    }
+  });
+
+  return { autoResolvedCount, reviewCount, unresolvedCount };
 }
 
 async function createOrchestratedDraftPlan(
@@ -1913,68 +2005,32 @@ app.post("/projects/:projectId/protocol-extraction", async (c) => {
   }
 });
 
-app.get("/projects/:projectId/variable-mapping-suggestions", async (c) => {
-  const projectId = c.req.param("projectId");
-  const access = await requireProject(c, projectId);
-  if ("response" in access) return access.response;
-
-  const specification = await getStudySpecification(c.env.DB, projectId);
-  if (!specification) {
-    return c.json(
-      {
-        error: {
-          code: "STUDY_SPECIFICATION_REQUIRED",
-          message: "Confirm the study specification before mapping variables."
-        }
-      },
-      409
-    );
-  }
-
+async function buildVariableMappingSuggestions(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  specification: StudySpecification
+) {
   const datasets = await listDatasetVersions(c.env.DB, projectId);
   const preferred =
     datasets.find((dataset) => dataset.sourceKind === "derived") ?? datasets[0];
   if (!preferred) {
-    return c.json(
-      {
-        error: {
-          code: "DATASET_REQUIRED",
-          message: "Upload a dataset before Methodome can map study concepts."
-        }
-      },
-      409
-    );
+    throw new Error("Upload a dataset before Methodome can map study concepts.");
   }
 
-  let profile;
-  try {
-    profile = await profileDatasetForProject(c, projectId, preferred.id);
-  } catch (error) {
-    return c.json(
-      {
-        error: {
-          code: "DATASET_PROFILE_FAILED",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Methodome could not profile the selected dataset."
-        }
-      },
-      422
-    );
-  }
-
-  const concepts = specification.researchQuestions.flatMap((question) => [
-    ...question.outcomes.map((variable) => variable.concept),
-    ...question.predictors.map((variable) => variable.concept),
-    ...question.covariates.map((variable) => variable.concept)
-  ]);
+  const profile = await profileDatasetForProject(c, projectId, preferred.id);
+  const concepts = specification.researchQuestions
+    .filter((question) => question.objectiveType !== "qualitative")
+    .flatMap((question) => [
+      ...question.outcomes.map((variable) => variable.concept),
+      ...question.predictors.map((variable) => variable.concept),
+      ...question.covariates.map((variable) => variable.concept)
+    ]);
 
   let instrumentText = "";
   if (c.env.FILES) {
     const researchFiles = (await listProjectFiles(c.env.DB, projectId))
       .filter((file) => file.fileKind === "instrument" || file.fileKind === "codebook")
-      .slice(0, 2);
+      .slice(0, 3);
     for (const summary of researchFiles) {
       try {
         const record = await getFileRecord(c.env.DB, summary.id, getUserId(c));
@@ -1987,9 +2043,9 @@ app.get("/projects/:projectId/variable-mapping-suggestions", async (c) => {
           ...(record.mediaType ? { mediaType: record.mediaType } : {}),
           bytes: await object.arrayBuffer()
         });
-        instrumentText += `\n\nFILE: ${record.filename}\n${text.slice(0, 15000)}`;
+        instrumentText += `\n\nFILE: ${record.filename}\n${text.slice(0, 18000)}`;
       } catch {
-        // Instrument text is helpful evidence but is not required for mapping.
+        // Instruments improve semantic resolution but are not required.
       }
     }
   }
@@ -1997,7 +2053,6 @@ app.get("/projects/:projectId/variable-mapping-suggestions", async (c) => {
   const policy = await getProjectPolicy(c.env.DB, projectId);
   let modelAssistAllowed = true;
   let modelAssistReason: string | undefined;
-
   if (policy) {
     try {
       assertModelRequestAllowed(policy, {
@@ -2030,7 +2085,7 @@ app.get("/projects/:projectId/variable-mapping-suggestions", async (c) => {
     allowModelAssist: modelAssistAllowed
   });
 
-  return c.json({
+  return {
     datasetVersionId: preferred.id,
     variables: profile.variables,
     suggestions,
@@ -2038,10 +2093,50 @@ app.get("/projects/:projectId/variable-mapping-suggestions", async (c) => {
       ? { status: "available" as const }
       : {
           status: "blocked" as const,
-          reason: modelAssistReason ??
+          reason:
+            modelAssistReason ??
             "Model-assisted mapping is unavailable for this project."
         }
-  });
+  };
+}
+
+app.get("/projects/:projectId/variable-mapping-suggestions", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const specification = await getStudySpecification(c.env.DB, projectId);
+  if (!specification) {
+    return c.json(
+      {
+        error: {
+          code: "STUDY_SPECIFICATION_REQUIRED",
+          message: "Confirm the study specification before mapping variables."
+        }
+      },
+      409
+    );
+  }
+
+  try {
+    return c.json(await buildVariableMappingSuggestions(c, projectId, specification));
+  } catch (error) {
+    const detail =
+      error instanceof Error
+        ? error.message
+        : "Methodome could not resolve variable mappings.";
+    return c.json(
+      {
+        error: {
+          code: detail.startsWith("Upload a dataset")
+            ? "DATASET_REQUIRED"
+            : "VARIABLE_MAPPING_SUGGESTIONS_FAILED",
+          message: detail
+        }
+      },
+      detail.startsWith("Upload a dataset") ? 409 : 422
+    );
+  }
 });
 
 app.get("/projects/:projectId/study-specification", async (c) => {
@@ -2138,6 +2233,7 @@ app.get("/projects/:projectId/readiness", async (c) => {
 const orchestratorAdvanceSchema = z.object({
   action: z.enum([
     "extract_protocol",
+    "map_variables",
     "create_draft_plan",
     "run_analyses",
     "prepare_qualitative_analysis",
@@ -2218,6 +2314,12 @@ app.post("/projects/:projectId/orchestrator/advance", async (c) => {
 
   let mutation:
     | { action: "extract_protocol"; researchQuestionCount: number }
+    | {
+        action: "map_variables";
+        autoResolvedCount: number;
+        reviewCount: number;
+        unresolvedCount: number;
+      }
     | { action: "create_draft_plan"; planId: string; analysisCount: number }
     | { action: "run_analyses"; queuedJobIds: string[] }
     | { action: "prepare_qualitative_analysis"; analysisId: string; segmentCount: number }
@@ -2237,6 +2339,11 @@ app.post("/projects/:projectId/orchestrator/advance", async (c) => {
       mutation = {
         action: "extract_protocol",
         researchQuestionCount: extraction.researchQuestions.length
+      };
+    } else if (view.automaticAction === "map_variables") {
+      mutation = {
+        action: "map_variables",
+        ...(await orchestratorMapVariables(c, projectId, before))
       };
     } else if (view.automaticAction === "create_draft_plan") {
       const plan = await createOrchestratedDraftPlan(c, projectId, before);
