@@ -1471,6 +1471,8 @@ export async function listQualitativeCodings(
     source: String(row.source) as "model" | "researcher",
     ...(row.rationale ? { rationale: String(row.rationale) } : {}),
     createdBy: String(row.created_by),
+    ...(row.reviewed_by ? { reviewedBy: String(row.reviewed_by) } : {}),
+    ...(row.reviewed_at ? { reviewedAt: String(row.reviewed_at) } : {}),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at)
   }));
