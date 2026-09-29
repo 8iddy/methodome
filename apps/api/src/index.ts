@@ -2628,13 +2628,30 @@ app.post("/projects/:projectId/qualitative-analyses", async (c) => {
       );
     }
 
+    if (
+      qualitativeSourceNeedsModelConversion(file.filename, file.mediaType)
+    ) {
+      try {
+        await assertQualitativeModelAllowed(c, projectId);
+      } catch (error) {
+        return c.json(
+          {
+            error: {
+              code: "QUALITATIVE_MODEL_BLOCKED",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Project processing policy blocks transcript conversion.",
+              details: { fileId }
+            }
+          },
+          409
+        );
+      }
+    }
+
     let text: string;
     try {
-      if (
-        qualitativeSourceNeedsModelConversion(file.filename, file.mediaType)
-      ) {
-        await assertQualitativeModelAllowed(c, projectId);
-      }
       text = await researchFileToText({
         env: c.env,
         filename: file.filename,
