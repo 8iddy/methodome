@@ -35,6 +35,10 @@ def test_linear_regression():
     terms = {item["term"]: item for item in result["estimates"]}
     assert math.isclose(terms["Intercept"]["estimate"], 1.0, abs_tol=1e-8)
     assert math.isclose(terms["x"]["estimate"], 2.0, abs_tol=1e-8)
+    diagnostic_ids = {item["id"] for item in result["diagnostics"]}
+    assert "max_abs_standardized_residual" in diagnostic_ids
+    assert "max_leverage" in diagnostic_ids
+    assert "residual_distribution_review" in diagnostic_ids
 
 
 def test_logistic_regression_runs_and_returns_odds_ratios():
@@ -72,6 +76,9 @@ def test_logistic_regression_runs_and_returns_odds_ratios():
         if item["id"] == "sparse_data_review"
     )
     assert "does not use a fixed events-per-variable cutoff" in sparse_review["message"]
+    diagnostic_ids = {item["id"] for item in result["diagnostics"]}
+    assert "max_abs_pearson_residual" in diagnostic_ids
+    assert "max_abs_deviance_residual" in diagnostic_ids
 
 
 def test_chi_square_flags_expected_counts():
@@ -347,3 +354,59 @@ def test_logistic_regression_refuses_complete_score_separation():
         message = str(exc).lower()
         assert "separation" in message or "did not converge" in message
         assert "do not report" in message or "not reportable" in message or "separation-aware" in message
+
+
+def test_linear_regression_reports_vif_without_magic_cutoff():
+    csv_text = (
+        "x1,x2,y\n"
+        "1,1,2.2\n"
+        "2,2,4.1\n"
+        "3,2,5.0\n"
+        "4,4,8.1\n"
+        "5,5,10.3\n"
+        "6,7,13.2\n"
+        "7,7,14.0\n"
+        "8,9,17.1\n"
+    )
+    result = run_analysis(
+        {
+            "methodId": "linear_regression",
+            "csv": csv_text,
+            "outcome": "y",
+            "predictors": ["x1", "x2"],
+        }
+    )
+
+    diagnostics = {item["id"]: item for item in result["diagnostics"]}
+    assert "vif.x1" in diagnostics
+    assert "vif.x2" in diagnostics
+    assert math.isclose(diagnostics["vif.x1"]["value"], 30.964968152866373, rel_tol=1e-8)
+    assert math.isclose(diagnostics["vif.x2"]["value"], 30.964968152866373, rel_tol=1e-8)
+    assert "does not use a single universal VIF cutoff" in diagnostics["vif.x1"]["message"]
+    assert diagnostics["vif.x1"]["status"] == "review"
+
+
+def test_logistic_regression_reports_residual_and_vif_diagnostics():
+    csv_text = (
+        "x1,x2,y\n"
+        "0.1,0,0\n0.2,1,0\n0.3,0,0\n0.4,1,1\n"
+        "0.5,0,0\n0.6,1,1\n0.7,0,1\n0.8,1,0\n"
+        "0.9,0,1\n1.0,1,1\n1.1,0,0\n1.2,1,1\n"
+        "1.3,0,1\n1.4,1,0\n1.5,0,1\n1.6,1,1\n"
+    )
+    result = run_analysis(
+        {
+            "methodId": "binary_logistic_regression",
+            "csv": csv_text,
+            "outcome": "y",
+            "predictors": ["x1", "x2"],
+        }
+    )
+
+    diagnostics = {item["id"]: item for item in result["diagnostics"]}
+    assert "max_abs_pearson_residual" in diagnostics
+    assert "max_abs_deviance_residual" in diagnostics
+    assert "vif.x1" in diagnostics
+    assert "vif.x2" in diagnostics
+    assert isinstance(diagnostics["vif.x1"]["value"], float)
+    assert isinstance(diagnostics["vif.x2"]["value"], float)
