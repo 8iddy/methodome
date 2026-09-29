@@ -7,7 +7,7 @@ import statistics
 import sys
 from typing import Any
 
-ENGINE_VERSION = "python-worker-0.3.2"
+ENGINE_VERSION = "python-worker-0.3.3"
 PACKAGE_VERSION = sys.version.split()[0]
 _NORMAL_975 = 1.959963984540054
 _EPS = 1e-14
@@ -2015,12 +2015,26 @@ def logistic_regression(
         sum(value * coefficient for value, coefficient in zip(row, beta))
         for row in x
     ]
-    event_scores = [score for score, outcome_value in zip(raw_scores, y) if outcome_value == 1.0]
-    non_event_scores = [score for score, outcome_value in zip(raw_scores, y) if outcome_value == 0.0]
-    if (
-        min(event_scores) >= max(non_event_scores) - 1e-10
-        or min(non_event_scores) >= max(event_scores) - 1e-10
-    ):
+    event_scores = [
+        score
+        for score, outcome_value in zip(raw_scores, y)
+        if outcome_value == 1.0
+    ]
+    non_event_scores = [
+        score
+        for score, outcome_value in zip(raw_scores, y)
+        if outcome_value == 0.0
+    ]
+    score_tolerance = 1e-10
+    events_above_non_events = (
+        min(event_scores) >= max(non_event_scores) - score_tolerance
+        and max(event_scores) > min(non_event_scores) + score_tolerance
+    )
+    non_events_above_events = (
+        min(non_event_scores) >= max(event_scores) - score_tolerance
+        and max(non_event_scores) > min(event_scores) + score_tolerance
+    )
+    if events_above_non_events or non_events_above_events:
         raise ValueError(
             "Ordinary maximum-likelihood logistic regression is not reportable because "
             "the fitted linear predictor completely or quasi-completely separates the outcome classes. "
@@ -2122,6 +2136,17 @@ def logistic_regression(
         )
 
     warnings: list[str] = []
+    max_abs_coefficient = max(abs(value) for value in beta)
+    max_standard_error = max(se)
+    min_probability = min(probabilities)
+    max_probability = max(probabilities)
+    numerical_boundary_reached = any(abs(score) >= 35.0 for score in raw_scores)
+
+    if numerical_boundary_reached:
+        warnings.append(
+            "At least one fitted linear predictor reached the Python runner's numerical stabilization boundary. "
+            "Review coefficient stability, sparse data, and separation before relying on ordinary maximum-likelihood inference."
+        )
 
     diagnostics: list[dict[str, Any]] = [
             {
@@ -2168,6 +2193,38 @@ def logistic_regression(
                 "message": (
                     "Review outcome balance, predictor sparsity and coefficient stability. "
                     "Methodome does not use a fixed events-per-variable cutoff as a pass/fail rule."
+                ),
+            },
+            {
+                "id": "coefficient_stability_review",
+                "label": "Largest absolute fitted coefficient",
+                "status": "review",
+                "value": max_abs_coefficient,
+                "message": (
+                    "Inspect coefficient magnitude together with standard errors, convergence, predictor sparsity and separation. "
+                    "No fixed coefficient cutoff is used as a standalone statistical decision rule."
+                ),
+            },
+            {
+                "id": "standard_error_stability_review",
+                "label": "Largest fitted coefficient standard error",
+                "status": "review",
+                "value": max_standard_error,
+                "message": (
+                    "Inspect uncertainty together with sparse cells, multicollinearity and separation. "
+                    "No fixed standard-error cutoff is used as a standalone statistical decision rule."
+                ),
+            },
+            {
+                "id": "fitted_probability_range",
+                "label": "Fitted probability range",
+                "status": "review" if numerical_boundary_reached else "passed",
+                "value": f"{min_probability:.12g} to {max_probability:.12g}",
+                "message": (
+                    "A review flag here means the fitted linear predictor reached the runner's numerical stabilization boundary; "
+                    "this is a computational safeguard, not a universal statistical threshold."
+                    if numerical_boundary_reached
+                    else "Fitted probabilities stayed inside the runner's numerical stabilization boundary."
                 ),
             },
         ]
