@@ -1,0 +1,151 @@
+{
+  "batch_id": "core-methodology-batch-1",
+  "status": "supported",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-qtype-001",
+      "topic": "research_question_intent",
+      "statement": "Explanatory or causal modelling and predictive modelling are distinct goals; high explanatory fit should not be assumed to imply high predictive performance.",
+      "source_id": "src-073-to-explain-or-to-predict",
+      "section": "Abstract and Introduction",
+      "page": "289-310",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-design-001",
+      "topic": "observational_study_design",
+      "statement": "CDC distinguishes cohort, case-control, and cross-sectional studies as common observational designs; cohort studies record exposure status and then follow participants for outcome occurrence.",
+      "source_id": "src-074-principles-of-epidemiology-in-public-health-practice-3rd-ed",
+      "section": "Lesson One, Analytic Epidemiology",
+      "page": "1-46 to 1-48",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-estimand-001",
+      "topic": "estimands",
+      "statement": "The estimand should correspond to the clinical question of interest, and the statistical analysis should be aligned to that estimand.",
+      "source_id": "src-025-ich-e9r1-estimands-and-sensitivity-analysis",
+      "section": "A.1 Purpose and Scope",
+      "page": "2",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-repeat-001",
+      "topic": "repeated_measures",
+      "statement": "Repeated measurements on the same subject are correlated rather than independent; ignoring that correlation can produce biased estimates, incorrect standard errors, and invalid P values and confidence intervals.",
+      "source_id": "src-029-longitudinal-and-repeated-measures-analysis-tutorial",
+      "section": "Introduction",
+      "page": "569",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-repeat-002",
+      "topic": "repeated_measures",
+      "statement": "GEE provides a marginal or population-average approach, while mixed-effect or multilevel models provide subject-specific modelling; the desired interpretation is part of method choice.",
+      "source_id": "src-029-longitudinal-and-repeated-measures-analysis-tutorial",
+      "section": "Marginal Models: GEEs and subject-specific models",
+      "page": "tutorial section following ANOVA limitations",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-cluster-001",
+      "topic": "clustered_design",
+      "statement": "Methods that apply to individually randomized trials rarely apply unchanged to cluster randomized trials; clustering changes design, bias, sample-size and analysis considerations.",
+      "source_id": "src-030-key-considerations-for-cluster-randomized-trials",
+      "section": "Abstract and key considerations",
+      "page": "International Journal of Epidemiology 2023;52",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-missing-001",
+      "topic": "missing_data",
+      "statement": "Complete-case analysis discards incomplete cases and is only valid under restrictive conditions; the National Academies report describes likelihood-based, Bayesian, GEE, Cox, inverse-probability, and multiple-imputation approaches as alternatives depending on the setting.",
+      "source_id": "src-031-the-prevention-and-treatment-of-missing-data-in-clinical-trials",
+      "section": "Drawing Inferences from Incomplete Data",
+      "page": "55",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-missing-002",
+      "topic": "missing_data",
+      "statement": "When missing-data assumptions may materially affect study findings, sensitivity analysis is needed to assess robustness.",
+      "source_id": "src-031-the-prevention-and-treatment-of-missing-data-in-clinical-trials",
+      "section": "Sensitivity analysis discussion",
+      "page": "report section on missingness assumptions",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-survival-001",
+      "topic": "survival_analysis",
+      "statement": "Time-to-event outcomes combine whether an event occurred and when it occurred; censoring must be accounted for, and ordinary methods that ignore censoring can bias results.",
+      "source_id": "src-032-survival-analysis-tutorial",
+      "section": "Introduction",
+      "page": "792-798",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-survival-002",
+      "topic": "survival_analysis",
+      "statement": "Kaplan-Meier estimation, the log-rank test, and Cox proportional-hazards modelling are standard approaches for time-to-event data, with additional methods needed for recurrent events, competing risks, frailty, and other special structures.",
+      "source_id": "src-032-survival-analysis-tutorial",
+      "section": "Introduction",
+      "page": "792-798",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-prediction-001",
+      "topic": "prediction_models",
+      "statement": "Prediction-model performance should assess discrimination and calibration; calibration concerns agreement between predicted and observed outcomes.",
+      "source_id": "src-035-developing-clinical-prediction-models-a-step-by-step-guide",
+      "section": "Glossary and model-performance discussion",
+      "page": "BMJ 2024;386:e078276",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-prediction-002",
+      "topic": "prediction_models",
+      "statement": "Overfitting occurs when a model performs well in development data but fails in new data; small samples with many model parameters increase this risk and can produce optimistic performance estimates.",
+      "source_id": "src-035-developing-clinical-prediction-models-a-step-by-step-guide",
+      "section": "Introduction and glossary",
+      "page": "BMJ 2024;386:e078276",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-mixed-001",
+      "topic": "mixed_methods",
+      "statement": "A convergent mixed-methods design combines concurrent quantitative and qualitative data and integrates the two sets of results to address study aims.",
+      "source_id": "src-037-best-practices-for-mixed-methods-research-in-the-health-sciences",
+      "section": "The Nature and Design of Mixed Methods Research",
+      "page": "8",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-mixed-002",
+      "topic": "mixed_methods",
+      "statement": "Sequential mixed-methods designs allow one dataset to build on another, including qualitative exploration followed by quantitative follow-up or quantitative results followed by qualitative explanation.",
+      "source_id": "src-037-best-practices-for-mixed-methods-research-in-the-health-sciences",
+      "section": "The Nature and Design of Mixed Methods Research",
+      "page": "8",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-survey-001",
+      "topic": "survey_design",
+      "statement": "Household survey design documentation should retain design variables, selection probabilities, weighting information, stratification, clustering, and stages of selection because these features are part of the sample design and estimation.",
+      "source_id": "src-072-designing-household-survey-samples-practical-guidelines",
+      "section": "Chapters 3, 5 and 6",
+      "page": "43-55, 99-123",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-survey-002",
+      "topic": "survey_design",
+      "statement": "For sampling without replacement from a finite population, the finite population correction adjusts standard errors; when the sampling fraction is small, the correction can often be ignored.",
+      "source_id": "src-072-designing-household-survey-samples-practical-guidelines",
+      "section": "Sampling errors for survey data",
+      "page": "133-134",
+      "support_type": "direct"
+    }
+  ]
+}

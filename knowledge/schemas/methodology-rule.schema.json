@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Methodome methodology decision rule",
+  "type": "object",
+  "required": [
+    "rule_id",
+    "topic",
+    "decision",
+    "conditions",
+    "action",
+    "source_evidence",
+    "validation_status"
+  ],
+  "properties": {
+    "rule_id": { "type": "string" },
+    "topic": { "type": "string" },
+    "decision": { "type": "string" },
+    "conditions": { "type": "array", "items": { "type": "string" } },
+    "action": { "type": "string" },
+    "assumptions": { "type": "array", "items": { "type": "string" } },
+    "diagnostics": { "type": "array", "items": { "type": "string" } },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "exceptions": { "type": "array", "items": { "type": "string" } },
+    "source_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source_id", "support"],
+        "properties": {
+          "source_id": { "type": "string" },
+          "support": { "type": "string" },
+          "section": { "type": ["string", "null"] },
+          "page": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "validation_status": {
+      "enum": ["draft", "supported", "validated", "retired"]
+    }
+  }
+}

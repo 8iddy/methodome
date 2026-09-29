@@ -1,0 +1,61 @@
+{
+  "batch_id": "methodome-logistic-safeguards-batch-1",
+  "status": "supported",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-logit-separation-001",
+      "topic": "binary_logistic_regression_separation",
+      "statement": "Separation occurs when covariates perfectly predict a discrete outcome. Complete separation perfectly predicts every observed outcome; quasi-complete separation does so for a subset. Separation can make finite maximum-likelihood odds-ratio estimates effectively infinite.",
+      "source_id": "src-077-separation-in-logistic-regression-causes-consequences-and-control",
+      "section": "Abstract and introduction",
+      "page": "864-865",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-logit-separation-002",
+      "topic": "binary_logistic_regression_separation",
+      "statement": "Separation is especially associated with small or sparse datasets, rare outcomes, rare exposures, highly correlated covariates, and strong covariate effects; ordinary maximum-likelihood estimation can break down or become seriously biased under these conditions.",
+      "source_id": "src-077-separation-in-logistic-regression-causes-consequences-and-control",
+      "section": "Abstract and introduction",
+      "page": "864-865",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-logit-penalty-001",
+      "topic": "binary_logistic_regression_penalized_likelihood",
+      "statement": "Penalized-likelihood approaches can prevent infinite coefficient estimates under separation and are also used to address broader sparse-data problems; Firth penalization is one such approach.",
+      "source_id": "src-077-separation-in-logistic-regression-causes-consequences-and-control",
+      "section": "Methods for control of separation",
+      "page": "866-869",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-logit-epv-001",
+      "topic": "binary_logistic_regression_sparse_events",
+      "statement": "Evidence does not support a universal minimum rule of 10 events per variable for binary logistic regression; problems at low events-per-variable also depend on factors such as total sample size.",
+      "source_id": "src-078-no-rationale-for-one-variable-per-ten-events-logistic-regression",
+      "section": "Abstract",
+      "page": "1",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-logit-epv-002",
+      "topic": "binary_logistic_regression_sparse_events",
+      "statement": "Low-events-per-variable simulations can be materially affected by separation, and different handling of separation changes conclusions about logistic-regression performance.",
+      "source_id": "src-078-no-rationale-for-one-variable-per-ten-events-logistic-regression",
+      "section": "Abstract and results",
+      "page": "1 onward",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-logit-firth-001",
+      "topic": "binary_logistic_regression_sparse_events",
+      "statement": "Firth correction can improve regression-coefficient accuracy and alleviate problems associated with separation in small or sparse binary logistic-regression settings.",
+      "source_id": "src-078-no-rationale-for-one-variable-per-ten-events-logistic-regression",
+      "section": "Abstract and simulation results",
+      "page": "1 onward",
+      "support_type": "direct"
+    }
+  ]
+}

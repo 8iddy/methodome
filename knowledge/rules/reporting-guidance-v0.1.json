@@ -1,0 +1,131 @@
+{
+  "rule_set_id": "methodome-reporting-guidance-v0.1",
+  "status": "supported",
+  "rules": [
+    {
+      "rule_id": "report-observational-001",
+      "topic": "observational_reporting",
+      "decision": "When producing an observational-study report, include the analysis choices and result details needed to show how design, confounding, missingness and sensitivity analyses affected the estimates.",
+      "conditions": [
+        "Study design is observational and within STROBE scope"
+      ],
+      "action": "Report statistical methods, confounding control, missing-data handling, relevant design features, sensitivity analyses, participant missingness, unadjusted estimates, adjusted estimates where applicable, precision, and the covariates used for adjustment.",
+      "assumptions": [],
+      "diagnostics": [
+        "Presence of study-design-specific reporting fields",
+        "Presence of missing-data reporting",
+        "Presence of estimate precision",
+        "Traceability of adjusted estimates to covariates"
+      ],
+      "warnings": [
+        "A reporting checklist does not validate the underlying method choice.",
+        "Do not hide design features such as sampling strategy or matching when they affect analysis."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-038-strobe-statement",
+          "support": "STROBE items 12-17 specify statistical-method, missing-data, design, sensitivity-analysis and estimate-reporting information for observational studies.",
+          "section": "Items 12-17",
+          "page": "1-2"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "report-randomized-trial-001",
+      "topic": "trial_reporting",
+      "decision": "When producing a randomized-trial report, preserve the link to the protocol and analysis plan and distinguish planned analyses from later analyses.",
+      "conditions": [
+        "Study design is a randomized trial within CONSORT scope"
+      ],
+      "action": "Report access to the protocol and SAP, analysis populations, missing-data handling, primary-outcome participant counts, effect estimates with precision, and additional analyses with prespecified versus post-hoc status.",
+      "assumptions": [],
+      "diagnostics": [
+        "Protocol/SAP reference",
+        "Analysis population",
+        "Missing-data method",
+        "Primary outcome estimate and precision",
+        "Prespecified versus post-hoc status"
+      ],
+      "warnings": [
+        "Do not present a post-hoc analysis as prespecified.",
+        "A reporting checklist does not validate the statistical analysis itself."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-040-consort-2025",
+          "support": "CONSORT 2025 requires protocol/SAP access, analysis and missing-data details, distinction of prespecified versus post-hoc analyses, participant flow and effect estimates with precision.",
+          "section": "Items 3, 21 and 22 plus results requirements",
+          "page": null
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "report-diagnostic-accuracy-001",
+      "topic": "diagnostic_accuracy_reporting",
+      "decision": "When producing a diagnostic-accuracy report, show the reference comparison and how missing or indeterminate results affect the accuracy estimates.",
+      "conditions": [
+        "Research question evaluates diagnostic accuracy within STARD scope"
+      ],
+      "action": "Report accuracy-estimation methods, handling of indeterminate and missing results, prespecified versus exploratory variability analyses, cross-tabulation against the reference standard, and accuracy estimates with precision.",
+      "assumptions": [],
+      "diagnostics": [
+        "Reference-standard comparison",
+        "Indeterminate-result handling",
+        "Missing-result handling",
+        "Cross-tabulation",
+        "Estimate precision"
+      ],
+      "warnings": [
+        "Do not report sensitivity, specificity or related measures without the reference-standard comparison and denominator context.",
+        "A reporting checklist does not establish that the reference standard is unbiased."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-043-stard-2015",
+          "support": "STARD items 14-17 and 23-24 specify analysis methods, missing/indeterminate handling, cross-tabulation and accuracy estimates with precision.",
+          "section": "Items 14-17 and 23-24",
+          "page": null
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "report-prediction-model-001",
+      "topic": "prediction_model_reporting",
+      "decision": "When producing a prediction-model report, expose how the data and predictors were handled, how validation was done, and how model performance was measured.",
+      "conditions": [
+        "Research objective is prediction or prognosis and the study falls within TRIPOD+AI scope"
+      ],
+      "action": "Report missing-data handling, data partitioning, predictor handling, model type and rationale, internal validation, discrimination and calibration measures, other declared performance measures, performance confidence intervals, and the model specification needed for external evaluation.",
+      "assumptions": [],
+      "diagnostics": [
+        "Missing-data description",
+        "Development/evaluation data use",
+        "Internal validation method",
+        "Calibration reporting",
+        "Discrimination reporting",
+        "Performance precision",
+        "Model specification availability"
+      ],
+      "warnings": [
+        "Do not substitute apparent training performance for validation performance.",
+        "A complete report does not by itself show that the prediction model is transportable to another population."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-042-tripodai",
+          "support": "TRIPOD+AI items 11-12 and 21-23 require reporting of missing data, analysis data use, predictor handling, model building and validation, performance measures, confidence intervals and model specification.",
+          "section": "Items 11-12 and 21-23",
+          "page": null
+        }
+      ],
+      "validation_status": "supported"
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "rule_set_id": "methodome-count-models-v0.1",
+  "status": "supported",
+  "rules": [
+    {
+      "rule_id": "poisson-regression-001",
+      "topic": "poisson_regression",
+      "decision": "Treat a Poisson count response as a count-regression problem rather than ordinary linear regression on raw counts.",
+      "conditions": [
+        "Outcome is a count",
+        "The scientific question requires modelling expected counts using predictors"
+      ],
+      "action": "Consider Poisson regression as a candidate and require a count-model diagnostic step before this method is activated for automatic use.",
+      "assumptions": [
+        "Outcome is appropriately represented as a count"
+      ],
+      "diagnostics": [
+        "Mean-variance behaviour",
+        "Excess zeros",
+        "Influential observations"
+      ],
+      "warnings": [
+        "Current corpus evidence supports routing Poisson counts away from ordinary linear regression but does not yet support a complete rule for overdispersion thresholds.",
+        "A separate source-backed rule is required before Methodome automatically selects negative-binomial regression."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-013-penn-state-stat-501-regression-methods",
+          "support": "Penn State notes that Poisson count responses have nonconstant variance under ordinary linear regression and recommends Poisson regression rather than relying on a square-root transformation.",
+          "section": "Lesson 9: More on Transformations",
+          "page": "41 of 73"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "count-overdispersion-001",
+      "topic": "count_regression_overdispersion",
+      "decision": "Do not automatically replace Poisson regression with negative-binomial regression solely because overdispersion is present.",
+      "conditions": [
+        "Outcome is a count and Poisson regression is a candidate",
+        "Observed or model-based evidence indicates variance greater than the Poisson mean-variance assumption"
+      ],
+      "action": "Flag ordinary Poisson inference for review and compare overdispersion-capable alternatives. When quasi-Poisson and negative-binomial regression are candidates, assess how the variance scales with the mean and prefer the model whose variance structure is more defensible for the data and research setting.",
+      "assumptions": [
+        "Outcome is non-negative count data",
+        "The selected model's mean-variance relationship is compatible with the observed data-generating structure"
+      ],
+      "diagnostics": [
+        "Dispersion assessment",
+        "Mean-variance relationship across the fitted range",
+        "Comparison of fitted effects and model adequacy under plausible overdispersion models"
+      ],
+      "warnings": [
+        "Overdispersion alone does not identify negative-binomial regression as the correct automatic choice.",
+        "Quasi-Poisson and negative-binomial regression weight observations differently and may produce materially different covariate estimates.",
+        "Excess zeros require a separate source-backed decision rule before zero-inflated or hurdle models can be recommended automatically."
+      ],
+      "exceptions": [
+        "If the Poisson mean-variance assumption is adequate, ordinary Poisson regression may remain appropriate.",
+        "Exposure-time offsets and rate models require their own source-backed conditions and should not be inferred from this rule alone."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data",
+          "support": "Ver Hoef & Boveng compare quasi-Poisson and negative-binomial regression for overdispersed counts and show that their linear versus quadratic mean-variance relationships alter weighting and can change covariate-effect estimates.",
+          "section": "Abstract and Introduction",
+          "page": "2766-2767"
+        }
+      ],
+      "validation_status": "supported"
+    }
+  ]
+}

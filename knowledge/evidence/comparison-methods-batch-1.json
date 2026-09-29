@@ -1,0 +1,124 @@
+{
+  "batch_id": "methodome-comparison-methods-batch-1",
+  "status": "supported",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-ttest-independent-001",
+      "topic": "independent_two_sample_t_test",
+      "statement": "The two-sample t-test for unpaired data targets a difference between two population means using two independent samples.",
+      "source_id": "src-079-nist-two-sample-t-test-for-equal-means",
+      "section": "Two-Sample t-Test for Equal Means",
+      "page": "1-2",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-ttest-welch-001",
+      "topic": "independent_two_sample_t_test",
+      "statement": "For unpaired mean comparison without an equal-variance assumption, NIST uses the Welch-Satterthwaite degrees of freedom and notes robustness to unequal sample sizes and/or unequal variances.",
+      "source_id": "src-079-nist-two-sample-t-test-for-equal-means",
+      "section": "Two-Sample t-Test for Equal Means",
+      "page": "1-2",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-ttest-pooled-001",
+      "topic": "independent_two_sample_t_test",
+      "statement": "The pooled two-sample t form is a special case when equal variances are assumed; NIST gives the simpler pooled degrees of freedom when equal variances are assumed and sample sizes are similar.",
+      "source_id": "src-079-nist-two-sample-t-test-for-equal-means",
+      "section": "Two-Sample t-Test for Equal Means",
+      "page": "1-2",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-ttest-paired-001",
+      "topic": "paired_t_test",
+      "statement": "Data are paired when each observation in one condition is naturally matched to the corresponding observation in the other condition; paired analysis is performed on the within-pair differences.",
+      "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
+      "section": "7.3.1.1 Analysis of paired observations",
+      "page": null,
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-ttest-paired-002",
+      "topic": "paired_t_test",
+      "statement": "The paired-sample t-test uses the mean and standard deviation of the within-pair differences and tests the mean difference using N minus 1 degrees of freedom.",
+      "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
+      "section": "7.3.1.1 Analysis of paired observations",
+      "page": null,
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-anova-001",
+      "topic": "one_way_anova",
+      "statement": "The ordinary fixed-effect ANOVA model assumes errors are independent, normally distributed with mean zero, and have equal variance; the model assumptions concern errors rather than simply the raw response values.",
+      "source_id": "src-055-penn-state-stat-502-anova-and-design-of-experiments",
+      "section": "Lesson 3 ANOVA Models Part I",
+      "page": "3-5",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-anova-diagnostics-001",
+      "topic": "one_way_anova",
+      "statement": "ANOVA model adequacy should be assessed with residual diagnostics, including residual patterns against fitted values and observation order, normality assessment, outlier checks, and variance-pattern assessment; transformations may be considered when residual patterns indicate nonconstant variance or nonlinearity.",
+      "source_id": "src-055-penn-state-stat-502-anova-and-design-of-experiments",
+      "section": "Lesson 3 assumptions and diagnostic tests",
+      "page": "3-6",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-anova-design-001",
+      "topic": "anova_design_structure",
+      "statement": "Repeated measurements on the same experimental unit cannot be assumed independent and require the statistical model to account for correlated errors.",
+      "source_id": "src-047-penn-state-stat-502-anova-and-design-of-experiments",
+      "section": "Lesson 11 Introduction to Repeated Measures",
+      "page": "1 onward",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-anova-design-002",
+      "topic": "anova_design_structure",
+      "statement": "When factor levels are sampled from a larger population rather than fixed by the researcher, the factor is random and the model and hypothesis tests differ from ordinary fixed-effect ANOVA; mixed models combine fixed and random effects.",
+      "source_id": "src-052-penn-state-stat-502-anova-and-design-of-experiments",
+      "section": "Lesson 6 Random Effects and Introduction to Mixed Models",
+      "page": "1-3",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-wilcoxon-signed-rank-001",
+      "topic": "wilcoxon_signed_rank",
+      "statement": "The Wilcoxon signed-rank test is a paired-data procedure based on the signs and magnitudes of ranked within-pair differences and requires the population distribution of differences to be symmetric about the target median.",
+      "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
+      "section": "6.5 A Nonparametric Alternative: The Wilcoxon Signed-Rank Test",
+      "page": "319 onward",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-mann-whitney-001",
+      "topic": "mann_whitney",
+      "statement": "The Wilcoxon-Mann-Whitney procedure should not be interpreted generally as a test of equality of medians. Divine et al. formulate the tested quantity as Pr(X1 < X2) + Pr(X1 = X2)/2, with null value 0.5.",
+      "source_id": "src-080-divine-wilcoxon-mann-whitney-fails-test-medians",
+      "section": "Abstract and Sections 1-3",
+      "page": "278-281",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-mann-whitney-002",
+      "topic": "mann_whitney",
+      "statement": "A pure location-shift interpretation of Wilcoxon-Mann-Whitney requires stronger distributional assumptions; differences in shape or variance undermine a simple median/location interpretation.",
+      "source_id": "src-080-divine-wilcoxon-mann-whitney-fails-test-medians",
+      "section": "2.3 What Does the WMW Test Do?",
+      "page": "279-281",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-kruskal-wallis-001",
+      "topic": "kruskal_wallis",
+      "statement": "Kruskal-Wallis is a rank-based nonparametric procedure for comparing several independent samples/populations when a parametric distributional model is not being assumed.",
+      "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
+      "section": "7.4.1 Kruskal-Wallis test",
+      "page": null,
+      "support_type": "direct"
+    }
+  ]
+}

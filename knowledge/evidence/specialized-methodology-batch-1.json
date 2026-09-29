@@ -1,0 +1,79 @@
+{
+  "batch_id": "specialized-methodology-batch-1",
+  "status": "supported",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-diagnostic-001",
+      "topic": "diagnostic_accuracy",
+      "statement": "Diagnostic test performance can be represented in a 2x2 table against a reference standard, with sensitivity, specificity, predictive values, likelihood ratios, and diagnostic odds ratio derived from true/false positive and negative counts.",
+      "source_id": "src-034-test-performance-metrics",
+      "section": "Appendix: Test Performance Metrics",
+      "page": "A-1",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-diagnostic-002",
+      "topic": "diagnostic_accuracy",
+      "statement": "Sensitivity and specificity trade off as the diagnostic threshold changes; ROC analysis summarizes this threshold-dependent trade-off.",
+      "source_id": "src-034-test-performance-metrics",
+      "section": "Sensitivity and Specificity",
+      "page": "A-1 to A-2",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-diagnostic-003",
+      "topic": "diagnostic_accuracy",
+      "statement": "Positive and negative predictive values depend on disease prevalence as well as test sensitivity and specificity.",
+      "source_id": "src-034-test-performance-metrics",
+      "section": "Appendix: Test Performance Metrics",
+      "page": "A-1",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-psychometric-001",
+      "topic": "psychometrics",
+      "statement": "Structural validity and internal consistency are relevant to reflective measurement models, where items are manifestations of a common underlying construct; factor analysis is not generally relevant to formative models whose items collectively form the construct.",
+      "source_id": "src-036-cosmin-manual-v20",
+      "section": "Assess the relevance of structural validity and internal consistency",
+      "page": "43",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-psychometric-002",
+      "topic": "psychometrics",
+      "statement": "COSMIN evaluates measurement properties including structural validity, internal consistency, cross-cultural validity/measurement invariance, reliability, measurement error, criterion validity, construct validity, and responsiveness.",
+      "source_id": "src-036-cosmin-manual-v20",
+      "section": "Step 6: Evaluate the nine measurement properties",
+      "page": "45 onward",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-competing-risk-001",
+      "topic": "competing_risks",
+      "statement": "When a competing event can prevent observation of the event of interest, conventional survival analysis can be biased; the source identifies cause-specific hazard and subdistribution hazard approaches as alternatives for competing-risk analysis.",
+      "source_id": "src-033-survival-analysis-in-the-presence-of-competing-risks",
+      "section": "Abstract and Introduction",
+      "page": null,
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-psychometric-003",
+      "topic": "psychometrics",
+      "statement": "Internal consistency is the interrelatedness of items and is only clearly interpretable when the items form a unidimensional reflective scale; structural validity evidence should therefore be considered before interpreting alpha, omega, or related internal-consistency statistics.",
+      "source_id": "src-036-cosmin-manual-v20",
+      "section": "6.3 Internal consistency",
+      "page": "167 onward",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-psychometric-004",
+      "topic": "psychometrics",
+      "statement": "Reliability and measurement error are distinct properties: reliability concerns the proportion of total variance attributable to true differences between people, whereas measurement error concerns systematic and random error in an individual's score not attributable to true change.",
+      "source_id": "src-036-cosmin-manual-v20",
+      "section": "6.5 Reliability and 6.6 Measurement error",
+      "page": "179-186",
+      "support_type": "direct"
+    }
+  ]
+}

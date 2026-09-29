@@ -1,0 +1,319 @@
+{
+  "rule_set_id": "methodome-current-executable-methods-v0.1",
+  "status": "supported",
+  "rules": [
+    {
+      "rule_id": "var-type-001",
+      "topic": "variable_types",
+      "decision": "Classify analytical variables before selecting descriptive or inferential procedures.",
+      "conditions": [
+        "A dataset variable is mapped to an analytical concept."
+      ],
+      "action": "Classify the mapped variable as categorical or quantitative at minimum, and retain more specific Methodome types when available.",
+      "assumptions": [],
+      "diagnostics": [
+        "Compare inferred type with observed values, labels and codebook metadata."
+      ],
+      "warnings": [
+        "Do not select a method from a variable name alone when dataset values or metadata contradict it."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-061-penn-state-stat-200-elementary-statistics",
+          "support": "Penn State guidance states that appropriate graphs, descriptive and inferential statistics depend on variable type.",
+          "section": "Lesson 2",
+          "page": "1-56"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "chi-square-001",
+      "topic": "chi_square",
+      "decision": "Use chi-square only for categorical count data with an adequate expected-count approximation.",
+      "conditions": [
+        "Outcome and comparison/explanatory variable are categorical and observations are independent."
+      ],
+      "action": "Consider chi-square test of independence; compute expected cell counts before execution.",
+      "assumptions": [
+        "Independent observations",
+        "Count/frequency data rather than percentages alone",
+        "Adequate expected counts for chi-square approximation"
+      ],
+      "diagnostics": [
+        "Expected cell counts"
+      ],
+      "warnings": [
+        "If expected counts are too small, do not rely on the ordinary chi-square approximation; route to an exact or alternative method supported by the registry."
+      ],
+      "exceptions": [
+        "Exact small-sample selection needs a separate source-backed Fisher rule before Methodome marks that decision validated."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-070-penn-state-stat-200-elementary-statistics",
+          "support": "The lesson applies chi-square to categorical data and requires adequate expected counts for the chi-square approximation.",
+          "section": "Lesson 11",
+          "page": "7-8 of 28"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "fisher-exact-001",
+      "topic": "fisher_exact",
+      "decision": "Use Fisher's exact test as the exact 2x2 alternative when comparing two independent groups with binary classifications and the ordinary large-sample approximation is unsuitable.",
+      "conditions": [
+        "Two independent groups or samples",
+        "Each observation falls into one of two mutually exclusive outcome classes",
+        "Data form a 2x2 contingency table",
+        "Counts are small or sparse enough that the ordinary asymptotic approximation should not be relied on"
+      ],
+      "action": "Use Fisher's exact test for the 2x2 table rather than forcing the ordinary large-sample approximation.",
+      "assumptions": [
+        "Independent samples or groups",
+        "Frequency/count data in a 2x2 table",
+        "Mutually exclusive outcome classes"
+      ],
+      "diagnostics": [
+        "Contingency-table dimensions",
+        "Observed and expected cell counts",
+        "Independence of observations"
+      ],
+      "warnings": [
+        "Do not use an arbitrary total-sample threshold such as n < 30 as a universal Fisher rule.",
+        "For tables larger than 2x2, use a method explicitly supported for that structure rather than silently extending this rule.",
+        "Paired or matched binary data require a different method because the independence condition does not hold."
+      ],
+      "exceptions": [
+        "If the ordinary approximation is adequate, the chi-square or large-sample two-proportion procedure may remain appropriate within its own rule boundary."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
+          "support": "NIST describes Fisher's exact probability test as an exact nonparametric choice for small independent samples with two mutually exclusive classes represented in a 2x2 contingency table.",
+          "section": "7.3.3, Case 2: An Exact Test for Small Samples",
+          "page": null
+        },
+        {
+          "source_id": "src-068-penn-state-stat-200-elementary-statistics",
+          "support": "Penn State states that Fisher's exact method may be used for two independent proportions when the large-sample normal-approximation condition is not met.",
+          "section": "Lesson 9.1: Two Independent Proportions",
+          "page": "2 of 27"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "pearson-001",
+      "topic": "pearson_correlation",
+      "decision": "Use Pearson correlation for a linear relationship between two quantitative variables when its conditions are appropriate.",
+      "conditions": [
+        "Both mapped variables are quantitative",
+        "Research objective concerns association rather than causation or prediction"
+      ],
+      "action": "Inspect a scatterplot or equivalent diagnostics for form and outliers, then consider Pearson correlation for linear association.",
+      "assumptions": [
+        "Quantitative variables",
+        "Linear relationship"
+      ],
+      "diagnostics": [
+        "Direction",
+        "Form",
+        "Strength",
+        "Outliers"
+      ],
+      "warnings": [
+        "Do not interpret correlation as causal evidence.",
+        "Outliers can materially affect the estimate."
+      ],
+      "exceptions": [
+        "A source-backed Spearman decision rule is still required for monotonic non-linear or ordinal cases."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-071-penn-state-stat-200-elementary-statistics",
+          "support": "The lesson presents Pearson correlation for two quantitative variables and emphasizes direction, form, strength and outliers.",
+          "section": "Lesson 12",
+          "page": "1-2 of 36"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "linear-regression-001",
+      "topic": "linear_regression",
+      "decision": "Consider ordinary linear regression only when the response is quantitative and linear-regression assumptions are plausible.",
+      "conditions": [
+        "Outcome is quantitative",
+        "Objective is association, explanation or prediction within Methodome's supported scope",
+        "Observations are not subject to an unsupported repeated/clustered/survey design"
+      ],
+      "action": "Consider linear regression and require residual diagnostics before presenting inferential results.",
+      "assumptions": [
+        "Linearity",
+        "Independent errors",
+        "Normally distributed errors for standard inferential procedures",
+        "Equal error variance"
+      ],
+      "diagnostics": [
+        "Residuals versus fitted values",
+        "Residuals versus predictors",
+        "Residuals versus order where dependence is plausible",
+        "Normal probability plot or equivalent residual-normality diagnostic"
+      ],
+      "warnings": [
+        "Independence violations can invalidate tests and intervals.",
+        "Outliers or omitted important predictors can distort conclusions."
+      ],
+      "exceptions": [
+        "Heteroscedasticity may require weighted/robust alternatives that are not yet part of Methodome's validated automated boundary."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-018-penn-state-stat-501-regression-methods",
+          "support": "Penn State's LINE conditions specify linearity, independence, normality and equal variances and use residual diagnostics to assess them.",
+          "section": "Lesson 4",
+          "page": "1 onward"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "logistic-regression-001",
+      "topic": "binary_logistic_regression",
+      "decision": "Use logistic regression as a regression candidate when the response is binary and the design does not require an unsupported correlation/survey model.",
+      "conditions": [
+        "Outcome is binary",
+        "At least one predictor or exposure is specified",
+        "Observations satisfy the current independence/design boundary"
+      ],
+      "action": "Consider binary logistic regression and report effects on an odds/odds-ratio scale where applicable.",
+      "assumptions": [],
+      "diagnostics": [
+        "Goodness of fit",
+        "Sparse data or separation checks",
+        "Multicollinearity checks for multiple predictors"
+      ],
+      "warnings": [
+        "Do not use ordinary linear regression merely because a binary outcome is coded 0/1."
+      ],
+      "exceptions": [
+        "Clustered/repeated binary outcomes require correlation-aware models such as GEE or mixed-effects logistic regression, which are outside the current executable boundary."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-009-penn-state-stat-501-regression-methods",
+          "support": "Penn State Lesson 13 introduces logistic regression for binary response variables.",
+          "section": "Lesson 13",
+          "page": "1 of 33"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "logistic-gof-001",
+      "topic": "logistic_regression_diagnostics",
+      "decision": "Assess binary logistic-regression fit with diagnostics that match the predictor-pattern structure of the data.",
+      "conditions": [
+        "A binary logistic regression model has been fitted",
+        "The analysis remains within Methodome's current independence and design boundary"
+      ],
+      "action": "Inspect deviance or Pearson residuals and select goodness-of-fit checks according to replication of predictor patterns; do not interpret Pearson or deviance goodness-of-fit tests as valid when their replicated-data condition is absent.",
+      "assumptions": [
+        "The selected goodness-of-fit procedure is compatible with the observed predictor-pattern replication structure"
+      ],
+      "diagnostics": [
+        "Deviance residuals",
+        "Pearson residuals",
+        "Residuals versus observation order where ordering may matter",
+        "Pearson chi-square or deviance goodness-of-fit when replicated predictor patterns support them",
+        "Hosmer-Lemeshow goodness-of-fit for unreplicated or sparsely replicated predictor patterns as described by the source"
+      ],
+      "warnings": [
+        "Do not report a goodness-of-fit result from a procedure whose data-structure condition is not met.",
+        "A non-significant goodness-of-fit test is not proof that the model is correctly specified.",
+        "This rule does not yet resolve complete or quasi-complete separation, rare-event bias, or sparse-event estimation; those need separate source-backed safeguards."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-009-penn-state-stat-501-regression-methods",
+          "support": "Penn State distinguishes replicated-data Pearson/deviance goodness-of-fit tests from the Hosmer-Lemeshow test for unreplicated or sparsely replicated data and demonstrates deviance/Pearson residual diagnostics.",
+          "section": "Lesson 13: Goodness-of-Fit Tests and logistic diagnostics",
+          "page": "14, 18-19, 29 of 33"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "multicollinearity-001",
+      "topic": "regression_diagnostics",
+      "decision": "Check multicollinearity when a regression model contains multiple predictors.",
+      "conditions": [
+        "Regression model has two or more predictors/covariates."
+      ],
+      "action": "Assess predictor correlation and a multicollinearity diagnostic such as VIF before relying on coefficient-level interpretation.",
+      "assumptions": [],
+      "diagnostics": [
+        "VIF or equivalent",
+        "Predictor correlation structure"
+      ],
+      "warnings": [
+        "Multicollinearity can reduce coefficient precision and make coefficient estimates and tests unstable across model specifications."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-010-penn-state-stat-501-regression-methods",
+          "support": "The lesson describes multicollinearity as correlated predictors that can reduce precision and destabilize regression conclusions.",
+          "section": "Lesson 12 Overview",
+          "page": null
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "spearman-correlation-001",
+      "topic": "spearman_correlation",
+      "decision": "Use Spearman rank correlation when the research objective is association and a rank-based monotonic association measure fits the variable scale or data structure better than Pearson correlation.",
+      "conditions": [
+        "Research objective is to quantify strength and direction of association rather than agreement, prediction, or causal effect",
+        "Observation pairs are independent",
+        "At least one mapped variable is ordinal/ranked, or continuous data are materially non-normal, or a monotonic non-linear relationship is present, or relevant outliers make Pearson correlation unsuitable"
+      ],
+      "action": "Inspect the relationship graphically, verify monotonic form and independence, then consider Spearman rank correlation.",
+      "assumptions": [
+        "The association is monotonic",
+        "Observation pairs are independent",
+        "Variables can be meaningfully ranked"
+      ],
+      "diagnostics": [
+        "Scatterplot or equivalent relationship plot",
+        "Linear versus monotonic form",
+        "Influential or extreme observations",
+        "Independence or repeated-measures structure"
+      ],
+      "warnings": [
+        "Do not use a normality-test p-value alone as an automatic switch from Pearson to Spearman.",
+        "A coefficient near zero does not rule out a materially non-monotonic relationship.",
+        "Correlation does not establish causality.",
+        "Repeated measurements from the same unit require a correlation-aware method rather than ordinary Pearson or Spearman correlation."
+      ],
+      "exceptions": [
+        "If the relationship is materially non-monotonic, ordinary Pearson and Spearman coefficients can both be misleading.",
+        "If the objective is agreement rather than association, use an agreement method supported by the registry."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-075-correlation-coefficients-appropriate-use-and-interpretation",
+          "support": "The tutorial distinguishes Pearson linear association from Spearman monotonic association and directly supports Spearman for ordinal data, nonnormal continuous data, relevant outliers, and nonlinear monotonic form; it also states that observation pairs should be independent.",
+          "section": "Abstract; Assumptions of a Pearson Correlation",
+          "page": "1763-1765"
+        }
+      ],
+      "validation_status": "supported"
+    }
+  ]
+}

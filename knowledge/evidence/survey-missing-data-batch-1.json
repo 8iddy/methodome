@@ -1,0 +1,140 @@
+{
+  "batch_id": "methodome-survey-missing-data-batch-1",
+  "status": "supported",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-survey-complex-001",
+      "topic": "survey_design",
+      "statement": "NHANES uses a complex multistage probability design with clustering, stratification, unequal selection probabilities and PPS selection; analyses must account for the relevant design parameters.",
+      "source_id": "src-081-nhanes-sample-design-module",
+      "section": "Sample Design / NHANES Sampling Procedure",
+      "page": "1-3",
+      "support_type": "direct",
+      "scope": "complex probability survey; NHANES example"
+    },
+    {
+      "evidence_id": "ev-survey-weight-001",
+      "topic": "survey_weights",
+      "statement": "NHANES weights incorporate a base weight linked to selection probability, nonresponse adjustments and post-stratification adjustments; the base-weight principle is inverse probability of selection, while exact construction is survey-specific.",
+      "source_id": "src-082-nhanes-weighting-module",
+      "section": "How weights are created",
+      "page": "1 onward",
+      "support_type": "direct",
+      "scope": "complex probability survey; NHANES implementation"
+    },
+    {
+      "evidence_id": "ev-survey-variance-001",
+      "topic": "survey_variance",
+      "statement": "Survey weights affect point estimates, while complex-design attributes including differential weighting, clustering and stratification affect variance estimates, standard errors, test statistics and confidence intervals.",
+      "source_id": "src-083-nhanes-variance-estimation-module",
+      "section": "Variance Estimation",
+      "page": "1 onward",
+      "support_type": "direct",
+      "scope": "complex probability survey; NHANES example"
+    },
+    {
+      "evidence_id": "ev-survey-domain-001",
+      "topic": "survey_domain_analysis",
+      "statement": "For Taylor-linearized subgroup/domain estimates, NHANES guidance retains all observations with nonzero analysis weights and uses a subpopulation indicator; simply subsetting to the domain can underestimate variance.",
+      "source_id": "src-083-nhanes-variance-estimation-module",
+      "section": "Subpopulations/domains",
+      "page": "3 onward",
+      "support_type": "direct",
+      "scope": "Taylor-linearized complex survey domain analysis; NHANES example"
+    },
+    {
+      "evidence_id": "ev-survey-fpc-001",
+      "topic": "finite_population_correction",
+      "statement": "The NHANES first-stage sampling fraction is small, so its finite population correction is close to one and negligible; this is an example showing that FPC relevance depends on the actual sampling fraction, not a universal ignore/apply rule.",
+      "source_id": "src-083-nhanes-variance-estimation-module",
+      "section": "Finite population correction",
+      "page": "3 onward",
+      "support_type": "direct",
+      "scope": "NHANES example supporting a general sampling-fraction principle"
+    },
+    {
+      "evidence_id": "ev-missing-sterne-001",
+      "topic": "missing_data",
+      "statement": "Complete-case analysis can be biased and can substantially reduce precision and power when missingness occurs across analysis variables.",
+      "source_id": "src-084-sterne-multiple-imputation-potential-and-pitfalls",
+      "section": "Consequences of missing data",
+      "page": "1-2",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-missing-sterne-002",
+      "topic": "missing_data_mechanisms",
+      "statement": "The risk of bias depends on why data are missing. MAR and MNAR cannot be distinguished from observed data alone; MNAR concerns therefore require sensitivity analysis under alternative assumptions.",
+      "source_id": "src-084-sterne-multiple-imputation-potential-and-pitfalls",
+      "section": "Consequences of missing data / types of missing data",
+      "page": "1-3",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-missing-sterne-003",
+      "topic": "missing_data_methods",
+      "statement": "Generic ad hoc methods such as mean imputation, a missing-category indicator and last observation carried forward are not statistically valid in general; single imputation usually makes standard errors too small because uncertainty in missing values is ignored.",
+      "source_id": "src-084-sterne-multiple-imputation-potential-and-pitfalls",
+      "section": "Statistical methods to handle missing data",
+      "page": "2-4",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-missing-sterne-004",
+      "topic": "multiple_imputation",
+      "statement": "For a plausible MAR analysis, the imputation model should include substantive-analysis variables and, as feasible, variables predictive of missing values and variables influencing the missingness process.",
+      "source_id": "src-084-sterne-multiple-imputation-potential-and-pitfalls",
+      "section": "Plausibility of missing at random assumption",
+      "page": "4",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-missing-multilevel-001",
+      "topic": "multilevel_multiple_imputation",
+      "statement": "In clustered or multilevel data, an imputation model that ignores clustering can underestimate the magnitude of clustering and therefore underestimate standard errors even if the final analysis model allows for clustering.",
+      "source_id": "src-085-resche-rigon-white-multilevel-mice",
+      "section": "Introduction",
+      "page": "2-3",
+      "support_type": "direct",
+      "scope": "multilevel/clustered data"
+    },
+    {
+      "evidence_id": "ev-missing-multilevel-002",
+      "topic": "multilevel_multiple_imputation",
+      "statement": "Multilevel data may contain systematically missing variables that are wholly absent in some clusters and sporadically missing variables that are partly absent within clusters; these patterns can require specialized multilevel imputation methods.",
+      "source_id": "src-085-resche-rigon-white-multilevel-mice",
+      "section": "Abstract and introduction",
+      "page": "1-3",
+      "support_type": "direct",
+      "scope": "multilevel/clustered data"
+    },
+    {
+      "evidence_id": "ev-mice-implementation-001",
+      "topic": "multiple_imputation",
+      "statement": "MICE creates separate conditional imputation models for variables with missing values, cycles through them, and can accommodate different variable types by using variable-appropriate conditional models.",
+      "source_id": "src-086-royston-white-mice-implementation-stata",
+      "section": "Sections 2 and 4",
+      "page": "2-5",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-mice-pooling-001",
+      "topic": "multiple_imputation",
+      "statement": "Multiple-imputation analysis is not complete after creating imputed datasets; estimates and standard errors from the repeated analyses must be combined across imputations using appropriate pooling rules such as Rubin's rules.",
+      "source_id": "src-086-royston-white-mice-implementation-stata",
+      "section": "3.1 MICE and the analysis model",
+      "page": "3",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-mice-diagnostics-001",
+      "topic": "multiple_imputation",
+      "statement": "Conditional imputation models can fail, including through perfect prediction in categorical regressions; imputation quality should be checked rather than assuming successful software execution implies a valid imputation model.",
+      "source_id": "src-086-royston-white-mice-implementation-stata",
+      "section": "8.5 Perfect prediction and 9 Comments and conclusions",
+      "page": "17-18",
+      "support_type": "direct"
+    }
+  ]
+}

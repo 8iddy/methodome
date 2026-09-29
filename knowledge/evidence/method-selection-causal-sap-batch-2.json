@@ -1,0 +1,70 @@
+{
+  "batch_id": "method-selection-causal-sap-batch-2",
+  "status": "supported",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-causal-001",
+      "topic": "causal_identification",
+      "statement": "Hernán and Robins treat exchangeability, positivity, and consistency as core identifiability conditions for causal inference from observational data.",
+      "source_id": "src-027-causal-inference-what-if",
+      "section": "Chapter 3: Observational studies",
+      "page": "27-38",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-causal-002",
+      "topic": "causal_inference",
+      "statement": "Randomization is valued because it is expected to produce exchangeability between treated and untreated groups with respect to potential outcomes.",
+      "source_id": "src-027-causal-inference-what-if",
+      "section": "Chapter 2.1 Randomization",
+      "page": "13-17",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-causal-003",
+      "topic": "impact_evaluation",
+      "statement": "Impact Evaluation in Practice distinguishes randomized assignment, instrumental variables, regression discontinuity, difference-in-differences, and matching as different strategies whose validity depends on their own assignment rules and assumptions.",
+      "source_id": "src-028-impact-evaluation-in-practice-2nd-ed",
+      "section": "Part Two: How to Evaluate",
+      "page": "63-156",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-causal-004",
+      "topic": "difference_in_differences",
+      "statement": "The World Bank guidance explicitly identifies an equal-trends assumption as a key condition for difference-in-differences designs.",
+      "source_id": "src-028-impact-evaluation-in-practice-2nd-ed",
+      "section": "Chapter 7",
+      "page": "129-141",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-sap-001",
+      "topic": "prespecification",
+      "statement": "ICH E9 states that the precise definition of the primary variable used in analysis should be specified in the protocol to avoid multiplicity and post-hoc definition concerns.",
+      "source_id": "src-024-ich-e9-statistical-principles-for-clinical-trials",
+      "section": "2.2.2 Primary and Secondary Variables",
+      "page": "7-8",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-sap-002",
+      "topic": "analysis_sets",
+      "statement": "ICH E9 treats prespecification, analysis sets, missing values/outliers, estimation and hypothesis testing, multiplicity adjustments, and subgroup/covariate analysis as distinct analysis-plan considerations.",
+      "source_id": "src-024-ich-e9-statistical-principles-for-clinical-trials",
+      "section": "Section V Data Analysis Considerations",
+      "page": "23-29",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-sap-003",
+      "topic": "statistical_analysis_plan",
+      "statement": "Gamble et al. provide a minimum-content framework for statistical analysis plans intended to improve transparency and reproducibility of clinical-trial analysis.",
+      "source_id": "src-026-guidelines-for-the-content-of-statistical-analysis-plans-in-clinical-trials",
+      "section": "Recommendations and Conclusions",
+      "page": "2337-2343",
+      "support_type": "direct"
+    }
+  ]
+}

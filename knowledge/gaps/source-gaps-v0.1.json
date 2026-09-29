@@ -1,0 +1,164 @@
+{
+  "tracker_id": "methodome-methodology-source-gaps-v0.1",
+  "updated_date": "2026-09-29",
+  "gaps": [
+    {
+      "gap_id": "gap-fisher-001",
+      "topic": "fisher_exact",
+      "need": "Primary source-backed decision rule distinguishing Fisher exact from chi-square for sparse contingency tables.",
+      "reason": "Current corpus source extracted for chi-square provides expected-count conditions but does not provide a sufficiently explicit Fisher-exact decision rule in the extracted text.",
+      "status": "closed",
+      "resolution": {
+        "source_ids": [
+          "src-002-nistsematech-e-handbook-of-statistical-methods",
+          "src-068-penn-state-stat-200-elementary-statistics"
+        ],
+        "evidence_ids": [
+          "ev-fisher-001",
+          "ev-fisher-002"
+        ],
+        "rule_ids": [
+          "fisher-exact-001"
+        ],
+        "note": "NIST provides the primary exact-test rule for small independent 2x2 discrete data; Penn State provides supporting guidance that Fisher's exact method is an alternative when the large-sample two-proportion approximation condition is not met. No universal total-sample cutoff is encoded."
+      }
+    },
+    {
+      "gap_id": "gap-spearman-001",
+      "topic": "spearman_correlation",
+      "need": "Primary source-backed rule for Spearman correlation, including ordinal/monotonic use and diagnostics.",
+      "reason": "The currently extracted STAT 200 correlation source focuses on Pearson correlation.",
+      "status": "closed",
+      "resolution": {
+        "source_ids": [
+          "src-075-correlation-coefficients-appropriate-use-and-interpretation"
+        ],
+        "evidence_ids": [
+          "ev-spearman-001",
+          "ev-spearman-002",
+          "ev-spearman-003"
+        ],
+        "rule_ids": [
+          "spearman-correlation-001"
+        ],
+        "note": "Schober et al. directly support Spearman for ordinal data, nonnormal continuous data, relevant outliers, and nonlinear monotonic relationships, with graphical/form and independence checks. No normality-p-value switch rule is encoded."
+      }
+    },
+    {
+      "gap_id": "gap-negative-binomial-001",
+      "topic": "negative_binomial_regression",
+      "need": "Primary source-backed decision rule for when negative-binomial regression should replace or supplement Poisson regression, including overdispersion diagnostics.",
+      "reason": "A specialist source now directly supports quasi-Poisson and negative-binomial regression as alternatives for overdispersed counts and explains their different mean-variance relationships. A fully automated negative-binomial selection rule still needs operational diagnostics for matching variance structure and other count-data features.",
+      "status": "deferred",
+      "resolution_progress": {
+        "source_ids": [
+          "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data"
+        ],
+        "rule_ids": [
+          "count-overdispersion-001"
+        ],
+        "note": "Ver Hoef & Boveng (2007) supports overdispersion-aware model selection but does not justify the crude rule 'overdispersion => negative binomial'."
+      },
+      "non_blocking_for_release": true,
+      "resolution_note": "Methodome v1 has source-backed count routing and an explicit safeguard against automatic overdispersion→negative-binomial switching. Detailed automated negative-binomial selection remains a v1.1 expansion and the method is not executable in the current runtime."
+    },
+    {
+      "gap_id": "gap-poisson-dispersion-001",
+      "topic": "poisson_regression",
+      "need": "Source-backed operational guidance for dispersion assessment, excess zeros, and model adequacy before automated Poisson recommendation.",
+      "reason": "The specialist source supports detecting overdispersion as a reason to reconsider ordinary Poisson and comparing quasi-Poisson versus negative-binomial variance structures. Excess-zero handling and a complete automated adequacy workflow remain unresolved.",
+      "status": "deferred",
+      "resolution_progress": {
+        "source_ids": [
+          "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data"
+        ],
+        "rule_ids": [
+          "count-overdispersion-001"
+        ],
+        "note": "Overdispersion now has direct source support; excess zeros and full operational thresholds remain open."
+      },
+      "non_blocking_for_release": true,
+      "resolution_note": "Methodome v1 records the Poisson mean-variance assumption and requires dispersion/model-adequacy review before future automatic recommendation. Full operational dispersion thresholds and remediation are deferred because Poisson is not executable in the current runtime."
+    },
+    {
+      "gap_id": "gap-logit-separation-001",
+      "topic": "binary_logistic_regression",
+      "need": "Primary source-backed safeguard for detecting complete and quasi-complete separation and routing to an appropriate estimation strategy.",
+      "reason": "Current logistic-regression sources support binary-outcome routing and general diagnostics but do not yet provide a sufficiently explicit Methodome rule for separation detection and response.",
+      "status": "closed",
+      "resolution": {
+        "source_ids": [
+          "src-077-separation-in-logistic-regression-causes-consequences-and-control",
+          "src-078-no-rationale-for-one-variable-per-ten-events-logistic-regression"
+        ],
+        "evidence_ids": [
+          "ev-logit-separation-001",
+          "ev-logit-separation-002",
+          "ev-logit-penalty-001",
+          "ev-logit-epv-002"
+        ],
+        "rule_ids": [
+          "logistic-separation-001"
+        ],
+        "note": "The corpus now supports detection/guarding of complete and quasi-complete separation and blocks ordinary maximum-likelihood interpretation under separation. Firth is recorded as a candidate remedy, not yet as an automatically executable Methodome fallback."
+      }
+    },
+    {
+      "gap_id": "gap-logit-sparse-events-001",
+      "topic": "binary_logistic_regression",
+      "need": "Primary source-backed safeguard for sparse-event and small-sample logistic regression, including when ordinary maximum-likelihood estimates may be biased or unstable and when penalized or small-sample alternatives should be considered.",
+      "reason": "Current corpus material does not yet support an operational rare-event or sparse-event threshold or automatic fallback method.",
+      "status": "closed",
+      "resolution": {
+        "source_ids": [
+          "src-077-separation-in-logistic-regression-causes-consequences-and-control",
+          "src-078-no-rationale-for-one-variable-per-ten-events-logistic-regression"
+        ],
+        "evidence_ids": [
+          "ev-logit-separation-002",
+          "ev-logit-epv-001",
+          "ev-logit-epv-002",
+          "ev-logit-firth-001"
+        ],
+        "rule_ids": [
+          "logistic-sparse-events-001"
+        ],
+        "note": "The safeguard explicitly rejects a universal 10-EPV cutoff and instead treats sparse-event risk as multifactorial. Firth is source-supported as a candidate remedy but remains outside automatic execution until implemented and validated."
+      }
+    },
+    {
+      "gap_id": "gap-count-excess-zero-001",
+      "topic": "count_regression",
+      "need": "Source-backed decision guidance for excess-zero count data, including when zero-inflated or hurdle models should enter the candidate set.",
+      "reason": "The overdispersion source does not by itself support an automated zero-inflation or hurdle-model decision rule.",
+      "status": "deferred",
+      "non_blocking_for_release": true,
+      "resolution_note": "Zero-inflated and hurdle-model routing is intentionally deferred to the advanced count-model expansion. Methodome v1 must flag excess zeros for review and must not invent an automatic zero-inflated/hurdle choice."
+    },
+    {
+      "gap_id": "gap-mice-general-guidance-001",
+      "topic": "multiple_imputation",
+      "need": "The intended White, Royston & Wood (2011) general MICE guidance source for imputation-model construction, variable-type handling, number of imputations, diagnostics and practical failure modes.",
+      "reason": "The Drive file named multiple-imputation-by-chained-equations-for-systematically-ygzclny7dt.pdf is not White, Royston & Wood (2011). It is Resche-Rigon & White (2018), a specialist multilevel MICE paper. Sterne et al. (2009) supports general MI safeguards, but the planned deeper general MICE source is still absent.",
+      "status": "deferred",
+      "candidate_sources": [
+        {
+          "title": "Multiple imputation using chained equations: Issues and guidance for practice",
+          "authors": "White IR; Royston P; Wood AM",
+          "journal": "Statistics in Medicine",
+          "year": 2011,
+          "doi": "10.1002/sim.4067",
+          "status": "identified_external_not_in_drive",
+          "note": "Acquire the actual paper before adding detailed general MICE implementation rules such as number-of-imputations and variable-specific chained-equation guidance."
+        }
+      ],
+      "related_sources": [
+        "src-084-sterne-multiple-imputation-potential-and-pitfalls",
+        "src-085-resche-rigon-white-multilevel-mice"
+      ],
+      "non_blocking_for_release": true,
+      "resolution_note": "Methodome v1 has sufficient source-backed safeguards from Sterne et al. (2009), Royston & White (2011 implementation paper), and Resche-Rigon & White (2018) to proceed. White, Royston & Wood (2011) remains a desirable v1.1 enrichment source for deeper generic MICE implementation guidance, but it is not a release blocker."
+    }
+  ],
+  "release_boundary_note": "For v1, unresolved advanced-method source gaps are recorded as deferred and non-blocking. Deferred means Methodome must not autonomously recommend or execute the unresolved branch until the rule is expanded and benchmarked."
+}

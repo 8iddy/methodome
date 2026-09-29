@@ -1,0 +1,138 @@
+{
+  "rule_set_id": "methodome-method-selection-causal-sap-v0.2",
+  "status": "supported",
+  "rules": [
+    {
+      "rule_id": "causal-gate-001",
+      "topic": "causal_inference",
+      "decision": "A causal question must pass an explicit identification gate before Methodome recommends a causal estimator.",
+      "conditions": [
+        "Objective type is causal",
+        "User/protocol seeks an effect, impact, intervention effect, or other counterfactual contrast"
+      ],
+      "action": "Require a defined intervention/exposure, outcome, target population, causal estimand, and defensible identification assumptions before method selection.",
+      "assumptions": [
+        "Exchangeability or a design/strategy that justifies the relevant exchangeability condition",
+        "Positivity",
+        "Consistency"
+      ],
+      "diagnostics": [
+        "Treatment/exposure support across covariate strata",
+        "Causal-design information",
+        "Potential confounding structure",
+        "Protocol evidence for intervention/exposure definition"
+      ],
+      "warnings": [
+        "Do not convert an ordinary observational association model into a causal claim merely by adjusting for covariates.",
+        "Causal identification and statistical estimation are separate problems."
+      ],
+      "exceptions": [
+        "Randomized assignment changes the identification argument but does not remove the need to define the estimand and analysis population."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-027-causal-inference-what-if",
+          "support": "Hernán and Robins organize observational causal identification around exchangeability, positivity and consistency, and explain that randomization is expected to produce exchangeability.",
+          "section": "Chapters 2-3",
+          "page": "13-38"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "did-001",
+      "topic": "difference_in_differences",
+      "decision": "Difference-in-differences requires a defensible equal/parallel trends assumption and should not be suggested from before/after data alone.",
+      "conditions": [
+        "Causal objective",
+        "Treated and comparison groups observed over time",
+        "Program assignment is not simply individual randomization"
+      ],
+      "action": "Consider difference-in-differences only when the design supports a credible comparison group and the equal-trends assumption is addressed.",
+      "assumptions": [
+        "Equal/parallel untreated outcome trends across groups over the relevant pre-intervention period",
+        "No design violations that invalidate the comparison"
+      ],
+      "diagnostics": [
+        "Pre-intervention trend inspection when available",
+        "Treatment timing",
+        "Group comparability",
+        "Spillovers or contamination"
+      ],
+      "warnings": [
+        "A pre/post comparison without a credible comparison group is not difference-in-differences."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-028-impact-evaluation-in-practice-2nd-ed",
+          "support": "World Bank guidance gives difference-in-differences its own chapter and explicitly identifies the equal-trends assumption and method limitations.",
+          "section": "Chapter 7",
+          "page": "129-141"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "sap-prespecification-001",
+      "topic": "statistical_analysis_plan",
+      "decision": "Primary analysis variables and their operational definitions should be prespecified before outcome-driven analysis decisions.",
+      "conditions": [
+        "A protocol/SAP defines primary and secondary objectives or outcomes"
+      ],
+      "action": "Capture primary versus secondary status, operational outcome definition, analysis population, and planned analysis before locking the Methodome plan.",
+      "assumptions": [],
+      "diagnostics": [
+        "Check protocol/SAP consistency",
+        "Check whether primary-variable definition changed after data review"
+      ],
+      "warnings": [
+        "Post-hoc redefinition of a primary variable can introduce bias and multiplicity problems."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-024-ich-e9-statistical-principles-for-clinical-trials",
+          "support": "ICH E9 states that the precise primary-variable definition should be specified in the protocol and warns against post-hoc redefinition.",
+          "section": "2.2.2",
+          "page": "7-8"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "sap-scope-001",
+      "topic": "statistical_analysis_plan",
+      "decision": "Methodome analysis plans should separately record analysis sets, missing-data handling, estimation/testing, multiplicity, subgroup/covariate plans, and sensitivity analyses where applicable.",
+      "conditions": [
+        "An analysis plan is being created or locked"
+      ],
+      "action": "Represent these elements explicitly rather than burying them in free text.",
+      "assumptions": [],
+      "diagnostics": [
+        "Completeness check before lock"
+      ],
+      "warnings": [
+        "A method name alone is not a complete analysis plan."
+      ],
+      "exceptions": [
+        "Not every project requires every field; applicability should follow design and objectives."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-024-ich-e9-statistical-principles-for-clinical-trials",
+          "support": "ICH E9 Section V treats these as separate data-analysis considerations.",
+          "section": "Section V",
+          "page": "23-29"
+        },
+        {
+          "source_id": "src-026-guidelines-for-the-content-of-statistical-analysis-plans-in-clinical-trials",
+          "support": "Gamble et al. provide a minimum-content framework for SAPs aimed at transparency and reproducibility.",
+          "section": "Recommendations and Conclusions",
+          "page": "2337-2343"
+        }
+      ],
+      "validation_status": "supported"
+    }
+  ]
+}

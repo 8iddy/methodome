@@ -1,0 +1,260 @@
+{
+  "rule_set_id": "methodome-survey-missing-data-v0.1",
+  "status": "supported",
+  "rules": [
+    {
+      "rule_id": "survey-weight-001",
+      "topic": "survey_design",
+      "decision": "When a probability survey supplies analysis weights, select and use the weight defined for the target population and measurement component rather than treating observations as equally weighted by default.",
+      "conditions": [
+        "Sampling probabilities are unequal, oversampling occurred, or survey documentation provides weights"
+      ],
+      "action": "Identify the survey-specific analysis weight and its construction/target from documentation. Preserve the weight alongside strata and PSU variables and use survey-aware estimation.",
+      "assumptions": [
+        "The selected weight corresponds to the analysis population and variables",
+        "Survey documentation is available or the weighting scheme is otherwise known"
+      ],
+      "diagnostics": [
+        "Weight variable present",
+        "Range and missingness of weights",
+        "Target population/component of the weight",
+        "Strata and PSU variables present"
+      ],
+      "warnings": [
+        "Weights alone are not sufficient for complex-survey variance estimation.",
+        "Do not reconstruct a generic weight from the NHANES formula unless the target survey uses the same design.",
+        "NHANES-specific weight names and cycle-combination rules are not universal survey rules."
+      ],
+      "exceptions": [
+        "A self-weighting simple random sample may not require unequal-probability weights, but its design still has to be declared."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-081-nhanes-sample-design-module",
+          "support": "Describes the multistage unequal-probability NHANES design and need to specify design parameters.",
+          "section": "Sample Design",
+          "page": "1-3"
+        },
+        {
+          "source_id": "src-082-nhanes-weighting-module",
+          "support": "Explains base weights, nonresponse adjustment and post-stratification and relates base weight to selection probability.",
+          "section": "Weighting",
+          "page": "1 onward"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "survey-variance-001",
+      "topic": "survey_design",
+      "decision": "Do not treat survey weights as sufficient for valid standard errors when the design also contains clustering or stratification.",
+      "conditions": [
+        "Complex probability survey",
+        "PSUs/clusters, strata, differential weighting or other design features are present"
+      ],
+      "action": "Use a survey-aware variance estimator with the available weight, strata and PSU/design variables. Carry design metadata into hypothesis tests and confidence intervals.",
+      "assumptions": [
+        "Design variables correspond to the survey's documented sampling structure"
+      ],
+      "diagnostics": [
+        "PSU/cluster variable",
+        "Stratum variable",
+        "Weight variable",
+        "Lonely/singleton PSU situations",
+        "Sampling fraction/FPC where relevant"
+      ],
+      "warnings": [
+        "Using weights in an ordinary iid estimator can still produce incorrect standard errors, tests and confidence intervals.",
+        "Do not infer that a large raw sample size makes clustering or stratification irrelevant."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-083-nhanes-variance-estimation-module",
+          "support": "States that weights affect parameter estimates while differential weighting, clustering and stratification affect variance estimates, standard errors, test statistics and confidence intervals.",
+          "section": "Variance Estimation",
+          "page": "1 onward"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "survey-domain-001",
+      "topic": "survey_domain_analysis",
+      "decision": "For complex-survey subgroup/domain analysis, do not automatically delete all observations outside the target domain before variance estimation.",
+      "conditions": [
+        "A complex survey is being analyzed",
+        "The target is a subgroup/domain/subpopulation",
+        "Taylor linearization or another design-based method requires the full design context"
+      ],
+      "action": "Retain the eligible survey records needed by the variance estimator and specify the target domain with an indicator/subpopulation mechanism supported by the survey software.",
+      "assumptions": [
+        "The survey software's domain-analysis method matches the design-based estimator being used"
+      ],
+      "diagnostics": [
+        "Domain indicator",
+        "Positive/nonzero analysis weights",
+        "PSU and strata representation after domain definition"
+      ],
+      "warnings": [
+        "Naively subsetting to the target group can understate variance by treating the domain sample size as fixed.",
+        "Exact implementation is software- and design-specific."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-083-nhanes-variance-estimation-module",
+          "support": "NHANES guidance explains that Taylor-linearized domain variance requires all records with nonzero weights plus a domain indicator and warns that subsetting can underestimate variability.",
+          "section": "Subpopulations/domains",
+          "page": "3 onward"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "missing-mechanism-001",
+      "topic": "missing_data",
+      "decision": "Choose a missing-data strategy from the plausible missingness process, analysis target and available predictors, not from the percentage missing alone.",
+      "conditions": [
+        "One or more variables required for analysis have missing values"
+      ],
+      "action": "Describe where missingness occurs, identify variables associated with missingness and with incomplete values, assess whether MCAR/MAR assumptions are plausible, and state what unverifiable assumptions the primary analysis requires. Add sensitivity analysis when MNAR departures could materially change conclusions.",
+      "assumptions": [],
+      "diagnostics": [
+        "Missingness by variable and record",
+        "Patterns of joint missingness",
+        "Observed predictors of missingness",
+        "Outcome/exposure/covariate role of incomplete variables",
+        "Cluster or survey structure"
+      ],
+      "warnings": [
+        "Do not encode 'missingness > X% = multiple imputation'.",
+        "MAR is an analysis assumption, not an empirically testable property that can be proven from observed data.",
+        "The same missing-data percentage can imply different risks under different mechanisms and estimands."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-084-sterne-multiple-imputation-potential-and-pitfalls",
+          "support": "Explains MCAR/MAR/MNAR, the dependence of bias on why data are missing, inability to distinguish MAR from MNAR using observed data, and the role of sensitivity analysis.",
+          "section": "Consequences of missing data / types of missing data",
+          "page": "1-4"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "missing-ad-hoc-imputation-001",
+      "topic": "missing_data",
+      "decision": "Do not automatically use mean imputation, missing-category indicators, last observation carried forward, or other single-imputation shortcuts as general missing-data solutions.",
+      "conditions": [
+        "A simple single-value or indicator-based imputation strategy is proposed"
+      ],
+      "action": "Block automatic recommendation unless a method-specific justification exists. Prefer a strategy whose assumptions and uncertainty treatment match the design and estimand.",
+      "assumptions": [],
+      "diagnostics": [
+        "Whether imputation uncertainty is propagated",
+        "Relationship between missingness and observed variables",
+        "Variable type and substantive model"
+      ],
+      "warnings": [
+        "Single imputation usually understates standard errors because uncertainty in the missing values is ignored.",
+        "A convenient imputation method can introduce bias even when the fraction missing is modest."
+      ],
+      "exceptions": [
+        "Specialized deterministic rules may be justified by the data-generating process or protocol, but require explicit documentation."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-084-sterne-multiple-imputation-potential-and-pitfalls",
+          "support": "States that common ad hoc methods including mean imputation, missing-category indicators and LOCF are not valid in general and that single imputation usually makes standard errors too small.",
+          "section": "Statistical methods to handle missing data",
+          "page": "2-4"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "multiple-imputation-model-001",
+      "topic": "multiple_imputation",
+      "decision": "When multiple imputation is used under a plausible MAR strategy, construct the imputation model to support the substantive analysis and the missingness assumptions.",
+      "conditions": [
+        "Multiple imputation is selected as the missing-data strategy"
+      ],
+      "action": "Include variables in the substantive analysis and, as feasible, observed variables predictive of the missing values and variables associated with the missingness process. Use variable-appropriate conditional imputation models, preserve compatibility with the substantive analysis, create multiple imputed datasets, pool analysis estimates and uncertainty across imputations, and inspect imputation-model behaviour rather than treating software completion as validation.",
+      "assumptions": [
+        "The imputation model is compatible enough with the substantive analysis for the intended inference",
+        "The stated MAR-type assumptions are scientifically plausible"
+      ],
+      "diagnostics": [
+        "Variables included in imputation model",
+        "Distribution and plausibility of imputed values",
+        "Compatibility with substantive model",
+        "Convergence/stability for iterative procedures",
+        "Sensitivity to missingness assumptions",
+        "Variable-specific imputation model and link/function",
+        "Pooling across imputed datasets",
+        "Perfect-prediction or separation failures in categorical imputation models",
+        "Observed-versus-imputed distribution checks"
+      ],
+      "warnings": [
+        "Do not treat multiple imputation as automatically unbiased merely because software produced imputed datasets.",
+        "Do not use number or percentage missing as the sole reason to select multiple imputation.",
+        "MICE software convergence or completion does not by itself establish that the imputation model is scientifically or statistically adequate.",
+        "Perfect prediction in categorical imputation models can produce unstable or inappropriate imputations."
+      ],
+      "exceptions": [
+        "MNAR analyses require additional assumptions and sensitivity models beyond an ordinary MAR imputation workflow."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-084-sterne-multiple-imputation-potential-and-pitfalls",
+          "support": "Recommends including substantive-analysis variables and variables predictive of missing values or the missingness process to make MAR assumptions more plausible.",
+          "section": "Plausibility of missing at random assumption",
+          "page": "4"
+        },
+        {
+          "source_id": "src-086-royston-white-mice-implementation-stata",
+          "support": "Royston and White describe the chained-equation algorithm, variable-specific imputation models, pooling with Rubin's rules, perfect-prediction problems, and the need to inspect imputation quality.",
+          "section": "Sections 2-4, 8.5 and 9",
+          "page": "2-18"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "multilevel-imputation-001",
+      "topic": "multiple_imputation",
+      "decision": "When data are clustered or multilevel, the imputation model must account for the multilevel structure rather than imputing as though all records were iid.",
+      "conditions": [
+        "Data contain clusters, sites, centres, repeated hierarchical units or other multilevel structure",
+        "Missing values occur in variables used by the analysis"
+      ],
+      "action": "Use or require a multilevel-compatible imputation strategy whose cluster structure is aligned with the substantive model. Distinguish variables missing within clusters from variables systematically absent in entire clusters.",
+      "assumptions": [
+        "Cluster structure is correctly identified",
+        "The imputation model is appropriate for variable types and hierarchy"
+      ],
+      "diagnostics": [
+        "Within- versus between-cluster missingness",
+        "Systematic versus sporadic missingness by cluster",
+        "Cluster sizes",
+        "Imputed between-cluster and within-cluster variation"
+      ],
+      "warnings": [
+        "Ignoring clustering during imputation can underestimate clustering and standard errors even if the final analysis later accounts for clustering.",
+        "A simple fixed-effect cluster indicator is not automatically equivalent to a valid multilevel imputation model."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-085-resche-rigon-white-multilevel-mice",
+          "support": "Shows why clustered/multilevel missing data need specialized imputation and states that ignoring clustering can underestimate clustering and standard errors.",
+          "section": "Abstract and introduction",
+          "page": "1-3"
+        }
+      ],
+      "validation_status": "supported"
+    }
+  ]
+}

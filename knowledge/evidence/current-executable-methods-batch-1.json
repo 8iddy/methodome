@@ -1,0 +1,142 @@
+{
+  "batch_id": "current-executable-methods-batch-1",
+  "status": "supported",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-var-001",
+      "topic": "variable_types",
+      "statement": "The choice of graphs, descriptive statistics and inferential procedures depends on whether variables are categorical or quantitative.",
+      "source_id": "src-061-penn-state-stat-200-elementary-statistics",
+      "section": "Lesson 2: Describing Data, Part 1",
+      "page": "1-56",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-chi-001",
+      "topic": "chi_square",
+      "statement": "Chi-square procedures are used for categorical data; chi-square approximation requires adequate expected counts, with this source requiring all expected counts to be at least five for the goodness-of-fit approximation.",
+      "source_id": "src-070-penn-state-stat-200-elementary-statistics",
+      "section": "Lesson 11: Chi-Square Tests",
+      "page": "7-8 of 28",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-corr-001",
+      "topic": "pearson_correlation",
+      "statement": "Pearson correlation is used to summarize a linear relationship between two quantitative variables; direction, form, strength and outliers should be examined.",
+      "source_id": "src-071-penn-state-stat-200-elementary-statistics",
+      "section": "Lesson 12: Correlation & Simple Linear Regression",
+      "page": "1-2 of 36",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-linreg-001",
+      "topic": "linear_regression",
+      "statement": "Simple linear regression relies on linearity, independent errors, normally distributed errors, and equal error variances; residual diagnostics are used to assess these assumptions.",
+      "source_id": "src-018-penn-state-stat-501-regression-methods",
+      "section": "Lesson 4: SLR Model Assumptions",
+      "page": "1 onward",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-linreg-002",
+      "topic": "linear_regression",
+      "statement": "Regression estimates, intervals and hypothesis tests rely on the model assumptions; departures from independence are especially consequential.",
+      "source_id": "src-018-penn-state-stat-501-regression-methods",
+      "section": "Lesson 4: SLR Model Assumptions",
+      "page": "Background",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-logit-001",
+      "topic": "logistic_regression",
+      "statement": "Logistic regression is an extension for datasets with a binary response variable.",
+      "source_id": "src-009-penn-state-stat-501-regression-methods",
+      "section": "Lesson 13: Weighted Least Squares & Logistic Regressions",
+      "page": "1 of 33",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-regdiag-001",
+      "topic": "multicollinearity",
+      "statement": "Multicollinearity occurs when predictors are moderately or highly correlated and can reduce coefficient precision and make coefficient interpretation and hypothesis tests unstable across model specifications.",
+      "source_id": "src-010-penn-state-stat-501-regression-methods",
+      "section": "Lesson 12: Multicollinearity & Other Regression Pitfalls",
+      "page": "Overview",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-fisher-001",
+      "topic": "fisher_exact",
+      "statement": "For two independent small samples with discrete nominal or ordinal outcomes that fall into two mutually exclusive classes, Fisher's exact probability test is an exact nonparametric method for the resulting 2x2 contingency table.",
+      "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
+      "section": "7.3.3: How can we determine whether two processes produce the same proportion of defectives? Case 2: An Exact Test for Small Samples",
+      "page": null,
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-fisher-002",
+      "topic": "fisher_exact",
+      "statement": "For two independent proportions, when the large-sample normal-approximation condition is not met, Fisher's exact method is one available alternative.",
+      "source_id": "src-068-penn-state-stat-200-elementary-statistics",
+      "section": "Lesson 9.1: Two Independent Proportions",
+      "page": "2 of 27",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-logit-gof-001",
+      "topic": "logistic_regression_diagnostics",
+      "statement": "Logistic-regression goodness-of-fit procedures depend on the data structure: Pearson chi-square and deviance goodness-of-fit tests require replicated predictor patterns, while the Hosmer-Lemeshow test is presented for unreplicated data or data with few replicated observations.",
+      "source_id": "src-009-penn-state-stat-501-regression-methods",
+      "section": "Lesson 13: Goodness-of-Fit Tests",
+      "page": "18-19 of 33",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-logit-resid-001",
+      "topic": "logistic_regression_diagnostics",
+      "statement": "Deviance or Pearson residuals can be used for diagnostic plots in binary logistic regression, including residuals versus observation order.",
+      "source_id": "src-009-penn-state-stat-501-regression-methods",
+      "section": "Lesson 13: Logistic regression diagnostics and software procedures",
+      "page": "14, 29 of 33",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-poisson-001",
+      "topic": "poisson_regression",
+      "statement": "For a Poisson count response, ordinary linear-regression constant-variance assumptions are inappropriate; the source recommends Poisson regression rather than relying on a variance-stabilizing square-root transformation.",
+      "source_id": "src-013-penn-state-stat-501-regression-methods",
+      "section": "Lesson 9: More on Transformations",
+      "page": "41 of 73",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-spearman-001",
+      "topic": "spearman_correlation",
+      "statement": "Spearman rank correlation can be used for ordinal data, nonnormally distributed continuous data, or data with relevant outliers as a measure of monotonic association.",
+      "source_id": "src-075-correlation-coefficients-appropriate-use-and-interpretation",
+      "section": "Abstract and Spearman discussion",
+      "page": "1763-1765",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-spearman-002",
+      "topic": "spearman_correlation",
+      "statement": "Spearman correlation does not require normally distributed data and can be used for nonlinear monotonic relationships that are continuously increasing or decreasing.",
+      "source_id": "src-075-correlation-coefficients-appropriate-use-and-interpretation",
+      "section": "Assumptions of a Pearson Correlation",
+      "page": "1765",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-spearman-003",
+      "topic": "correlation_diagnostics",
+      "statement": "Correlation analysis should inspect relationship form and relevant outliers, and ordinary Pearson or Spearman correlation assumes each observed x-y pair is independent of the other pairs; repeated observations from the same subject violate this independence condition.",
+      "source_id": "src-075-correlation-coefficients-appropriate-use-and-interpretation",
+      "section": "Assumptions and interpretation",
+      "page": "1764-1765",
+      "support_type": "direct"
+    }
+  ]
+}

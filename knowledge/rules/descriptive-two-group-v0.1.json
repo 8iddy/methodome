@@ -1,0 +1,97 @@
+{
+  "rule_set_id": "methodome-descriptive-two-group-v0.1",
+  "status": "supported",
+  "rules": [
+    {
+      "rule_id": "descriptive-categorical-001",
+      "topic": "descriptive_analysis",
+      "decision": "Summarize categorical variables with counts and proportions rather than numeric means.",
+      "conditions": [
+        "Variable is binary, nominal categorical, or ordinal categorical"
+      ],
+      "action": "Report category counts and proportions, retain missing counts, and preserve category labels/order where relevant.",
+      "assumptions": [],
+      "diagnostics": [
+        "Category levels",
+        "Missing count",
+        "Unexpected or invalid categories"
+      ],
+      "warnings": [
+        "Do not compute a mean merely because categories are numerically coded."
+      ],
+      "exceptions": [
+        "Ordinal variables may also receive ordinal summaries when those summaries match the research question."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-061-penn-state-stat-200-elementary-statistics",
+          "support": "Penn State describes categorical variables as groupings and summarizes one categorical variable with a proportion.",
+          "section": "Lesson 2, 2.1 Categorical Variables",
+          "page": "1-2 of 56"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "descriptive-continuous-001",
+      "topic": "descriptive_analysis",
+      "decision": "Choose central-tendency summaries for quantitative variables with attention to shape and outliers.",
+      "conditions": [
+        "Variable is quantitative or continuous"
+      ],
+      "action": "Inspect distribution shape and outliers; use mean as a primary centre summary for roughly symmetric data and median as a primary centre summary when skewness or outliers make the mean unrepresentative.",
+      "assumptions": [],
+      "diagnostics": [
+        "Distribution shape",
+        "Outliers",
+        "Mean",
+        "Median",
+        "Standard deviation",
+        "Five-number summary or interquartile range"
+      ],
+      "warnings": [
+        "Do not choose mean versus median without considering distribution shape and influential outliers."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-061-penn-state-stat-200-elementary-statistics",
+          "support": "Penn State states that the mean is often preferred for symmetric distributions and the median for skewed distributions or those with outliers because the median is more resistant.",
+          "section": "Skewness & Central Tendency",
+          "page": "43 of 56"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "multi-group-gate-001",
+      "topic": "multiple_group_comparisons",
+      "decision": "Do not replace an overall comparison of more than two independent group means with a series of unadjusted pairwise t tests.",
+      "conditions": [
+        "Quantitative outcome",
+        "More than two independent groups",
+        "Research question asks whether group means differ"
+      ],
+      "action": "Use an overall multi-group procedure such as one-way ANOVA when its conditions are suitable, then use planned or adjusted comparisons as warranted.",
+      "assumptions": [],
+      "diagnostics": [
+        "Number of groups",
+        "Planned comparisons",
+        "Multiplicity"
+      ],
+      "warnings": [
+        "Multiple unadjusted pairwise tests increase Type I error."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-069-penn-state-stat-200-elementary-statistics",
+          "support": "Penn State states that multiple independent t tests across more than two groups increase Type I error and motivates one-way ANOVA.",
+          "section": "Lesson 10",
+          "page": "1 of 15"
+        }
+      ],
+      "validation_status": "supported"
+    }
+  ]
+}

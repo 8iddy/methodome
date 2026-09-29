@@ -1,0 +1,1781 @@
+{
+  "corpus_id": "methodome-methodology-corpus-v1",
+  "drive_folder_id": "1HExso0MBgFlAonZz3CR6aqMi3Ws4ODc8",
+  "file_count": 87,
+  "generated_date": "2026-09-29",
+  "authority_tiers": {
+    "A": "Authoritative guideline, official institutional source, major methodological text, or major methods paper.",
+    "B": "Institutional teaching material, tutorial, or supporting methodological source.",
+    "C": "Supplemental or illustrative source."
+  },
+  "entries": [
+    {
+      "source_id": "src-001-nistsematech-e-handbook-of-statistical-methods",
+      "drive_id": "1Is484xpGJo7UNpEODh_SuV8TMHU5dv6c",
+      "file_name": "apr.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1323017,
+      "source_family": "NIST/SEMATECH e-Handbook of Statistical Methods",
+      "organization": "NIST",
+      "year": null,
+      "domains": [
+        "reliability",
+        "survival_analysis",
+        "bayesian_methods"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "low",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
+      "drive_id": "1XUFlLhW58Ovbz1SniByppD3s6EWDL0lT",
+      "file_name": "prc.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 890135,
+      "source_family": "NIST/SEMATECH e-Handbook of Statistical Methods",
+      "organization": "NIST",
+      "year": null,
+      "domains": [
+        "comparative_analysis",
+        "hypothesis_testing",
+        "confidence_intervals"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-003-nistsematech-e-handbook-of-statistical-methods",
+      "drive_id": "1FfuUW5uSpUDiQTvoq3fTodOiiMZgTLhY",
+      "file_name": "pmc.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1746685,
+      "source_family": "NIST/SEMATECH e-Handbook of Statistical Methods",
+      "organization": "NIST",
+      "year": null,
+      "domains": [
+        "time_series",
+        "process_monitoring",
+        "multivariate_analysis"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-004-nistsematech-e-handbook-of-statistical-methods",
+      "drive_id": "1b6vcInlWYiTD6OvpEqc7n8VVvuGFOzlR",
+      "file_name": "pri.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 2823032,
+      "source_family": "NIST/SEMATECH e-Handbook of Statistical Methods",
+      "organization": "NIST",
+      "year": null,
+      "domains": [
+        "experimental_design",
+        "randomization",
+        "factorial_design"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-005-nistsematech-e-handbook-of-statistical-methods",
+      "drive_id": "1fJqiXGQXn_R4qqcinBEzPy4X2p0hIrKB",
+      "file_name": "pmd.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 390004,
+      "source_family": "NIST/SEMATECH e-Handbook of Statistical Methods",
+      "organization": "NIST",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_selection",
+        "model_validation"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-006-nistsematech-e-handbook-of-statistical-methods",
+      "drive_id": "1QKhlw_bSIg6yK7nvqj8jlxY_ODKefLOZ",
+      "file_name": "ppc.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 875523,
+      "source_family": "NIST/SEMATECH e-Handbook of Statistical Methods",
+      "organization": "NIST",
+      "year": null,
+      "domains": [
+        "data_collection",
+        "model_building",
+        "assumption_checks"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-007-nistsematech-e-handbook-of-statistical-methods",
+      "drive_id": "18ejBIS1CkaR3QKycqneyCdOBa2Oz2EfF",
+      "file_name": "mpc.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 2128787,
+      "source_family": "NIST/SEMATECH e-Handbook of Statistical Methods",
+      "organization": "NIST",
+      "year": null,
+      "domains": [
+        "measurement",
+        "measurement_error",
+        "reliability"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-008-nistsematech-e-handbook-of-statistical-methods",
+      "drive_id": "11bp5BsB68tpp-XgZ67a3cWTO4Zmd1yhQ",
+      "file_name": "eda.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 3647217,
+      "source_family": "NIST/SEMATECH e-Handbook of Statistical Methods",
+      "organization": "NIST",
+      "year": null,
+      "domains": [
+        "exploratory_data_analysis",
+        "assumption_checks",
+        "descriptive_analysis"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-009-penn-state-stat-501-regression-methods",
+      "drive_id": "1qvizSmJssLAP9T6MQ2t_afxIFMXO8kA8",
+      "file_name": "13  Weighted Least Squares & Logistic Regressions – STAT 501 _ Regression Methods.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1712344,
+      "source_family": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-010-penn-state-stat-501-regression-methods",
+      "drive_id": "1EyR3YzoM8DZdh0oXbUy_YeeQyMCMWkFg",
+      "file_name": "12  Multicollinearity & Other Regression Pitfalls – STAT 501 _ Regression Methods.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 3023697,
+      "source_family": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-011-penn-state-stat-501-regression-methods",
+      "drive_id": "1eW2r25R0nQmD0-CLeGRkjnZwxdaeSYec",
+      "file_name": "11  Influential Points – STAT 501 _ Regression Methods.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 2760332,
+      "source_family": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-012-penn-state-stat-501-regression-methods",
+      "drive_id": "1JEN-w7HjO0t253jPXyZgOASGrqORMP-H",
+      "file_name": "10  Model Building – STAT 501 _ Regression Methods.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 5074291,
+      "source_family": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-013-penn-state-stat-501-regression-methods",
+      "drive_id": "1mLTf41EGmlslwGUbdfDkFBx-okSerGFp",
+      "file_name": "9  Data Transformations – STAT 501 _ Regression Methods.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 3913489,
+      "source_family": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-014-penn-state-stat-501-regression-methods",
+      "drive_id": "1ZzTOQ3qFYpnQzxwzPwYMrMW3E1WKcQsb",
+      "file_name": "8  Categorical Predictors – STAT 501 _ Regression Methods.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 3834885,
+      "source_family": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-015-penn-state-stat-501-regression-methods",
+      "drive_id": "1KU9K5bkB20GeFaMPWXnTtbuViBqyVXgU",
+      "file_name": "7  MLR Estimation, Prediction & Model Assumptions – STAT 501 _ Regression Methods.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1400432,
+      "source_family": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-016-penn-state-stat-501-regression-methods",
+      "drive_id": "1Xvij9lxV19qbG2SXs7RMHhkoSNrVF77V",
+      "file_name": "6  MLR Model Evaluation – STAT 501 _ Regression Methods.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 2676575,
+      "source_family": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-017-penn-state-stat-501-regression-methods",
+      "drive_id": "1kAouvN1-zsfaEwZn4itshipwB8MFIGXR",
+      "file_name": "5  Multiple Linear Regression – STAT 501 _ Regression Methods.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1891402,
+      "source_family": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-018-penn-state-stat-501-regression-methods",
+      "drive_id": "1Tas609m9tE0Ma7ba9uy3s3X6afb3Flad",
+      "file_name": "4  SLR Model Assumptions – STAT 501 _ Regression Methods.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 2710543,
+      "source_family": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-019-penn-state-stat-501-regression-methods",
+      "drive_id": "1y-qR4cHDukgyiHQJFCpT6rm2sL1rxUvH",
+      "file_name": "3  SLR Estimation & Prediction – STAT 501 _ Regression Methods.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1243550,
+      "source_family": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-020-penn-state-stat-501-regression-methods",
+      "drive_id": "1bO9S540EBseNMIBHBbO7QdqOQ1kH6Nzc",
+      "file_name": "2  SLR Model Evaluation – STAT 501 _ Regression Methods.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 3120566,
+      "source_family": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-021-penn-state-stat-501-regression-methods",
+      "drive_id": "1xZv6J6n4kciuBvmEXn3e_ek4ckH1SLLC",
+      "file_name": "1  Simple Linear Regression – STAT 501 _ Regression Methods.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 3710298,
+      "source_family": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-022-categorical-data-analysis-3rd-ed",
+      "drive_id": "1TelAxNE9dhhthYLAcGULR7iCpD1DnWzC",
+      "file_name": "3rd-ed-alan_agresti_categorical_data_analysis.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 33764155,
+      "source_family": "Categorical Data Analysis, 3rd ed.",
+      "organization": "Wiley",
+      "year": null,
+      "domains": [
+        "categorical_data",
+        "logistic_regression",
+        "count_models",
+        "association_tests"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-023-interrupted-time-series-analysis-for-single-series-and-comparative-designs",
+      "drive_id": "1i-o0hgWXP-6EqVr5_a5DHNqByiAGSyFa",
+      "file_name": "ITS_SAS.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 909721,
+      "source_family": "Interrupted Time Series Analysis for Single Series and Comparative Designs",
+      "organization": "ICES / HSNRI",
+      "year": null,
+      "domains": [
+        "time_series",
+        "quasi_experimental"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-024-ich-e9-statistical-principles-for-clinical-trials",
+      "drive_id": "1_6YoWIrvLGMr7SCS7Sr5Pbqz37XCHFGQ",
+      "file_name": "ich-e-9-statistical-principles-clinical-trials-step-5_en.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 332364,
+      "source_family": "ICH E9 Statistical Principles for Clinical Trials",
+      "organization": "ICH",
+      "year": 1998,
+      "domains": [
+        "clinical_trials",
+        "statistical_principles",
+        "analysis_populations",
+        "multiplicity"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-025-ich-e9r1-estimands-and-sensitivity-analysis",
+      "drive_id": "1nIx9QFFfNfu9d_A3fXrJiaSDXDnVNljU",
+      "file_name": "E9-R1_Step4_Guideline_2019_1203.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 160629,
+      "source_family": "ICH E9(R1) Estimands and Sensitivity Analysis",
+      "organization": "ICH",
+      "year": 2019,
+      "domains": [
+        "estimands",
+        "sensitivity_analysis",
+        "clinical_trials"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-026-guidelines-for-the-content-of-statistical-analysis-plans-in-clinical-trials",
+      "drive_id": "15-u3kaj_fxBJvAfBRzm5MF0puFlBRn8I",
+      "file_name": "Guidelines for the Content of Statistical Analysis Plans in Clinical Trials _ Guidelines _ JAMA _ JAMA Network.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1234610,
+      "source_family": "Guidelines for the Content of Statistical Analysis Plans in Clinical Trials",
+      "organization": "JAMA",
+      "year": 2017,
+      "domains": [
+        "statistical_analysis_plan",
+        "prespecification",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-027-causal-inference-what-if",
+      "drive_id": "1dBNZrHqjzKSbv2OKSnBfm_ww2BetT3Do",
+      "file_name": "hernanrobins_WhatIf_2jan25.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 11196295,
+      "source_family": "Causal Inference: What If",
+      "organization": "Hernán & Robins",
+      "year": 2025,
+      "domains": [
+        "causal_inference",
+        "estimands",
+        "confounding",
+        "standardization",
+        "ipw"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-028-impact-evaluation-in-practice-2nd-ed",
+      "drive_id": "1m1KE9a48gMfjn9Hl8KOCS4zfDeiOOnlj",
+      "file_name": "Impact-evaluation-in-practice.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 6406653,
+      "source_family": "Impact Evaluation in Practice, 2nd ed.",
+      "organization": "World Bank",
+      "year": 2016,
+      "domains": [
+        "causal_inference",
+        "impact_evaluation",
+        "quasi_experimental"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-029-longitudinal-and-repeated-measures-analysis-tutorial",
+      "drive_id": "1zjUy70W4ixWVH6WRrxN0B9ksXyQ9V7hT",
+      "file_name": "ane-127-569.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 580069,
+      "source_family": "Longitudinal and repeated-measures analysis tutorial",
+      "organization": "Anesthesia & Analgesia",
+      "year": 2018,
+      "domains": [
+        "longitudinal_data",
+        "repeated_measures",
+        "mixed_models",
+        "gee"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-030-key-considerations-for-cluster-randomized-trials",
+      "drive_id": "1-fmlQ7fYFux5LxUB6F-3Wn8jbkdvgHJ0",
+      "file_name": "dyad064.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 298501,
+      "source_family": "Key considerations for cluster randomized trials",
+      "organization": "International Journal of Epidemiology",
+      "year": 2023,
+      "domains": [
+        "cluster_randomized_trials",
+        "clustering",
+        "sample_size",
+        "analysis"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-031-the-prevention-and-treatment-of-missing-data-in-clinical-trials",
+      "drive_id": "1xShvcl1H_JMi4567mbsHm557QROiMfdt",
+      "file_name": "12955.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1275323,
+      "source_family": "The Prevention and Treatment of Missing Data in Clinical Trials",
+      "organization": "National Academies",
+      "year": 2010,
+      "domains": [
+        "missing_data",
+        "sensitivity_analysis",
+        "clinical_trials"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-032-survival-analysis-tutorial",
+      "drive_id": "11nhbL_3goFzOhY6zKc8jF7Pnpn2cisUy",
+      "file_name": "ane-127-792.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 302624,
+      "source_family": "Survival analysis tutorial",
+      "organization": "Anesthesia & Analgesia",
+      "year": 2018,
+      "domains": [
+        "survival_analysis",
+        "time_to_event",
+        "censoring"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-033-survival-analysis-in-the-presence-of-competing-risks",
+      "drive_id": "1htZa7BIA9foaw3DcHKayJuBo2YWopuAq",
+      "file_name": "ace3_97.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 310805,
+      "source_family": "Survival Analysis in the Presence of Competing Risks",
+      "organization": "Journal of Epidemiology",
+      "year": null,
+      "domains": [
+        "survival_analysis",
+        "competing_risks"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-034-test-performance-metrics",
+      "drive_id": "1WQW2ZFZo7Ai8Q2tCCMTS_hj2XN5Ksh82",
+      "file_name": "Bookshelf_NBK98249.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 133138,
+      "source_family": "Test Performance Metrics",
+      "organization": "NCBI Bookshelf",
+      "year": null,
+      "domains": [
+        "diagnostic_accuracy",
+        "sensitivity",
+        "specificity",
+        "predictive_values"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-035-developing-clinical-prediction-models-a-step-by-step-guide",
+      "drive_id": "1dOoCM3oIIL8zd4KGhxb3n76aqdmCR1ai",
+      "file_name": "bmj-2023-078276.full.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 603414,
+      "source_family": "Developing clinical prediction models: a step-by-step guide",
+      "organization": "BMJ",
+      "year": 2024,
+      "domains": [
+        "prediction_models",
+        "validation",
+        "calibration",
+        "discrimination"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-036-cosmin-manual-v20",
+      "drive_id": "159yLZ85xeNgqd4c9H1DEeutDBbNzT4C9",
+      "file_name": "COSMIN-manual-V2_final.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 6981421,
+      "source_family": "COSMIN Manual v2.0",
+      "organization": "COSMIN / Amsterdam UMC",
+      "year": 2024,
+      "domains": [
+        "psychometrics",
+        "measurement_properties",
+        "reliability",
+        "validity"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-037-best-practices-for-mixed-methods-research-in-the-health-sciences",
+      "drive_id": "1YqDXNrPo_pXCaMKbfFh-2XYoqwoh9h5D",
+      "file_name": "Best_Practices_for_Mixed_Methods_Research.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 299229,
+      "source_family": "Best Practices for Mixed Methods Research in the Health Sciences",
+      "organization": "NIH OBSSR",
+      "year": null,
+      "domains": [
+        "mixed_methods",
+        "qualitative_research",
+        "integration"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-038-strobe-statement",
+      "drive_id": "1-q7v8zl_PIoPkVJ-3nVXdT5GpZtcenyT",
+      "file_name": "STROBE_checklist_v4_combined.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 19869,
+      "source_family": "STROBE Statement",
+      "organization": "STROBE",
+      "year": null,
+      "domains": [
+        "observational_studies",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-039-consort-2025-explanation-and-elaboration",
+      "drive_id": "13tRI7gt2pHT3tV5Ixqn5oMGNv_twJ0HP",
+      "file_name": "bmj-2024-081124.full.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1192000,
+      "source_family": "CONSORT 2025 Explanation and Elaboration",
+      "organization": "BMJ / CONSORT",
+      "year": 2025,
+      "domains": [
+        "randomized_trials",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-040-consort-2025",
+      "drive_id": "1VMWsECy97gNNQS0LWtCz1sgJ0o2U_oPN",
+      "file_name": "CONSORT_2025_expanded_checklist.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 273257,
+      "source_family": "CONSORT 2025",
+      "organization": "CONSORT",
+      "year": 2025,
+      "domains": [
+        "randomized_trials",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-041-consort-2025",
+      "drive_id": "1GgW4B5cHDqYIuSQ5NTxjvHLKQVSI8AhG",
+      "file_name": "CONSORT  2025 editable checklist.docx",
+      "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "size_bytes": 36934,
+      "source_family": "CONSORT 2025",
+      "organization": "CONSORT",
+      "year": 2025,
+      "domains": [
+        "randomized_trials",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-042-tripodai",
+      "drive_id": "1TIU__H7OoKjUadIijh-IjwShpscb1C6d",
+      "file_name": "bmj-2023-078378.full.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 293383,
+      "source_family": "TRIPOD+AI",
+      "organization": "BMJ / TRIPOD",
+      "year": 2024,
+      "domains": [
+        "prediction_models",
+        "machine_learning",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-043-stard-2015",
+      "drive_id": "1Ze2uCtojvevXeFfjFzqk-xlpoW9wkJqg",
+      "file_name": "STARD-2015-checklist.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 303672,
+      "source_family": "STARD 2015",
+      "organization": "STARD",
+      "year": 2015,
+      "domains": [
+        "diagnostic_accuracy",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-044-record-statement",
+      "drive_id": "1nooFF5DqR6bOHjXjDGsxQx-dyZauZaSc",
+      "file_name": "RECORD Checklist.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 40994,
+      "source_family": "RECORD Statement",
+      "organization": "RECORD",
+      "year": null,
+      "domains": [
+        "routinely_collected_data",
+        "observational_studies",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-045-prisma-2020",
+      "drive_id": "1ClIu5ViApycdBzFyeMxUVWlFJawIpdAM",
+      "file_name": "PRISMA_2020_expanded_checklist.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 214730,
+      "source_family": "PRISMA 2020",
+      "organization": "PRISMA",
+      "year": 2020,
+      "domains": [
+        "systematic_reviews",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "low",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-046-penn-state-stat-502-anova-and-design-of-experiments",
+      "drive_id": "1n5_-nJeUEs6O6dAi0tSS5beV-vgcC2Xf",
+      "file_name": "12  Cross-over Repeated Measure Designs – STAT 502 _ Analysis of Variance and Design of Experiments.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 777061,
+      "source_family": "Penn State STAT 502 ANOVA and Design of Experiments",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "anova",
+        "experimental_design",
+        "repeated_measures",
+        "mixed_models"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-047-penn-state-stat-502-anova-and-design-of-experiments",
+      "drive_id": "1TXJ_edtd4iiBgWKlxrOJjz_HdYxdDxsm",
+      "file_name": "11  Introduction to Repeated Measures – STAT 502 _ Analysis of Variance and Design of Experiments.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 693924,
+      "source_family": "Penn State STAT 502 ANOVA and Design of Experiments",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "anova",
+        "experimental_design",
+        "repeated_measures",
+        "mixed_models"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-048-penn-state-stat-502-anova-and-design-of-experiments",
+      "drive_id": "1pNHXI-rL8zJC5lcbBXK3afpAODxz3VzP",
+      "file_name": "10  ANCOVA Part II – STAT 502 _ Analysis of Variance and Design of Experiments.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 818914,
+      "source_family": "Penn State STAT 502 ANOVA and Design of Experiments",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "anova",
+        "experimental_design",
+        "repeated_measures",
+        "mixed_models"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-049-penn-state-stat-502-anova-and-design-of-experiments",
+      "drive_id": "1_T_05lh4ek5BzpwipzPxnCAEjfCKKvS_",
+      "file_name": "9  ANCOVA Part I – STAT 502 _ Analysis of Variance and Design of Experiments.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 893717,
+      "source_family": "Penn State STAT 502 ANOVA and Design of Experiments",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "anova",
+        "experimental_design",
+        "repeated_measures",
+        "mixed_models"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-050-penn-state-stat-502-anova-and-design-of-experiments",
+      "drive_id": "1boINk-_vgJUt7LX7yavHuSeQlBDsM-nv",
+      "file_name": "8  Randomization Design Part II – STAT 502 _ Analysis of Variance and Design of Experiments.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 809484,
+      "source_family": "Penn State STAT 502 ANOVA and Design of Experiments",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "anova",
+        "experimental_design",
+        "repeated_measures",
+        "mixed_models"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-051-penn-state-stat-502-anova-and-design-of-experiments",
+      "drive_id": "1WBMtN9WWbSF26sIIhqehVZt61HDaSSeC",
+      "file_name": "7  Randomization Design Part I – STAT 502 _ Analysis of Variance and Design of Experiments.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 2088139,
+      "source_family": "Penn State STAT 502 ANOVA and Design of Experiments",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "anova",
+        "experimental_design",
+        "repeated_measures",
+        "mixed_models"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-052-penn-state-stat-502-anova-and-design-of-experiments",
+      "drive_id": "1p8QVTEGR1myi332nQrD4FeSzSyHHrw2G",
+      "file_name": "6  Random Effects and Introduction to Mixed Models – STAT 502 _ Analysis of Variance and Design of Experiments.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1131334,
+      "source_family": "Penn State STAT 502 ANOVA and Design of Experiments",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "anova",
+        "experimental_design",
+        "repeated_measures",
+        "mixed_models"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-053-penn-state-stat-502-anova-and-design-of-experiments",
+      "drive_id": "1v1mFSdAfoPV3Wjv6e4QSLeB39190fDpN",
+      "file_name": "5  Multi-Factor ANOVA – STAT 502 _ Analysis of Variance and Design of Experiments.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 2237603,
+      "source_family": "Penn State STAT 502 ANOVA and Design of Experiments",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "anova",
+        "experimental_design",
+        "repeated_measures",
+        "mixed_models"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-054-penn-state-stat-502-anova-and-design-of-experiments",
+      "drive_id": "10y8xsKFPgb8Q_IQhZRgLJhzAPBN1m1gc",
+      "file_name": "4  ANOVA Models Part II – STAT 502 _ Analysis of Variance and Design of Experiments.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1181966,
+      "source_family": "Penn State STAT 502 ANOVA and Design of Experiments",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "anova",
+        "experimental_design",
+        "repeated_measures",
+        "mixed_models"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-055-penn-state-stat-502-anova-and-design-of-experiments",
+      "drive_id": "12m8k9treMBB6Kj-1dLKCN_P27G1N0S-f",
+      "file_name": "3  ANOVA Models Part I – STAT 502 _ Analysis of Variance and Design of Experiments.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 2098840,
+      "source_family": "Penn State STAT 502 ANOVA and Design of Experiments",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "anova",
+        "experimental_design",
+        "repeated_measures",
+        "mixed_models"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-056-penn-state-stat-502-anova-and-design-of-experiments",
+      "drive_id": "1lhZSBsq6eUF1-cKz0o5GI1_iwBL9PStD",
+      "file_name": "2  ANOVA Foundations – STAT 502 _ Analysis of Variance and Design of Experiments.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 2291172,
+      "source_family": "Penn State STAT 502 ANOVA and Design of Experiments",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "anova",
+        "experimental_design",
+        "repeated_measures",
+        "mixed_models"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-057-penn-state-stat-502-anova-and-design-of-experiments",
+      "drive_id": "1iavIZ7ZXaMxNrq7fFkWjMoKTMwmSladE",
+      "file_name": "1  Overview of ANOVA – STAT 502 _ Analysis of Variance and Design of Experiments.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 541266,
+      "source_family": "Penn State STAT 502 ANOVA and Design of Experiments",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "anova",
+        "experimental_design",
+        "repeated_measures",
+        "mixed_models"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
+      "drive_id": "1pE8Sqy5zH1vdtLi9bBO0RxeNEJDfATPq",
+      "file_name": "AnIntroductiontoStatistical.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 19957900,
+      "source_family": "An Introduction to Statistical Methods and Data Analysis, 6th ed.",
+      "organization": "Cengage",
+      "year": 2010,
+      "domains": [
+        "foundational_statistics",
+        "inference",
+        "regression",
+        "anova",
+        "experimental_design"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-059-penn-state-stat-200-elementary-statistics",
+      "drive_id": "11om7I14vA2SZM8u9DeL12J282evzA5jg",
+      "file_name": "0_ Prerequisite Skills – STAT 200 _ Elementary Statistics.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 881810,
+      "source_family": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-060-penn-state-stat-200-elementary-statistics",
+      "drive_id": "1AcIkfkWmYwr1jKciznryhTKTP4Q_uk9H",
+      "file_name": "1  Collecting Data – STAT 200 _ Elementary Statistics.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 735591,
+      "source_family": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-061-penn-state-stat-200-elementary-statistics",
+      "drive_id": "1869lBBqH-SQW2K1rKwTC8i1lPVS735Yp",
+      "file_name": "2  Describing Data, Part 1 – STAT 200 _ Elementary Statistics.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 4657987,
+      "source_family": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-062-penn-state-stat-200-elementary-statistics",
+      "drive_id": "1PTLUkahZZ_xdCC1qTeD5Zym7hLoPAPgR",
+      "file_name": "3  Describing Data, Part 2 – STAT 200 _ Elementary Statistics.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 2717585,
+      "source_family": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-063-penn-state-stat-200-elementary-statistics",
+      "drive_id": "1RVmIa2u5Ldf2borO7CJ-jOcN7_TtDzsd",
+      "file_name": "4  Confidence Intervals – STAT 200 _ Elementary Statistics.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 2847601,
+      "source_family": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-064-penn-state-stat-200-elementary-statistics",
+      "drive_id": "1Ei3GPUzg7AjOYbHZG3dOoo1XNBPqh8FV",
+      "file_name": "5  Hypothesis Testing, Part 1 – STAT 200 _ Elementary Statistics.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1045354,
+      "source_family": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-065-penn-state-stat-200-elementary-statistics",
+      "drive_id": "1yt2-loEP7E40qxAXqy7iWX7jxxZbiE38",
+      "file_name": "6  Hypothesis Testing, Part 2 – STAT 200 _ Elementary Statistics.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1191840,
+      "source_family": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-066-penn-state-stat-200-elementary-statistics",
+      "drive_id": "1P57sWoJk7iRLRj86A_xT9nHaWzjCxakZ",
+      "file_name": "7  Normal Distributions – STAT 200 _ Elementary Statistics.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 4361338,
+      "source_family": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-067-penn-state-stat-200-elementary-statistics",
+      "drive_id": "1Yb_9d7Kp_ACAQHVC05DRdhbTsOYo21c1",
+      "file_name": "8  Inference for One Sample – STAT 200 _ Elementary Statistics.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 2454060,
+      "source_family": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-068-penn-state-stat-200-elementary-statistics",
+      "drive_id": "1gPHjPmjoGh5uLrW-EYSxDIYI20G2VZK-",
+      "file_name": "9  Inference for Two Samples – STAT 200 _ Elementary Statistics.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1140818,
+      "source_family": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-069-penn-state-stat-200-elementary-statistics",
+      "drive_id": "1nqvq8JKVcgxvdmI8SrW-QGeSWtU8bver",
+      "file_name": "10  One-Way ANOVA – STAT 200 _ Elementary Statistics.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 919396,
+      "source_family": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-070-penn-state-stat-200-elementary-statistics",
+      "drive_id": "1aHjz0RZm0kCdzg_nrTuBNZazPPIxA9Jz",
+      "file_name": "11  Chi-Square Tests – STAT 200 _ Elementary Statistics.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1257369,
+      "source_family": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-071-penn-state-stat-200-elementary-statistics",
+      "drive_id": "1lO2hkC43SVk5JzFdiiabtkMg_D8VllRd",
+      "file_name": "12  Correlation & Simple Linear Regression – STAT 200 _ Elementary Statistics.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 2057846,
+      "source_family": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-072-designing-household-survey-samples-practical-guidelines",
+      "drive_id": "1aD3u4GeiPrW10KYehd6LrTmltmaFHWel",
+      "file_name": "Designing_household_survey.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 21191571,
+      "source_family": "Designing Household Survey Samples: Practical Guidelines",
+      "organization": "United Nations Statistics Division",
+      "year": 2008,
+      "domains": [
+        "sampling",
+        "survey_design",
+        "weights",
+        "stratification",
+        "cluster_sampling"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-073-to-explain-or-to-predict",
+      "drive_id": "1E_dJRXrjNzs8wNzN__949aacaIvxHnhY",
+      "file_name": "10-STS330.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 300394,
+      "source_family": "To Explain or to Predict?",
+      "organization": "Statistical Science",
+      "year": 2010,
+      "domains": [
+        "research_questions",
+        "prediction",
+        "explanation"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-074-principles-of-epidemiology-in-public-health-practice-3rd-ed",
+      "drive_id": "1kRFx3VOGg2JDCfOGUo6_tl_vumpdgzNB",
+      "file_name": "cdc_13178_DS1.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 6305461,
+      "source_family": "Principles of Epidemiology in Public Health Practice, 3rd ed.",
+      "organization": "CDC",
+      "year": 2012,
+      "domains": [
+        "epidemiology",
+        "study_design",
+        "descriptive_epidemiology",
+        "analytic_epidemiology"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "provisional",
+      "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-075-correlation-coefficients-appropriate-use-and-interpretation",
+      "drive_id": "1HMQkw-ELpQDB_l4E6uop3sW_cnT95pei",
+      "file_name": "Correlation-coefficients.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 309910,
+      "source_family": "Correlation Coefficients: Appropriate Use and Interpretation",
+      "organization": "Anesthesia & Analgesia",
+      "year": 2018,
+      "domains": [
+        "correlation",
+        "pearson_correlation",
+        "spearman_correlation",
+        "association",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data",
+      "drive_id": "1VApEe0IAN3eZVOpR7zkM9wxQEiwLo1Ai",
+      "file_name": "QUASI-POISSON VS. NEGATIVE BINOMIAL REGRESSION_ HOW SHOULD WE MOD.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 254205,
+      "source_family": "Quasi-Poisson vs. Negative Binomial Regression: How Should We Model Overdispersed Count Data?",
+      "organization": "Ecology / Ecological Society of America",
+      "year": 2007,
+      "domains": [
+        "count_regression",
+        "poisson_regression",
+        "negative_binomial_regression",
+        "overdispersion",
+        "model_selection"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-077-separation-in-logistic-regression-causes-consequences-and-control",
+      "drive_id": "1Gkt7L8BBvyNXjq8izvN7jgfwK176IhOW",
+      "file_name": "kwx299.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 266795,
+      "source_family": "Separation in Logistic Regression: Causes, Consequences, and Control",
+      "organization": "American Journal of Epidemiology",
+      "year": 2018,
+      "domains": [
+        "binary_logistic_regression",
+        "separation",
+        "sparse_data",
+        "small_samples",
+        "penalized_likelihood"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-078-no-rationale-for-one-variable-per-ten-events-logistic-regression",
+      "drive_id": "1u3CNnxzlXiPrqCiUbX_lLgEHjCCMyR3D",
+      "file_name": "12874_2016_Article_267.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1131607,
+      "source_family": "No rationale for 1 variable per 10 events criterion for binary logistic regression analysis",
+      "organization": "BMC Medical Research Methodology",
+      "year": 2016,
+      "domains": [
+        "binary_logistic_regression",
+        "events_per_variable",
+        "small_samples",
+        "separation",
+        "firth_correction"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-079-nist-two-sample-t-test-for-equal-means",
+      "drive_id": "1ot9kffY8YjvlsnXydVB0lboDYJ_K2WYq",
+      "file_name": "1.3.5.3. Two-Sample _i_t__i_-Test for Equal Means.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 287081,
+      "source_family": "NIST/SEMATECH e-Handbook of Statistical Methods",
+      "organization": "NIST",
+      "year": null,
+      "domains": [
+        "two_sample_t_test",
+        "welch_t_test",
+        "mean_comparison"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-080-divine-wilcoxon-mann-whitney-fails-test-medians",
+      "drive_id": "1Q7OOfzhSWBo_dUgZsfwFOApGBuebF3Gn",
+      "file_name": "The Wilcoxon Mann Whitney Procedure Fails as a Test of Medians.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1265954,
+      "source_family": "The Wilcoxon–Mann–Whitney Procedure Fails as a Test of Medians",
+      "organization": "The American Statistician",
+      "year": 2018,
+      "domains": [
+        "mann_whitney",
+        "wilcoxon_rank_sum",
+        "nonparametric_methods",
+        "probability_of_superiority"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-081-nhanes-sample-design-module",
+      "drive_id": "1bb6tYjSXMXDhiXigdVZ25cbGNV8YrBWH",
+      "file_name": "NHANES Tutorials - Sample Design Module.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 237726,
+      "source_family": "CDC/NCHS NHANES Tutorials",
+      "organization": "CDC / National Center for Health Statistics",
+      "year": null,
+      "domains": [
+        "complex_survey",
+        "multistage_sampling",
+        "pps",
+        "stratification",
+        "psu"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-082-nhanes-weighting-module",
+      "drive_id": "1zgmdc3R3icvUsHO0fV71QaZZOhHD0MXB",
+      "file_name": "NHANES Tutorials - Weighting Module.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 663499,
+      "source_family": "CDC/NCHS NHANES Tutorials",
+      "organization": "CDC / National Center for Health Statistics",
+      "year": null,
+      "domains": [
+        "complex_survey",
+        "survey_weights",
+        "nonresponse_adjustment",
+        "poststratification"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-083-nhanes-variance-estimation-module",
+      "drive_id": "1SSNhC0RLKThSabRu4WXbhjTqenXk6-ee",
+      "file_name": "NHANES Tutorials - Variance Estimation Module.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 473678,
+      "source_family": "CDC/NCHS NHANES Tutorials",
+      "organization": "CDC / National Center for Health Statistics",
+      "year": null,
+      "domains": [
+        "complex_survey",
+        "variance_estimation",
+        "clustering",
+        "stratification",
+        "domain_analysis",
+        "finite_population_correction"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-084-sterne-multiple-imputation-potential-and-pitfalls",
+      "drive_id": "1QnEVWfgUMoH2Zw6egcDqMqvwpO7t88dI",
+      "file_name": "Multiple imputation for missing data in epidemiological and clinical research_ potential and pitfalls _ The BMJ.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 717275,
+      "source_family": "Multiple imputation for missing data in epidemiological and clinical research: potential and pitfalls",
+      "organization": "BMJ",
+      "year": 2009,
+      "domains": [
+        "missing_data",
+        "multiple_imputation",
+        "mcar_mar_mnar",
+        "sensitivity_analysis"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-085-resche-rigon-white-multilevel-mice",
+      "drive_id": "1xci-abxj8Ms9BQIBkFC02dFYjuWye85J",
+      "file_name": "multiple-imputation-by-chained-equations-for-systematically-ygzclny7dt.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 364807,
+      "source_family": "Multiple imputation by chained equations for systematically and sporadically missing multilevel data",
+      "organization": "Statistical Methods in Medical Research",
+      "year": 2018,
+      "domains": [
+        "missing_data",
+        "multiple_imputation",
+        "mice",
+        "multilevel_data",
+        "clustered_data"
+      ],
+      "authority_tier": "A",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-086-royston-white-mice-implementation-stata",
+      "drive_id": "1Tb-fLETRassQtWBnfTuf_pWxNLCgJ-07",
+      "file_name": "Multiple_Imputation_by_Chained_Equations_MICE_Impl.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 663634,
+      "source_family": "Multiple Imputation by Chained Equations (MICE): Implementation in Stata",
+      "organization": "Journal of Statistical Software",
+      "year": 2011,
+      "domains": [
+        "missing_data",
+        "multiple_imputation",
+        "mice",
+        "imputation_models",
+        "diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-087-resche-rigon-white-multilevel-mice-duplicate",
+      "drive_id": "18khNToED5s6rLEjx74CwzvbXY7v3Kc6-",
+      "file_name": "emss-71930.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 419201,
+      "source_family": "Multiple imputation by chained equations for systematically and sporadically missing multilevel data",
+      "organization": "Statistical Methods in Medical Research",
+      "year": 2018,
+      "domains": [
+        "missing_data",
+        "multiple_imputation",
+        "mice",
+        "multilevel_data",
+        "clustered_data"
+      ],
+      "authority_tier": "A",
+      "role": "supporting",
+      "priority": "low",
+      "metadata_status": "verified",
+      "extraction_status": "duplicate_no_extraction",
+      "duplicate_of": "src-085-resche-rigon-white-multilevel-mice"
+    }
+  ]
+}
