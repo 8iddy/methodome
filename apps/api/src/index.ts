@@ -2178,6 +2178,115 @@ app.get("/projects/:projectId/analysis-plan", async (c) => {
   });
 });
 
+const updatePlanMethodsSchema = z.object({
+  methodSelections: z.array(
+    z.object({
+      analysisId: z.string().min(1),
+      methodId: z.string().min(1)
+    })
+  ).min(1)
+});
+
+app.patch("/projects/:projectId/analysis-plan/:planId", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const parsed = updatePlanMethodsSchema.safeParse(
+    await c.req.json().catch(() => null)
+  );
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_ANALYSIS_PLAN_UPDATE",
+          message: "Analysis plan method selections are invalid.",
+          details: parsed.error.flatten()
+        }
+      },
+      400
+    );
+  }
+
+  const plan = await getAnalysisPlanById(
+    c.env.DB,
+    projectId,
+    c.req.param("planId")
+  );
+  if (!plan) {
+    return c.json(
+      {
+        error: {
+          code: "ANALYSIS_PLAN_NOT_FOUND",
+          message: "Analysis plan was not found."
+        }
+      },
+      404
+    );
+  }
+  if (plan.lockedAt || plan.lockHash) {
+    return c.json(
+      {
+        error: {
+          code: "ANALYSIS_PLAN_ALREADY_LOCKED",
+          message: "A locked analysis plan cannot be changed."
+        }
+      },
+      409
+    );
+  }
+
+  for (const selection of parsed.data.methodSelections) {
+    const definition = methodRegistry[selection.methodId];
+    if (!definition || !definition.executable) {
+      return c.json(
+        {
+          error: {
+            code: "ANALYSIS_PLAN_METHOD_NOT_EXECUTABLE",
+            message:
+              "Every selected method must be an executable Methodome method.",
+            details: selection
+          }
+        },
+        409
+      );
+    }
+  }
+
+  let updated: AnalysisPlan;
+  try {
+    updated = updateAnalysisMethodSelections(
+      plan,
+      parsed.data.methodSelections
+    );
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: "ANALYSIS_PLAN_METHOD_OUTSIDE_CANDIDATES",
+          message:
+            error instanceof Error
+              ? error.message
+              : "A selected method is outside the candidate set."
+        }
+      },
+      409
+    );
+  }
+
+  await updateStoredAnalysisPlan(c.env.DB, updated);
+  await addAudit(c, {
+    projectId,
+    action: "analysis_plan_methods_selected",
+    objectType: "analysis_plan",
+    objectId: updated.id,
+    before: plan,
+    after: updated
+  });
+
+  return c.json({ plan: updated });
+});
+
 app.post("/projects/:projectId/analysis-plan", async (c) => {
   const projectId = c.req.param("projectId");
   const access = await requireProject(c, projectId);
@@ -2393,7 +2502,23 @@ app.post("/projects/:projectId/analysis-plan/:planId/lock", async (c) => {
     );
   }
 
-  const locked = await lockAnalysisPlan(plan, new Date().toISOString());
+  let locked: AnalysisPlan;
+  try {
+    locked = await lockAnalysisPlan(plan, new Date().toISOString());
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: "ANALYSIS_PLAN_NOT_READY_TO_LOCK",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Resolve all analysis-plan decisions before locking."
+        }
+      },
+      409
+    );
+  }
   await updateStoredAnalysisPlan(c.env.DB, locked);
   await addAudit(c, {
     projectId,
