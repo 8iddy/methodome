@@ -22,6 +22,7 @@ import { assertModelRequestAllowed, type ProjectProcessingPolicy } from "@method
 import { compareDatasetSchemas } from "@methodome/schema-harmonisation";
 import {
   assessProjectReadiness,
+  buildOrchestratorView,
   type WorkflowSection
 } from "@methodome/workflow-engine";
 import { requireAuth } from "./auth";
@@ -399,6 +400,96 @@ async function resolveStudySpecificationForMethods(
   }
 
   return { specification: resolved, datasetVersionId: preferred.id };
+}
+
+async function computeProjectReadiness(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  currentSection?: WorkflowSection
+) {
+  const [
+    files,
+    datasets,
+    specification,
+    mappings,
+    plan,
+    history,
+    extraction
+  ] = await Promise.all([
+    listProjectFiles(c.env.DB, projectId),
+    listDatasetVersions(c.env.DB, projectId),
+    getStudySpecification(c.env.DB, projectId),
+    listVariableMappings(c.env.DB, projectId),
+    getLatestAnalysisPlan(c.env.DB, projectId),
+    listAnalysisHistory(c.env.DB, getUserId(c)),
+    getLatestProtocolExtraction(c.env.DB, projectId)
+  ]);
+
+  let selections: ReturnType<typeof selectCandidateMethods>[] = [];
+  let resolvedDatasetVersionId: string | undefined;
+  let resolvedSpecification = specification;
+
+  if (specification) {
+    const resolved = await resolveStudySpecificationForMethods(
+      c,
+      projectId,
+      specification
+    );
+    resolvedDatasetVersionId = resolved.datasetVersionId;
+    resolvedSpecification = resolved.specification;
+    selections = resolved.specification.researchQuestions.map((question) =>
+      selectCandidateMethods(resolved.specification, question.id)
+    );
+  }
+
+  const projectHistory = history.filter((item) => item.projectId === projectId);
+  const completedAnalysisCount = Math.min(
+    plan?.analyses.length ?? 0,
+    projectHistory.filter((item) => item.state === "complete").length
+  );
+
+  const readiness = assessProjectReadiness(
+    {
+      hasProtocol: files.some((file) => file.fileKind === "protocol"),
+      hasProtocolExtraction: Boolean(extraction),
+      transcriptCount: files.filter((file) => file.fileKind === "transcript").length,
+      datasetCount: datasets.length,
+      hasDerivedDataset: datasets.some((dataset) => dataset.sourceKind === "derived"),
+      specification,
+      mappings: mappings.map((mapping) => ({
+        researchConcept: mapping.researchConcept,
+        ...(mapping.datasetVariable
+          ? { datasetVariable: mapping.datasetVariable }
+          : {}),
+        mappingStatus: mapping.mappingStatus as
+          | "direct_match"
+          | "probable_match"
+          | "uncertain"
+          | "no_match",
+        ...(mapping.confirmedBy ? { confirmedBy: mapping.confirmedBy } : {})
+      })),
+      selections,
+      plan,
+      completedAnalysisCount
+    },
+    currentSection
+  );
+
+  return {
+    readiness,
+    files,
+    datasets,
+    specification,
+    resolvedSpecification,
+    mappings,
+    plan,
+    history: projectHistory,
+    extraction,
+    selections,
+    ...(resolvedDatasetVersionId
+      ? { resolvedDatasetVersionId }
+      : {})
+  };
 }
 
 const createProjectSchema = z.object({
@@ -1340,39 +1431,6 @@ app.get("/projects/:projectId/readiness", async (c) => {
   const access = await requireProject(c, projectId);
   if ("response" in access) return access.response;
 
-  const [
-    files,
-    datasets,
-    specification,
-    mappings,
-    plan,
-    history,
-    extraction
-  ] = await Promise.all([
-    listProjectFiles(c.env.DB, projectId),
-    listDatasetVersions(c.env.DB, projectId),
-    getStudySpecification(c.env.DB, projectId),
-    listVariableMappings(c.env.DB, projectId),
-    getLatestAnalysisPlan(c.env.DB, projectId),
-    listAnalysisHistory(c.env.DB, getUserId(c)),
-    getLatestProtocolExtraction(c.env.DB, projectId)
-  ]);
-
-  let selections: ReturnType<typeof selectCandidateMethods>[] = [];
-  let resolvedDatasetVersionId: string | undefined;
-
-  if (specification) {
-    const resolved = await resolveStudySpecificationForMethods(
-      c,
-      projectId,
-      specification
-    );
-    resolvedDatasetVersionId = resolved.datasetVersionId;
-    selections = resolved.specification.researchQuestions.map((question) =>
-      selectCandidateMethods(resolved.specification, question.id)
-    );
-  }
-
   const validSections = new Set<WorkflowSection>([
     "overview",
     "protocol",
@@ -1394,44 +1452,13 @@ app.get("/projects/:projectId/readiness", async (c) => {
       ? (requestedSection as WorkflowSection)
       : undefined;
 
-  const projectHistory = history.filter((item) => item.projectId === projectId);
-  const completedAnalysisCount = Math.min(
-    plan?.analyses.length ?? 0,
-    projectHistory.filter((item) => item.state === "complete").length
-  );
-
-  const readiness = assessProjectReadiness(
-    {
-      hasProtocol: files.some((file) => file.fileKind === "protocol"),
-      hasProtocolExtraction: Boolean(extraction),
-      transcriptCount: files.filter((file) => file.fileKind === "transcript").length,
-      datasetCount: datasets.length,
-      hasDerivedDataset: datasets.some((dataset) => dataset.sourceKind === "derived"),
-      specification,
-      mappings: mappings.map((mapping) => ({
-        researchConcept: mapping.researchConcept,
-        ...(mapping.datasetVariable
-          ? { datasetVariable: mapping.datasetVariable }
-          : {}),
-        mappingStatus: mapping.mappingStatus as
-          | "direct_match"
-          | "probable_match"
-          | "uncertain"
-          | "no_match",
-        ...(mapping.confirmedBy ? { confirmedBy: mapping.confirmedBy } : {})
-      })),
-      selections,
-      plan,
-      completedAnalysisCount
-    },
-    currentSection
-  );
+  const state = await computeProjectReadiness(c, projectId, currentSection);
 
   return c.json({
-    readiness,
+    readiness: state.readiness,
     registryVersion,
-    ...(resolvedDatasetVersionId
-      ? { datasetVersionId: resolvedDatasetVersionId }
+    ...(state.resolvedDatasetVersionId
+      ? { datasetVersionId: state.resolvedDatasetVersionId }
       : {})
   });
 });
