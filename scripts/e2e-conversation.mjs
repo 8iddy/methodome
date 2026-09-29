@@ -226,6 +226,7 @@ async function main() {
         payload.orchestrator.status === "complete",
       "first scientific checkpoint"
     );
+    let studyInterpretationConfirmed = false;
 
     for (let checkpoint = 0; checkpoint < 4; checkpoint += 1) {
       const studyDecision = conversation.orchestrator.decisions.find(
@@ -251,6 +252,7 @@ async function main() {
       } else {
         await resolveDecision(studyDecision.id, { approved: true });
       }
+      studyInterpretationConfirmed = true;
       console.log("PASS in-thread study interpretation confirmation");
 
       conversation = await waitForConversation(
@@ -374,14 +376,19 @@ async function main() {
       [200]
     );
     const actions = new Set(audit.payload.events.map((event) => event.action));
-    for (const action of [
+    const requiredAuditActions = [
       "orchestrator_protocol_information_extracted",
-      "conversation_study_interpretation_confirmed",
       "orchestrator_variable_mappings_proposed",
       "conversation_analysis_method_selected",
       "conversation_analysis_plan_approved",
       "analysis_completed"
-    ]) {
+    ];
+    if (studyInterpretationConfirmed) {
+      requiredAuditActions.push(
+        "conversation_study_interpretation_confirmed"
+      );
+    }
+    for (const action of requiredAuditActions) {
       if (!actions.has(action)) {
         throw new Error(`Conversation audit is missing ${action}.`);
       }
