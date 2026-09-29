@@ -1,6 +1,6 @@
 {
   "rule_set_id": "methodome-logistic-safeguards-v0.1",
-  "status": "draft",
+  "status": "supported",
   "rules": [
     {
       "rule_id": "logistic-separation-001",
@@ -35,7 +35,7 @@
           "page": "864-870"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "logistic-sparse-events-001",
@@ -77,7 +77,7 @@
           "page": "864-865"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     }
   ]
 }
