@@ -1,6 +1,6 @@
 {
   "rule_set_id": "methodome-survey-missing-data-v0.1",
-  "status": "draft",
+  "status": "supported",
   "rules": [
     {
       "rule_id": "survey-weight-001",
@@ -42,7 +42,7 @@
           "page": "1 onward"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "survey-variance-001",
@@ -76,7 +76,7 @@
           "page": "1 onward"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "survey-domain-001",
@@ -109,7 +109,7 @@
           "page": "3 onward"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "missing-mechanism-001",
@@ -141,7 +141,7 @@
           "page": "1-4"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "missing-ad-hoc-imputation-001",
@@ -172,7 +172,7 @@
           "page": "2-4"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "multiple-imputation-model-001",
@@ -220,7 +220,7 @@
           "page": "2-18"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "multilevel-imputation-001",
@@ -254,7 +254,7 @@
           "page": "1-3"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     }
   ]
 }
