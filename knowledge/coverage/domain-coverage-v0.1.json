@@ -1,0 +1,163 @@
+{
+  "coverage_id": "methodome-methodology-coverage-v0.1",
+  "updated_date": "2026-09-29",
+  "statuses": {
+    "registered": "Relevant source family is present in the corpus.",
+    "extracted": "Source-grounded evidence has been extracted.",
+    "ruled": "At least one operational Methodome rule exists.",
+    "gap": "Source support is insufficient for a defensible rule.",
+    "deferred": "Intentionally outside the first knowledge release."
+  },
+  "domains": [
+    {
+      "domain": "research_question_intent",
+      "status": "ruled",
+      "notes": "Description, association/explanation, prediction and causal distinctions represented; diagnostic/prognostic need deeper domain rules."
+    },
+    {
+      "domain": "study_design",
+      "status": "ruled",
+      "notes": "Cross-sectional/cohort/case-control recognition plus mixed-method separation."
+    },
+    {
+      "domain": "sampling_and_survey_design",
+      "status": "ruled",
+      "notes": "Strata, PSU/cluster, multistage, weights and finite-population correction represented."
+    },
+    {
+      "domain": "variable_types",
+      "status": "ruled",
+      "notes": "Categorical versus quantitative minimum represented; ordinal/count/time-to-event refinements continue."
+    },
+    {
+      "domain": "descriptive_analysis",
+      "status": "extracted",
+      "notes": "Foundational sources registered and partially extracted; variable-type-specific summaries still need rule expansion."
+    },
+    {
+      "domain": "two_group_mean_comparisons",
+      "status": "registered",
+      "notes": "Independent and paired inference sources present; formal t-test rules not yet encoded."
+    },
+    {
+      "domain": "anova",
+      "status": "ruled",
+      "notes": "One-way ANOVA and Kruskal-Wallis draft rules added."
+    },
+    {
+      "domain": "chi_square",
+      "status": "ruled",
+      "notes": "Expected-count checks represented."
+    },
+    {
+      "domain": "fisher_exact",
+      "status": "ruled",
+      "notes": "NIST and STAT 200 provide direct small-sample support."
+    },
+    {
+      "domain": "pearson_correlation",
+      "status": "ruled",
+      "notes": "Linear quantitative association rule and diagnostics represented."
+    },
+    {
+      "domain": "spearman_correlation",
+      "status": "gap",
+      "notes": "Corpus mentions Spearman but current extraction does not yet support a general ordinal/monotonic decision rule."
+    },
+    {
+      "domain": "linear_regression",
+      "status": "ruled",
+      "notes": "LINE assumptions, residual diagnostics and multicollinearity represented."
+    },
+    {
+      "domain": "binary_logistic_regression",
+      "status": "ruled",
+      "notes": "Binary-response eligibility represented; separation/sparse-data rule needs stronger direct source extraction."
+    },
+    {
+      "domain": "multinomial_ordinal_logistic",
+      "status": "registered",
+      "notes": "Categorical-analysis source family present but not yet extracted into rules."
+    },
+    {
+      "domain": "poisson_negative_binomial",
+      "status": "registered",
+      "notes": "Categorical/count modelling source family present but not yet extracted into rules."
+    },
+    {
+      "domain": "repeated_measures_longitudinal",
+      "status": "ruled",
+      "notes": "Correlation-aware analysis and GEE versus mixed-model interpretation represented."
+    },
+    {
+      "domain": "clustered_data",
+      "status": "ruled",
+      "notes": "Clustering gate represented; small-cluster corrections and model-specific rules still need expansion."
+    },
+    {
+      "domain": "missing_data",
+      "status": "ruled",
+      "notes": "No automatic complete-case default and sensitivity-analysis gate represented."
+    },
+    {
+      "domain": "causal_inference",
+      "status": "ruled",
+      "notes": "Identification gate and difference-in-differences rule represented; IV, RDD, matching and IPW need method-specific rules."
+    },
+    {
+      "domain": "survival_time_to_event",
+      "status": "ruled",
+      "notes": "Censoring recognition and survival-method routing represented; competing-risk rule remains to be extracted."
+    },
+    {
+      "domain": "diagnostic_accuracy",
+      "status": "registered",
+      "notes": "Diagnostic-performance source present; rule extraction pending."
+    },
+    {
+      "domain": "prediction_prognosis",
+      "status": "ruled",
+      "notes": "Prediction/explanation distinction plus calibration, discrimination and overfitting represented; prognostic-specific workflow needs expansion."
+    },
+    {
+      "domain": "psychometrics",
+      "status": "registered",
+      "notes": "COSMIN source registered; reliability/validity/factor-analysis rules pending."
+    },
+    {
+      "domain": "qualitative_analysis",
+      "status": "registered",
+      "notes": "Mixed-methods source describes qualitative evidence but dedicated coding/thematic-analysis guidance is not yet sufficient."
+    },
+    {
+      "domain": "mixed_methods",
+      "status": "ruled",
+      "notes": "Convergent and sequential integration designs represented without forcing qualitative questions into statistics."
+    },
+    {
+      "domain": "statistical_analysis_plans",
+      "status": "ruled",
+      "notes": "Prespecification and SAP component rules represented."
+    },
+    {
+      "domain": "model_diagnostics",
+      "status": "ruled",
+      "notes": "Linear regression and multicollinearity diagnostics represented; method-specific diagnostic catalogue continues."
+    },
+    {
+      "domain": "reporting_standards",
+      "status": "registered",
+      "notes": "STROBE, CONSORT, RECORD, STARD, TRIPOD+AI and PRISMA are registered for later reporting-layer translation."
+    },
+    {
+      "domain": "bayesian_methods",
+      "status": "deferred",
+      "notes": "Not part of the first executable knowledge release."
+    },
+    {
+      "domain": "sem_psychometric_models",
+      "status": "deferred",
+      "notes": "Not part of the first executable knowledge release."
+    }
+  ]
+}
