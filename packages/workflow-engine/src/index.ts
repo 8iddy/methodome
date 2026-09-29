@@ -415,7 +415,7 @@ function mappingSummary(
     const mapping = byConcept.get(conceptKey);
     const safelyResolved =
       Boolean(mapping?.confirmedBy) ||
-      Boolean(mapping?.mappingStatus === "direct_match" && mapping.datasetVariable);
+      Boolean(mapping?.mappingStatus === "direct_match" && mapping?.datasetVariable);
     if (!safelyResolved) {
       unreviewedCount += 1;
       continue;
