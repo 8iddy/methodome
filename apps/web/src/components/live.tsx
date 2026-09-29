@@ -235,7 +235,7 @@ export function LiveAuthPage({ signup }: { signup: boolean }) {
               placeholder="000000"
             />
           </label>
-          <Button type="submit">{busy ? "Verifying…" : "Verify email"}</Button>
+          <Button type="submit" loading={busy} loadingLabel="Verifying…">Verify email</Button>
           <Button variant="quiet" onClick={() => void resend()}>
             Send another code
           </Button>
@@ -289,7 +289,13 @@ export function LiveAuthPage({ signup }: { signup: boolean }) {
             />
           )}
 
-          <Button type="submit">{busy ? "Working…" : signup ? "Create account" : "Sign in"}</Button>
+          <Button
+            type="submit"
+            loading={busy}
+            loadingLabel={signup ? "Creating account…" : "Signing in…"}
+          >
+            {signup ? "Create account" : "Sign in"}
+          </Button>
           {notice && <p className="confirmation" role="status">{notice}</p>}
           {error && <p className="confirmation" role="alert">{error}</p>}
           <p className="muted">
@@ -419,7 +425,7 @@ export function LiveNewProjectPage() {
             <option value="mixed_methods">Mixed methods</option>
           </select>
         </label>
-        <Button type="submit">{busy ? "Creating…" : "Create project"}</Button>
+        <Button type="submit" loading={busy} loadingLabel="Creating project…">Create project</Button>
         {error && <p className="confirmation" role="alert">{error}</p>}
       </form>
     </main>
@@ -2066,7 +2072,7 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
       </label>
 
       <div className="action-row">
-        <Button onClick={() => void save()}>{busy ? "Saving…" : "Confirm study specification"}</Button>
+        <Button onClick={() => void save()} loading={busy} loadingLabel="Saving study design…">Confirm study specification</Button>
         {source === "saved" && (
           <Button href={`/app/projects/${projectId}/variables`} variant="secondary">
             Continue to variable mapping
