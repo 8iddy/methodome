@@ -20,7 +20,8 @@ export default defineConfig({
       "@methodome/data-pipeline": root + "packages/data-pipeline/src/index.ts",
       "@methodome/benchmark": root + "packages/benchmark/src/index.ts",
       "@methodome/analysis-plan": root + "packages/analysis-plan/src/index.ts",
-      "@methodome/schema-harmonisation": root + "packages/schema-harmonisation/src/index.ts"
+      "@methodome/schema-harmonisation": root + "packages/schema-harmonisation/src/index.ts",
+      "@methodome/workflow-engine": root + "packages/workflow-engine/src/index.ts"
     }
   }
 });

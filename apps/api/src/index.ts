@@ -20,6 +20,10 @@ import {
 import type { Project } from "@methodome/domain";
 import { assertModelRequestAllowed, type ProjectProcessingPolicy } from "@methodome/policy-engine";
 import { compareDatasetSchemas } from "@methodome/schema-harmonisation";
+import {
+  assessProjectReadiness,
+  type WorkflowSection
+} from "@methodome/workflow-engine";
 import { requireAuth } from "./auth";
 import { consumeAnalysisQueue } from "./analysis-worker";
 import { createAuth, emailVerificationEnabled } from "./better-auth";
@@ -1329,6 +1333,107 @@ app.put("/projects/:projectId/study-specification", async (c) => {
   });
 
   return c.json({ specification });
+});
+
+app.get("/projects/:projectId/readiness", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const [
+    files,
+    datasets,
+    specification,
+    mappings,
+    plan,
+    history,
+    extraction
+  ] = await Promise.all([
+    listProjectFiles(c.env.DB, projectId),
+    listDatasetVersions(c.env.DB, projectId),
+    getStudySpecification(c.env.DB, projectId),
+    listVariableMappings(c.env.DB, projectId),
+    getLatestAnalysisPlan(c.env.DB, projectId),
+    listAnalysisHistory(c.env.DB, getUserId(c)),
+    getLatestProtocolExtraction(c.env.DB, projectId)
+  ]);
+
+  let selections: ReturnType<typeof selectCandidateMethods>[] = [];
+  let resolvedDatasetVersionId: string | undefined;
+
+  if (specification) {
+    const resolved = await resolveStudySpecificationForMethods(
+      c,
+      projectId,
+      specification
+    );
+    resolvedDatasetVersionId = resolved.datasetVersionId;
+    selections = resolved.specification.researchQuestions.map((question) =>
+      selectCandidateMethods(resolved.specification, question.id)
+    );
+  }
+
+  const validSections = new Set<WorkflowSection>([
+    "overview",
+    "protocol",
+    "instruments",
+    "data",
+    "data-preparation",
+    "study-design",
+    "variables",
+    "analysis-plan",
+    "analysis",
+    "results",
+    "reports",
+    "audit-trail",
+    "settings"
+  ]);
+  const requestedSection = c.req.query("section");
+  const currentSection =
+    requestedSection && validSections.has(requestedSection as WorkflowSection)
+      ? (requestedSection as WorkflowSection)
+      : undefined;
+
+  const projectHistory = history.filter((item) => item.projectId === projectId);
+  const completedAnalysisCount = Math.min(
+    plan?.analyses.length ?? 0,
+    projectHistory.filter((item) => item.state === "complete").length
+  );
+
+  const readiness = assessProjectReadiness(
+    {
+      hasProtocol: files.some((file) => file.fileKind === "protocol"),
+      hasProtocolExtraction: Boolean(extraction),
+      transcriptCount: files.filter((file) => file.fileKind === "transcript").length,
+      datasetCount: datasets.length,
+      hasDerivedDataset: datasets.some((dataset) => dataset.sourceKind === "derived"),
+      specification,
+      mappings: mappings.map((mapping) => ({
+        researchConcept: mapping.researchConcept,
+        ...(mapping.datasetVariable
+          ? { datasetVariable: mapping.datasetVariable }
+          : {}),
+        mappingStatus: mapping.mappingStatus as
+          | "direct_match"
+          | "probable_match"
+          | "uncertain"
+          | "no_match",
+        ...(mapping.confirmedBy ? { confirmedBy: mapping.confirmedBy } : {})
+      })),
+      selections,
+      plan,
+      completedAnalysisCount
+    },
+    currentSection
+  );
+
+  return c.json({
+    readiness,
+    registryVersion,
+    ...(resolvedDatasetVersionId
+      ? { datasetVersionId: resolvedDatasetVersionId }
+      : {})
+  });
 });
 
 app.get("/projects/:projectId/method-candidates", async (c) => {
