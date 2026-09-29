@@ -4,6 +4,7 @@ import type { CandidateSelection } from "@methodome/method-registry";
 import type { StudySpecification } from "@methodome/study-spec";
 import {
   assessProjectReadiness,
+  buildOrchestratorView,
   type ProjectWorkflowSnapshot,
   type VariableMappingSnapshot
 } from "@methodome/workflow-engine";
@@ -292,5 +293,115 @@ describe("project readiness", () => {
     expect(readiness.stages.mappings).toBe("ready");
     expect(readiness.questions[0]?.status).toBe("method_blocked");
     expect(readiness.questions[0]?.blockers[0]?.code).toBe("method_blocked");
+  });
+});
+
+
+describe("project orchestrator view", () => {
+  it("automatically advances a fully ready quantitative project to draft planning", () => {
+    const readiness = assessProjectReadiness(snapshot());
+    const orchestrator = buildOrchestratorView(readiness, null);
+
+    expect(orchestrator.status).toBe("ready_to_execute");
+    expect(orchestrator.automaticAction).toBe("create_draft_plan");
+    expect(orchestrator.decisions).toHaveLength(0);
+  });
+
+  it("surfaces method choice as a researcher decision instead of guessing", () => {
+    const draft: AnalysisPlan = {
+      id: "plan-draft",
+      projectId: "project-1",
+      versionId: "v1",
+      datasetVersionId: "dataset-1",
+      studySpecificationVersion: "1.0",
+      status: "planned_before_analysis",
+      analyses: [
+        {
+          id: "analysis-choice",
+          researchQuestionId: "rq1",
+          outcome: "stockout_days",
+          predictors: ["data_use_score"],
+          covariates: [],
+          candidateMethodIds: [
+            "pearson_correlation",
+            "spearman_correlation"
+          ],
+          requiredDecisions: ["Choose association estimand."],
+          warnings: [],
+          diagnostics: ["relationship form"],
+          addedAfterLock: false
+        }
+      ],
+      createdBy: "user-1",
+      createdAt: "2026-09-29T00:00:00.000Z"
+    };
+    const readiness = assessProjectReadiness(
+      snapshot({ plan: draft })
+    );
+    const orchestrator = buildOrchestratorView(readiness, draft);
+
+    expect(orchestrator.status).toBe("waiting_for_researcher");
+    expect(
+      orchestrator.decisions.some(
+        (decision) =>
+          decision.kind === "select_method" &&
+          decision.analysisId === "analysis-choice"
+      )
+    ).toBe(true);
+    expect(orchestrator.automaticAction).toBeUndefined();
+  });
+
+  it("requires researcher approval before locking a fully specified draft plan", () => {
+    const locked = lockedPlan();
+    const { lockedAt: _lockedAt, lockHash: _lockHash, ...draft } = locked;
+    const readiness = assessProjectReadiness(
+      snapshot({ plan: draft })
+    );
+    const orchestrator = buildOrchestratorView(readiness, draft);
+
+    expect(orchestrator.status).toBe("waiting_for_researcher");
+    expect(
+      orchestrator.decisions.some(
+        (decision) => decision.kind === "approve_plan"
+      )
+    ).toBe(true);
+  });
+
+  it("automatically queues execution only after the plan is locked", () => {
+    const plan = lockedPlan();
+    const readiness = assessProjectReadiness(
+      snapshot({ plan, completedAnalysisCount: 0 })
+    );
+    const orchestrator = buildOrchestratorView(readiness, plan);
+
+    expect(orchestrator.status).toBe("ready_to_execute");
+    expect(orchestrator.automaticAction).toBe("run_analyses");
+  });
+
+  it("routes qualitative-only work to the qualitative branch rather than quantitative planning", () => {
+    const qualitative = specification("qualitative");
+    qualitative.researchQuestions[0]!.outcomes = [
+      {
+        concept: "implementation experience",
+        datasetVariable: null,
+        variableType: "text",
+        mappingStatus: null
+      }
+    ];
+
+    const readiness = assessProjectReadiness(
+      snapshot({
+        specification: qualitative,
+        mappings: [],
+        selections: [selection(false, "Qualitative branch.")],
+        transcriptCount: 2,
+        datasetCount: 0
+      })
+    );
+    const orchestrator = buildOrchestratorView(readiness, null);
+
+    expect(readiness.nextAction.code).toBe("prepare_qualitative_analysis");
+    expect(orchestrator.status).toBe("blocked");
+    expect(orchestrator.automaticAction).toBeUndefined();
   });
 });
