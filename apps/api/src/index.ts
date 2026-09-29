@@ -2449,7 +2449,9 @@ async function runConversationOrchestrator(
           ...(decision.options ? { options: decision.options } : {}),
           context: {
             questionId: decision.questionId ?? null,
-            analysisId: decision.analysisId ?? null
+            analysisId: decision.analysisId ?? null,
+            concept: decision.concept ?? null,
+            role: decision.role ?? null
           }
         })),
         now: new Date().toISOString()
@@ -2586,6 +2588,519 @@ app.post("/projects/:projectId/conversation/messages", async (c) => {
   }
   return c.json({ messageId, runId: queued ? runId : null, queued }, 202);
 });
+
+const conversationDecisionResponseSchema = z.object({
+  choiceId: z.string().trim().min(1).optional(),
+  datasetVariable: z.string().trim().min(1).optional(),
+  confirmNotRepresented: z.boolean().optional(),
+  approved: z.boolean().optional()
+});
+
+async function queueConversationContinuation(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  triggerMessageId?: string
+) {
+  await completeWaitingOrchestrationRuns(
+    c.env.DB,
+    projectId,
+    "researcher_response_received"
+  );
+  const now = new Date().toISOString();
+  const runId = makeId("run");
+  const queued = await createOrchestrationRun(c.env.DB, {
+    id: runId,
+    projectId,
+    ...(triggerMessageId ? { triggerMessageId } : {}),
+    createdBy: getUserId(c),
+    now
+  });
+  if (queued) {
+    await c.env.ANALYSIS_QUEUE.send({
+      type: "orchestration",
+      runId,
+      projectId,
+      userId: getUserId(c),
+      ...(c.get("userEmail") ? { userEmail: c.get("userEmail") } : {})
+    });
+  }
+  return queued ? runId : null;
+}
+
+app.post(
+  "/projects/:projectId/conversation/decisions/:decisionId",
+  async (c) => {
+    const projectId = c.req.param("projectId");
+    const access = await requireProject(c, projectId);
+    if ("response" in access) return access.response;
+
+    const decisionId = c.req.param("decisionId");
+    const parsed = conversationDecisionResponseSchema.safeParse(
+      await c.req.json().catch(() => ({}))
+    );
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_CONVERSATION_DECISION",
+            message: "That research decision response is invalid.",
+            details: parsed.error.flatten()
+          }
+        },
+        400
+      );
+    }
+
+    const stored = await getProjectConversationDecision(
+      c.env.DB,
+      projectId,
+      decisionId
+    );
+    if (!stored) {
+      return c.json(
+        {
+          error: {
+            code: "CONVERSATION_DECISION_NOT_FOUND",
+            message: "That research decision is no longer available."
+          }
+        },
+        404
+      );
+    }
+    if (stored.status !== "open") {
+      return c.json(
+        {
+          error: {
+            code: "CONVERSATION_DECISION_ALREADY_RESOLVED",
+            message: "That research decision has already been resolved."
+          }
+        },
+        409
+      );
+    }
+
+    const state = await computeProjectReadiness(c, projectId);
+    const view = buildOrchestratorView(state.readiness, state.plan);
+    const decision = view.decisions.find(
+      (item) => item.id === decisionId && item.blocking
+    );
+    if (!decision) {
+      return c.json(
+        {
+          error: {
+            code: "CONVERSATION_DECISION_STALE",
+            message:
+              "The project has changed since this question was created. Methodome refreshed the current research state instead."
+          }
+        },
+        409
+      );
+    }
+
+    const response = parsed.data;
+    let responseSummary = "Research decision recorded.";
+
+    if (decision.kind === "select_method") {
+      if (!state.plan || !decision.analysisId || !response.choiceId) {
+        return c.json(
+          {
+            error: {
+              code: "METHOD_SELECTION_REQUIRED",
+              message: "Choose one of Methodome's defensible analysis options."
+            }
+          },
+          400
+        );
+      }
+      if (
+        !decision.options?.some((option) => option.id === response.choiceId)
+      ) {
+        return c.json(
+          {
+            error: {
+              code: "METHOD_SELECTION_OUTSIDE_CANDIDATES",
+              message: "The selected option is outside the current defensible method set."
+            }
+          },
+          409
+        );
+      }
+      const method = methodRegistry[response.choiceId];
+      if (!method?.executable) {
+        return c.json(
+          {
+            error: {
+              code: "METHOD_NOT_EXECUTABLE",
+              message: "That method is not executable in the current Methodome runtime."
+            }
+          },
+          409
+        );
+      }
+
+      const updated = updateAnalysisMethodSelections(state.plan, [
+        {
+          analysisId: decision.analysisId,
+          methodId: response.choiceId
+        }
+      ]);
+      await updateStoredAnalysisPlan(c.env.DB, updated);
+      await addAudit(c, {
+        projectId,
+        action: "conversation_analysis_method_selected",
+        objectType: "analysis_plan",
+        objectId: updated.id,
+        before: state.plan,
+        after: {
+          decisionId,
+          analysisId: decision.analysisId,
+          methodId: response.choiceId,
+          methodologyKnowledgeVersion
+        }
+      });
+      responseSummary = `Use ${method.displayName} for this research question.`;
+    } else if (decision.kind === "approve_plan") {
+      if (!state.plan || response.approved !== true) {
+        return c.json(
+          {
+            error: {
+              code: "PLAN_APPROVAL_REQUIRED",
+              message: "Confirm that Methodome should run the proposed analysis plan."
+            }
+          },
+          400
+        );
+      }
+      if (!state.plan.lockedAt || !state.plan.lockHash) {
+        const locked = await lockAnalysisPlan(
+          state.plan,
+          new Date().toISOString()
+        );
+        await updateStoredAnalysisPlan(c.env.DB, locked);
+        await addAudit(c, {
+          projectId,
+          action: "conversation_analysis_plan_approved",
+          objectType: "analysis_plan",
+          objectId: locked.id,
+          before: state.plan,
+          after: {
+            decisionId,
+            lockedAt: locked.lockedAt,
+            lockHash: locked.lockHash,
+            methodologyKnowledgeVersion
+          }
+        });
+      }
+      responseSummary = "Run the proposed analysis plan.";
+    } else if (
+      decision.kind === "review_mapping" ||
+      decision.kind === "resolve_mapping_gap"
+    ) {
+      const concept = decision.concept ?? String(stored.context.concept ?? "");
+      if (!concept) {
+        return c.json(
+          {
+            error: {
+              code: "MAPPING_CONCEPT_NOT_AVAILABLE",
+              message: "Methodome could not identify the concept attached to this decision."
+            }
+          },
+          409
+        );
+      }
+
+      const datasetVariable = response.datasetVariable ?? response.choiceId;
+      const confirmAbsent = response.confirmNotRepresented === true;
+      if (!datasetVariable && !confirmAbsent) {
+        return c.json(
+          {
+            error: {
+              code: "MAPPING_RESPONSE_REQUIRED",
+              message:
+                "Choose the matching dataset field, or confirm that the concept is not represented."
+            }
+          },
+          400
+        );
+      }
+
+      if (datasetVariable) {
+        if (!state.resolvedDatasetVersionId) {
+          return c.json(
+            {
+              error: {
+                code: "DATASET_REQUIRED",
+                message: "Methodome needs an analysis dataset before confirming this mapping."
+              }
+            },
+            409
+          );
+        }
+        const profile = await profileDatasetForProject(
+          c,
+          projectId,
+          state.resolvedDatasetVersionId
+        );
+        if (
+          !profile.variables.some(
+            (variable) => variable.variableName === datasetVariable
+          )
+        ) {
+          return c.json(
+            {
+              error: {
+                code: "MAPPING_VARIABLE_NOT_FOUND",
+                message: "That field is not present in the current analysis dataset."
+              }
+            },
+            409
+          );
+        }
+      }
+
+      const specificationRecord = await getCurrentStudySpecificationRecord(
+        c.env.DB,
+        projectId
+      );
+      if (!specificationRecord) {
+        return c.json(
+          {
+            error: {
+              code: "STUDY_SPECIFICATION_REQUIRED",
+              message: "The study model is required before resolving variables."
+            }
+          },
+          409
+        );
+      }
+
+      const existing = state.mappings.find(
+        (mapping) =>
+          normalizeConcept(mapping.researchConcept) ===
+          normalizeConcept(concept)
+      );
+      const priorEvidence = existing?.evidence ?? [];
+      const mappingStatus = confirmAbsent
+        ? "no_match"
+        : existing?.datasetVariable === datasetVariable &&
+            ["direct_match", "probable_match", "uncertain"].includes(
+              existing.mappingStatus
+            )
+          ? (existing.mappingStatus as
+              | "direct_match"
+              | "probable_match"
+              | "uncertain")
+          : "uncertain";
+
+      await saveVariableMappings(c.env.DB, {
+        projectId,
+        studySpecificationId: specificationRecord.id,
+        mappings: [
+          {
+            id: existing?.id ?? stableMappingId(concept),
+            researchConcept: concept,
+            ...(confirmAbsent ? {} : { datasetVariable: datasetVariable! }),
+            mappingStatus,
+            evidence: [
+              ...priorEvidence,
+              confirmAbsent
+                ? "Researcher confirmed in the Methodome conversation that this concept is not represented in the selected dataset."
+                : `Researcher confirmed in the Methodome conversation that “${datasetVariable}” represents this concept.`
+            ],
+            confirmedBy: getUserId(c)
+          }
+        ]
+      });
+      await addAudit(c, {
+        projectId,
+        action: "conversation_variable_mapping_resolved",
+        objectType: "variable_mapping",
+        objectId: existing?.id ?? stableMappingId(concept),
+        after: {
+          decisionId,
+          concept,
+          datasetVariable: confirmAbsent ? null : datasetVariable,
+          confirmedNotRepresented: confirmAbsent,
+          methodologyKnowledgeVersion
+        }
+      });
+      responseSummary = confirmAbsent
+        ? `“${concept}” is not represented in the selected dataset.`
+        : `Use “${datasetVariable}” for “${concept}”.`;
+    } else if (decision.kind === "confirm_study_design") {
+      if (decision.questionId && response.choiceId && state.specification) {
+        const allowedObjectiveTypes = new Set([
+          "descriptive",
+          "association",
+          "prediction",
+          "causal",
+          "diagnostic",
+          "prognostic",
+          "qualitative",
+          "exploratory"
+        ]);
+        if (!allowedObjectiveTypes.has(response.choiceId)) {
+          return c.json(
+            {
+              error: {
+                code: "OBJECTIVE_TYPE_INVALID",
+                message: "Choose one of Methodome's supported research objective types."
+              }
+            },
+            400
+          );
+        }
+        const updatedSpecification = parseStudySpecification({
+          ...state.specification,
+          version: `conversation-${Date.now()}`,
+          researchQuestions: state.specification.researchQuestions.map(
+            (question) =>
+              question.id === decision.questionId
+                ? { ...question, objectiveType: response.choiceId }
+                : question
+          )
+        });
+        await saveStudySpecification(
+          c.env.DB,
+          makeId("spec"),
+          projectId,
+          updatedSpecification,
+          getUserId(c)
+        );
+        responseSummary = "Use that analytical interpretation for this research question.";
+      } else {
+        if (response.approved !== true || !state.extraction) {
+          return c.json(
+            {
+              error: {
+                code: "STUDY_DESIGN_CONFIRMATION_REQUIRED",
+                message:
+                  "Confirm Methodome's protocol interpretation, or review the study model before continuing."
+              }
+            },
+            400
+          );
+        }
+        const extraction = protocolExtractionSchema.parse(
+          state.extraction.extraction
+        );
+        const specification = studySpecificationFromProtocolExtraction(
+          extraction
+        );
+        if (!specification) {
+          return c.json(
+            {
+              error: {
+                code: "STUDY_DESIGN_CLARIFICATION_REQUIRED",
+                message:
+                  "The protocol does not contain enough information to confirm the study model automatically. Review the missing design details."
+              }
+            },
+            409
+          );
+        }
+        await saveStudySpecification(
+          c.env.DB,
+          makeId("spec"),
+          projectId,
+          specification,
+          getUserId(c),
+          {
+            source: "protocol_interpretation_confirmed_in_conversation",
+            extractionId: state.extraction.id,
+            methodologyKnowledgeVersion
+          }
+        );
+        responseSummary = "Continue with Methodome's interpretation of the protocol.";
+      }
+
+      await addAudit(c, {
+        projectId,
+        action: "conversation_study_interpretation_confirmed",
+        objectType: "study_specification",
+        objectId: decision.questionId ?? "study",
+        after: {
+          decisionId,
+          choiceId: response.choiceId ?? null,
+          approved: response.approved ?? null,
+          methodologyKnowledgeVersion
+        }
+      });
+    } else {
+      return c.json(
+        {
+          error: {
+            code: "CONVERSATION_DECISION_REQUIRES_DETAILED_REVIEW",
+            message:
+              "This checkpoint requires detailed source review. Open the project record to complete it safely."
+          }
+        },
+        409
+      );
+    }
+
+    const now = new Date().toISOString();
+    const resolved = await resolveProjectConversationDecision(c.env.DB, {
+      projectId,
+      decisionKey: decisionId,
+      response,
+      resolvedBy: getUserId(c),
+      now
+    });
+    if (!resolved) {
+      return c.json(
+        {
+          error: {
+            code: "CONVERSATION_DECISION_ALREADY_RESOLVED",
+            message: "That research decision was resolved while the project was updating."
+          }
+        },
+        409
+      );
+    }
+
+    const threadId = await ensureProjectThread(
+      c.env.DB,
+      projectId,
+      `thread_${projectId}`,
+      now
+    );
+    const messageId = makeId("msg");
+    await appendProjectMessage(c.env.DB, {
+      id: messageId,
+      threadId,
+      projectId,
+      role: "researcher",
+      messageKind: "message",
+      content: responseSummary,
+      metadata: {
+        decisionId,
+        decisionKind: decision.kind,
+        response
+      },
+      attachmentFileIds: [],
+      createdBy: getUserId(c),
+      createdAt: now,
+      deduplicationKey: `decision-response:${decisionId}`
+    });
+
+    const runId = await queueConversationContinuation(
+      c,
+      projectId,
+      messageId
+    );
+
+    return c.json(
+      {
+        resolved: true,
+        decisionId,
+        runId,
+        message: responseSummary
+      },
+      202
+    );
+  }
+);
 
 app.get("/projects/:projectId/orchestrator", async (c) => {
   const projectId = c.req.param("projectId");
