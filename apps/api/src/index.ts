@@ -815,6 +815,19 @@ async function enqueueOrchestratedPlan(
 }
 
 
+function qualitativeSourceNeedsModelConversion(
+  filename: string,
+  mediaType?: string
+): boolean {
+  const lower = filename.toLowerCase();
+  return !(
+    lower.endsWith(".txt") ||
+    lower.endsWith(".md") ||
+    lower.endsWith(".markdown") ||
+    mediaType?.startsWith("text/")
+  );
+}
+
 async function orchestratorPrepareQualitativeAnalysis(
   c: import("hono").Context<AppBindings>,
   projectId: string,
@@ -858,6 +871,11 @@ async function orchestratorPrepareQualitativeAnalysis(
     const object = await c.env.FILES.get(file.objectKey);
     if (!object) {
       throw new Error(`Stored transcript ${file.filename} could not be read.`);
+    }
+    if (
+      qualitativeSourceNeedsModelConversion(file.filename, file.mediaType)
+    ) {
+      await assertQualitativeModelAllowed(c, projectId);
     }
     const text = await researchFileToText({
       env: c.env,
@@ -2612,6 +2630,11 @@ app.post("/projects/:projectId/qualitative-analyses", async (c) => {
 
     let text: string;
     try {
+      if (
+        qualitativeSourceNeedsModelConversion(file.filename, file.mediaType)
+      ) {
+        await assertQualitativeModelAllowed(c, projectId);
+      }
       text = await researchFileToText({
         env: c.env,
         filename: file.filename,
