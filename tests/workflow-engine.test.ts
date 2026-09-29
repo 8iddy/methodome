@@ -470,7 +470,10 @@ describe("project orchestrator view", () => {
     const readiness = assessProjectReadiness(
       snapshot({
         specification: spec,
-        mappings: [],
+        mappings: [
+          mapping("stockout frequency", "stockout_days"),
+          mapping("routine data use", "data_use_score")
+        ],
         selections: [selection(false, "Objective type is required.")]
       })
     );
