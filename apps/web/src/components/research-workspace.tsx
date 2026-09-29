@@ -516,10 +516,12 @@ function QualitativeWorkbench({
       );
       if (proposed.length > 0 && allResolved) {
         for (const coding of proposed) {
+          const choice = codingChoices[coding.id];
+          if (!choice) continue;
           decisions.push({
             segmentId: segment.id,
             codeId: coding.codeId,
-            status: codingChoices[coding.id]
+            status: choice
           });
         }
         reviewedSegmentIds.push(segment.id);
