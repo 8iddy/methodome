@@ -4,42 +4,6 @@
   "extracted_date": "2026-09-29",
   "records": [
     {
-      "evidence_id": "ev-nonparam-001",
-      "topic": "nonparametric_two_sample",
-      "statement": "The Wilcoxon rank-sum test is presented as a nonparametric alternative for comparing two population central values with independent samples and is equivalent to the Mann-Whitney U test.",
-      "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
-      "section": "Chapter 6.3",
-      "page": "305-313",
-      "support_type": "direct"
-    },
-    {
-      "evidence_id": "ev-nonparam-002",
-      "topic": "nonparametric_paired",
-      "statement": "The Wilcoxon signed-rank test is presented as a nonparametric alternative for paired-data inference.",
-      "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
-      "section": "Chapter 6.5",
-      "page": "319 onward",
-      "support_type": "direct"
-    },
-    {
-      "evidence_id": "ev-anova-001",
-      "topic": "anova",
-      "statement": "One-way analysis of variance compares population means across more than two groups under independence, equal-variance, and normality conditions; independence is the most critical of these design conditions.",
-      "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
-      "section": "Chapter 8.3-8.4",
-      "page": "414-421",
-      "support_type": "direct"
-    },
-    {
-      "evidence_id": "ev-kruskal-001",
-      "topic": "kruskal_wallis",
-      "statement": "Kruskal-Wallis is presented as a nonparametric alternative for comparing more than two population central values when the usual ANOVA conditions are unsuitable.",
-      "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
-      "section": "Chapter 8.6",
-      "page": "428 onward",
-      "support_type": "direct"
-    },
-    {
       "evidence_id": "ev-causal-001",
       "topic": "causal_identification",
       "statement": "Hernán and Robins treat exchangeability, positivity, and consistency as core identifiability conditions for causal inference from observational data.",
