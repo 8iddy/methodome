@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { ActivitySpinner, Badge, Button } from "@/components/ui";
 import {
   advanceProjectOrchestrator,
+  askProjectAssistant,
   confirmQualitativeCodebook,
   confirmQualitativeThemes,
   getAnalysisPlan,
@@ -26,6 +27,12 @@ import {
 } from "@/lib/api";
 
 type OrchestratorPayload = Awaited<ReturnType<typeof getProjectOrchestrator>>;
+
+type ConversationMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+};
 
 function human(value: string) {
   return value
@@ -69,6 +76,9 @@ export function ResearchWorkspaceHome({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [conversation, setConversation] = useState<ConversationMessage[]>([]);
+  const [conversationInput, setConversationInput] = useState("");
+  const [conversationBusy, setConversationBusy] = useState(false);
   const lastAutomaticAction = useRef("");
 
   async function refresh() {
@@ -154,6 +164,48 @@ export function ResearchWorkspaceHome({
     }
   }
 
+  async function askMethodome(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const message = conversationInput.trim();
+    if (!message || conversationBusy) return;
+
+    const userMessage: ConversationMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: message
+    };
+    const history = conversation.map(({ role, content }) => ({ role, content }));
+    setConversation((current) => [...current, userMessage]);
+    setConversationInput("");
+    setConversationBusy(true);
+
+    try {
+      const response = await askProjectAssistant(projectId, message, history);
+      setConversation((current) => [
+        ...current,
+        {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: response.reply
+        }
+      ]);
+    } catch (err) {
+      setConversation((current) => [
+        ...current,
+        {
+          id: `assistant-error-${Date.now()}`,
+          role: "assistant",
+          content:
+            err instanceof Error
+              ? err.message
+              : "I could not answer that from the current project state."
+        }
+      ]);
+    } finally {
+      setConversationBusy(false);
+    }
+  }
+
   if (!payload) {
     return (
       <section className="workspace-loading">
@@ -187,8 +239,69 @@ export function ResearchWorkspaceHome({
         </div>
       </header>
 
+      <section className="project-conversation" aria-label="Conversation with Methodome">
+        <div className="conversation-intro">
+          <p className="workspace-kicker">TALK TO METHODOME</p>
+          <h2>Work through the study in plain language.</h2>
+          <p>
+            Tell Methodome what you are trying to understand, ask why it needs a
+            decision, or ask what it will do next. Methodome uses the current
+            study record to answer and does not silently change scientific
+            decisions.
+          </p>
+        </div>
+
+        <div className="conversation-thread" aria-live="polite">
+          <article className="conversation-message assistant">
+            <small>METHODOME</small>
+            <p>{orchestrator.summary}</p>
+            <p>{orchestrator.nextAction.detail}</p>
+          </article>
+
+          {conversation.map((item) => (
+            <article
+              className={`conversation-message ${item.role}`}
+              key={item.id}
+            >
+              <small>{item.role === "assistant" ? "METHODOME" : "YOU"}</small>
+              <p>{item.content}</p>
+            </article>
+          ))}
+
+          {conversationBusy && (
+            <div className="conversation-thinking">
+              <ActivitySpinner label="Methodome is responding" />
+              <span>Methodome is reading the current study state…</span>
+            </div>
+          )}
+        </div>
+
+        <form className="conversation-compose" onSubmit={askMethodome}>
+          <textarea
+            value={conversationInput}
+            onChange={(event) => setConversationInput(event.target.value)}
+            placeholder="Tell Methodome what you want to analyse, or ask what it needs from you…"
+            rows={2}
+            maxLength={4000}
+            disabled={conversationBusy}
+          />
+          <Button
+            type="submit"
+            loading={conversationBusy}
+            loadingLabel="Thinking…"
+            disabled={!conversationInput.trim()}
+          >
+            Send
+          </Button>
+        </form>
+        <p className="conversation-footnote">
+          Conversation is guidance over the live project state. Confirmed
+          scientific decisions remain explicit and auditable.
+        </p>
+      </section>
+
       <section className="workspace-now">
-        <div className="now-label">NOW</div>
+        <div className="now-label">CURRENT</div>
         <div className="now-body">
           <p className="orchestrator-summary">{orchestrator.summary}</p>
           <h2>{orchestrator.nextAction.label}</h2>
