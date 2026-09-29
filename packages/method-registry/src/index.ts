@@ -195,6 +195,53 @@ function firstOutcome(question: ResearchQuestion): VariableConcept | undefined {
   return question.outcomes[0];
 }
 
+function samplingDesignText(study: StudySpecification): string {
+  return (study.samplingDesign ?? "").trim().toLowerCase();
+}
+
+function requiresSurveyAwareAnalysis(study: StudySpecification): boolean {
+  const sampling = samplingDesignText(study);
+  return (
+    study.surveyWeights ||
+    study.stratified ||
+    sampling.includes("stratified") ||
+    sampling.includes("multistage") ||
+    sampling.includes("multi-stage") ||
+    sampling.includes("probability proportional") ||
+    sampling.includes("pps") ||
+    sampling.includes("cluster sampling")
+  );
+}
+
+function contextualWarnings(
+  study: StudySpecification,
+  question: ResearchQuestion
+): string[] {
+  const warnings: string[] = [];
+  const sampling = samplingDesignText(study);
+
+  if (
+    sampling.includes("convenience") ||
+    sampling.includes("purposive") ||
+    sampling.includes("volunteer") ||
+    sampling.includes("self-select") ||
+    sampling.includes("non-probability") ||
+    sampling.includes("nonprobability")
+  ) {
+    warnings.push(
+      "The sampling design is non-probability. Do not present design-based population representativeness or invent sampling weights."
+    );
+  }
+
+  if (question.objectiveType === "prediction") {
+    warnings.push(
+      "A fitted regression model is not a complete prediction analysis. Predictive performance requires validation and appropriate calibration/discrimination assessment for the outcome."
+    );
+  }
+
+  return warnings;
+}
+
 function candidate(id: string, rationale: string, decisionRequired?: string): CandidateMethod {
   const method = methodRegistry[id];
   if (!method) throw new Error(`Unknown method: ${id}`);
@@ -225,6 +272,16 @@ export function selectCandidateMethods(
     };
   }
 
+  if (!question.objectiveType) {
+    return {
+      questionId,
+      candidates: [],
+      warnings: [],
+      blockedReason:
+        "Objective type must be confirmed before automatic method selection."
+    };
+  }
+
   if (question.objectiveType === "qualitative") {
     return {
       questionId,
@@ -242,9 +299,46 @@ export function selectCandidateMethods(
       questionId,
       candidates: [],
       warnings: [
-        "Causal analyses require additional design and estimand information before Methodome can narrow the method set."
+        "Causal analyses require an explicit causal estimand and identification argument before Methodome can narrow the estimator set."
       ],
-      blockedReason: "Automatic causal method selection is outside the initial validated boundary."
+      blockedReason:
+        "Automatic causal estimator selection is outside the current autonomous execution boundary."
+    };
+  }
+
+  if (question.objectiveType === "diagnostic") {
+    return {
+      questionId,
+      candidates: [],
+      warnings: [
+        "Diagnostic-accuracy questions require an index test, reference standard, and threshold-aware performance workflow."
+      ],
+      blockedReason:
+        "Do not reduce a diagnostic-accuracy question to an ordinary association or regression analysis."
+    };
+  }
+
+  if (question.objectiveType === "prognostic") {
+    return {
+      questionId,
+      candidates: [],
+      warnings: [
+        "Prognostic analyses require a prediction/time-to-event workflow with validation and performance assessment that is not yet executable in the current release."
+      ],
+      blockedReason:
+        "Automatic prognostic method selection is outside the current autonomous execution boundary."
+    };
+  }
+
+  if (question.objectiveType === "exploratory") {
+    return {
+      questionId,
+      candidates: [],
+      warnings: [
+        "Exploratory intent is too broad for Methodome to choose a single inferential procedure safely."
+      ],
+      blockedReason:
+        "Confirm a descriptive, association, prediction, causal, diagnostic, prognostic, or qualitative target before automatic method selection."
     };
   }
 
@@ -258,6 +352,21 @@ export function selectCandidateMethods(
     };
   }
 
+  const baseWarnings = contextualWarnings(study, question);
+
+  if (requiresSurveyAwareAnalysis(study)) {
+    return {
+      questionId,
+      candidates: [],
+      warnings: [
+        ...baseWarnings,
+        "The sampling design requires survey-aware estimation that carries the relevant weight, strata, and PSU/cluster information into variance estimation."
+      ],
+      blockedReason:
+        "A complex-survey analysis path is required before Methodome can select an iid method."
+    };
+  }
+
   if (question.objectiveType === "descriptive") {
     return {
       questionId,
@@ -267,18 +376,23 @@ export function selectCandidateMethods(
           "The research question is descriptive and the outcome mapping has been confirmed."
         )
       ],
-      warnings: []
+      warnings: baseWarnings
     };
   }
 
-  if (study.surveyWeights) {
+  if (
+    (study.clustered || study.repeatedMeasures) &&
+    outcome.variableType !== "binary"
+  ) {
     return {
       questionId,
       candidates: [],
       warnings: [
-        "Survey weighted analysis is not yet in the initial deterministic candidate rules."
+        ...baseWarnings,
+        "The current deterministic registry has no correlation-aware executable method for this outcome type."
       ],
-      blockedReason: "A survey aware method path is required."
+      blockedReason:
+        "Repeated or clustered observations must not be analysed with an iid method."
     };
   }
 
@@ -298,9 +412,12 @@ export function selectCandidateMethods(
             "Choose this when a population average effect is the scientific target."
           )
         ],
-        warnings: study.clusterVariable
-          ? []
-          : ["Clustering is declared but the cluster variable has not been confirmed."]
+        warnings: [
+          ...baseWarnings,
+          ...(study.clusterVariable
+            ? []
+            : ["Clustering is declared but the cluster variable has not been confirmed."])
+        ]
       };
     }
 
@@ -317,22 +434,31 @@ export function selectCandidateMethods(
       )
     ];
 
-    if (question.predictors.length === 1 && categoricalPredictor && question.covariates.length === 0) {
+    if (
+      question.predictors.length === 1 &&
+      categoricalPredictor &&
+      question.covariates.length === 0
+    ) {
       candidates.push(
         candidate(
           "chi_square",
           "A single categorical predictor can be assessed as an unadjusted association.",
           "Use this for an unadjusted contingency table analysis, not as a replacement for adjusted regression."
-        ),
-        candidate(
-          "fisher_exact",
-          "A single categorical predictor can be assessed with an exact test when expected cell counts are small.",
-          "Use only when the contingency table structure is suitable."
         )
       );
+
+      if (question.predictors[0]?.variableType === "binary") {
+        candidates.push(
+          candidate(
+            "fisher_exact",
+            "A binary predictor with a binary outcome forms a 2x2 table that can use Fisher's exact test when an exact analysis is needed.",
+            "Use only for a suitable independent 2x2 table; sparse expected counts do not repair dependence or survey design."
+          )
+        );
+      }
     }
 
-    return { questionId, candidates, warnings: [] };
+    return { questionId, candidates, warnings: baseWarnings };
   }
 
   if (outcome.variableType === "count") {
@@ -341,16 +467,41 @@ export function selectCandidateMethods(
       candidates: [
         candidate(
           "poisson_regression",
-          "The outcome is a count. Poisson regression is a candidate if dispersion is acceptable.",
-          "Run the dispersion check before choosing this model."
+          "The outcome is a count, so Poisson regression is one future count-model candidate.",
+          "Assess the mean-variance relationship, exposure/offset structure, excess zeros, influence, and study design before choosing a count model."
         ),
         candidate(
           "negative_binomial_regression",
-          "The outcome is a count. Negative binomial regression is a candidate when overdispersion is present.",
-          "Use the dispersion diagnostic to distinguish this from Poisson regression."
+          "Negative binomial regression is one possible future model for some overdispersed count processes.",
+          "Do not choose negative binomial solely because overdispersion is present; compare the mean-variance structure and other defensible count-model alternatives."
         )
       ],
-      warnings: []
+      warnings: [
+        ...baseWarnings,
+        "Automatic count-model selection and execution are deferred in methodology v1. Overdispersion alone does not select negative binomial regression."
+      ]
+    };
+  }
+
+  if (
+    outcome.variableType === "categorical_ordinal" &&
+    question.objectiveType === "association" &&
+    question.predictors.length === 1 &&
+    question.covariates.length === 0 &&
+    ["continuous", "categorical_ordinal"].includes(
+      question.predictors[0]?.variableType ?? "unknown"
+    )
+  ) {
+    return {
+      questionId,
+      candidates: [
+        candidate(
+          "spearman_correlation",
+          "The outcome is ordinal and the unadjusted research question concerns a rank-based monotonic association.",
+          "Use only when the paired observations are independent across units and the relationship is meaningfully monotonic."
+        )
+      ],
+      warnings: baseWarnings
     };
   }
 
@@ -386,13 +537,13 @@ export function selectCandidateMethods(
       );
     }
 
-    return { questionId, candidates, warnings: [] };
+    return { questionId, candidates, warnings: baseWarnings };
   }
 
   return {
     questionId,
     candidates: [],
-    warnings: [],
-    blockedReason: `No initial deterministic rule exists for outcome type ${outcome.variableType}.`
+    warnings: baseWarnings,
+    blockedReason: `No current deterministic rule exists for outcome type ${outcome.variableType}.`
   };
 }
