@@ -586,7 +586,7 @@ export async function suggestMappingsWithAi(input: {
       {
         role: "system",
         content:
-          "You suggest mappings between research concepts and dataset variables. Do not use row-level data. A direct_match is forbidden unless there is explicit exact metadata evidence. For semantic suggestions use probable_match or uncertain. Use no_match if the evidence is insufficient. Never invent a dataset variable. Evidence must refer to supplied variable names, labels, types, response choices, or supplied instrument text."
+          "You resolve research concepts to the supplied dataset variables using metadata and research instruments only; never use or request row-level data. For every concept, identify the most plausible operational variable when the evidence supports one. Use instrument or codebook text to connect coded field names to questionnaire wording. Use probable_match when one supplied variable is clearly the best semantic match, uncertain when multiple supplied variables are plausible or the evidence is weak, and no_match only when no supplied variable plausibly operationalises the concept. A direct_match is forbidden here because deterministic exact matching is handled separately. Never invent a variable. Evidence must name the supplied field, label, type, response choices, or instrument wording that supports the mapping."
       },
       {
         role: "user",
