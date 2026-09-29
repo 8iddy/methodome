@@ -1,0 +1,70 @@
+{
+  "batch_id": "methodome-design-sampling-finalization-batch-1",
+  "status": "supported",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-design-randomized-001",
+      "topic": "randomized_experiment",
+      "statement": "In an experiment the investigator assigns the explanatory condition; random assignment is a defining design feature used to balance treatment groups and support causal comparison, unlike an observational study in which exposure is observed rather than assigned.",
+      "source_id": "src-060-penn-state-stat-200-elementary-statistics",
+      "section": "Lesson 1 Research Design",
+      "page": "1-18",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-design-randomized-002",
+      "topic": "randomized_trial_analysis",
+      "statement": "For randomized clinical trials, preserving the initial randomization in analysis is important for preventing bias, and the full analysis set should stay as close as possible to the intention-to-treat principle.",
+      "source_id": "src-024-ich-e9-statistical-principles-for-clinical-trials",
+      "section": "5.2 Analysis Sets",
+      "page": "24-26",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-design-its-001",
+      "topic": "interrupted_time_series",
+      "statement": "Interrupted time-series analysis uses outcomes measured over time before and after an intervention; simple pre/post comparison can be misleading because pre-interruption trend and autocorrelation must be considered.",
+      "source_id": "src-023-interrupted-time-series-analysis-for-single-series-and-comparative-designs",
+      "section": "What is ITS Analysis? / Time Series Caveats",
+      "page": null,
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-design-its-002",
+      "topic": "interrupted_time_series",
+      "statement": "Interrupted time-series analysis can estimate an immediate level change, a sustained slope change, or both following an intervention.",
+      "source_id": "src-023-interrupted-time-series-analysis-for-single-series-and-comparative-designs",
+      "section": "ITS Analysis",
+      "page": null,
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-sampling-probability-001",
+      "topic": "sampling_design",
+      "statement": "Probability sampling gives population units known selection chances; simple random, stratified and cluster sampling are probability-based designs, while convenience sampling is non-probability based.",
+      "source_id": "src-060-penn-state-stat-200-elementary-statistics",
+      "section": "1.2 Sampling Methods",
+      "page": "7-9 of 18",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-sampling-probability-002",
+      "topic": "sampling_design",
+      "statement": "UN household-survey guidance treats simple random, systematic, stratified, cluster and multistage sampling as distinct probability-sampling strategies and emphasizes probability sampling at each stage of selection.",
+      "source_id": "src-072-designing-household-survey-samples-practical-guidelines",
+      "section": "Chapter 3 and Annex I",
+      "page": "43-55, 211-224",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-sampling-census-001",
+      "topic": "census_complete_enumeration",
+      "statement": "A census/complete enumeration differs from a sample survey because data are collected for the target population rather than selected sample units; surveys are often used when complete enumeration is impractical because of time or cost.",
+      "source_id": "src-072-designing-household-survey-samples-practical-guidelines",
+      "section": "1.2 Data sources",
+      "page": "4-6",
+      "support_type": "direct"
+    }
+  ]
+}
