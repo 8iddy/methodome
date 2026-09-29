@@ -1864,6 +1864,17 @@ def logistic_regression(
         )
 
     warnings: list[str] = []
+    max_abs_coefficient = max(abs(value) for value in beta)
+    max_standard_error = max(se)
+    min_probability = min(probabilities)
+    max_probability = max(probabilities)
+    numerical_boundary_reached = any(abs(score) >= 35.0 for score in raw_scores)
+
+    if numerical_boundary_reached:
+        warnings.append(
+            "At least one fitted linear predictor reached the Python runner's numerical stabilization boundary. "
+            "Review coefficient stability, sparse data, and separation before relying on ordinary maximum-likelihood inference."
+        )
 
     return _result(
         "binary_logistic_regression",
@@ -1914,6 +1925,38 @@ def logistic_regression(
                 "message": (
                     "Review outcome balance, predictor sparsity and coefficient stability. "
                     "Methodome does not use a fixed events-per-variable cutoff as a pass/fail rule."
+                ),
+            },
+            {
+                "id": "coefficient_stability_review",
+                "label": "Largest absolute fitted coefficient",
+                "status": "review",
+                "value": max_abs_coefficient,
+                "message": (
+                    "Inspect coefficient magnitude together with standard errors, convergence, predictor sparsity and separation. "
+                    "No fixed coefficient cutoff is used as a standalone statistical decision rule."
+                ),
+            },
+            {
+                "id": "standard_error_stability_review",
+                "label": "Largest fitted coefficient standard error",
+                "status": "review",
+                "value": max_standard_error,
+                "message": (
+                    "Inspect unusually large uncertainty together with sparse cells, multicollinearity and separation. "
+                    "No fixed standard-error cutoff is used as a standalone statistical decision rule."
+                ),
+            },
+            {
+                "id": "fitted_probability_range",
+                "label": "Fitted probability range",
+                "status": "review" if numerical_boundary_reached else "passed",
+                "value": f"{min_probability:.12g} to {max_probability:.12g}",
+                "message": (
+                    "A review flag here means the fitted linear predictor reached the runner's numerical stabilization boundary; "
+                    "this is a computational safeguard, not a universal statistical threshold."
+                    if numerical_boundary_reached
+                    else "Fitted probabilities stayed inside the runner's numerical stabilization boundary."
                 ),
             },
         ],
