@@ -911,8 +911,19 @@ function mappingDecisions(readiness: ProjectReadiness): OrchestratorDecision[] {
         output.push({
           id: `decision:intent:${blocker.questionId}`,
           kind: "confirm_study_design",
-          prompt: blocker.message,
+          prompt:
+            "I need one clarification about the analytical intent of this research question before I can choose methods safely.",
           questionId: blocker.questionId,
+          options: [
+            { id: "descriptive", label: "Describe or summarise" },
+            { id: "association", label: "Assess an association or difference" },
+            { id: "prediction", label: "Predict an outcome" },
+            { id: "causal", label: "Estimate a causal effect" },
+            { id: "diagnostic", label: "Evaluate diagnostic accuracy" },
+            { id: "prognostic", label: "Estimate future risk or prognosis" },
+            { id: "qualitative", label: "Understand experiences, barriers or meanings" },
+            { id: "exploratory", label: "Explore patterns without a prespecified target" }
+          ],
           blocking: true
         });
         continue;
