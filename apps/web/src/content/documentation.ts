@@ -201,16 +201,14 @@ export const documentationSections: DocumentationSection[] = [
   },
   {
     id: "current-limits",
-    title: "Current MVP limits",
+    title: "Current release boundaries",
     summary:
-      "The v0.1.0 MVP is a working quantitative release, not the full long-term product.",
+      "Methodome now supports orchestrated quantitative analysis and source-linked qualitative coding and synthesis, while several advanced capabilities remain deliberately outside the current execution boundary.",
     points: [
-      "Email verification and password-reset delivery still require production email configuration.",
-      "Qualitative and mixed-methods workflows are not yet implemented.",
-      "Bayesian and structural equation modelling workflows are not yet implemented.",
-      "General interactive data cleaning is still limited.",
-      "The current production dataset upload path supports CSV. Protocol and research-document text extraction supports text-based PDF, DOCX, TXT and Markdown through Workers AI document conversion.",
-      "Full DOCX, PDF, HTML, LaTeX and Quarto reporting remains post-MVP work."
+      "Bayesian, structural equation, complex survey and several advanced longitudinal workflows are represented methodologically but are not all executable yet.",
+      "General interactive data cleaning remains limited; transformations should continue to create traceable derived dataset versions.",
+      "The production dataset path currently prioritises CSV, while protocol and research-document extraction supports text-based PDF, DOCX, TXT and Markdown through Workers AI document conversion.",
+      "Rich report generation to DOCX, PDF, HTML, LaTeX and Quarto remains a later release capability."
     ]
   }
 ];
