@@ -2439,7 +2439,7 @@ function deterministicResultSummary(
   result: NonNullable<Awaited<ReturnType<typeof getAnalysisResult>>>
 ): string {
   const methodName = methodRegistry[methodId]?.displayName ?? methodId.replaceAll("_", " ");
-  const estimates = result.result.estimates
+  const estimates = result.estimates
     .slice(0, 8)
     .map((estimate) => {
       const pieces = [
@@ -2457,12 +2457,12 @@ function deterministicResultSummary(
       }
       return pieces.join(", ");
     });
-  const diagnosticReview = result.result.diagnostics.filter(
+  const diagnosticReview = result.diagnostics.filter(
     (item) => item.status === "review" || item.status === "failed"
   );
 
   return [
-    `${methodName} (n=${result.result.n})`,
+    `${methodName} (n=${result.n})`,
     estimates.length > 0
       ? estimates.join("; ")
       : "The method returned no coefficient-level estimates.",
