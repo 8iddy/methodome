@@ -130,12 +130,17 @@ describe("methodology knowledge corpus", () => {
     }
   });
 
-  it("labels synthetic benchmarks as non-expert regression tests", () => {
+  it("labels synthetic benchmarks as non-expert regression tests with unique cases", () => {
     const benchmark = readJson(
       "knowledge/benchmarks/synthetic-method-selection-v0.1.json"
     );
 
     expect(benchmark.purpose).toContain("NOT a substitute");
-    expect(benchmark.cases.length).toBeGreaterThanOrEqual(10);
+    expect(benchmark.cases.length).toBeGreaterThanOrEqual(20);
+
+    const caseIds = benchmark.cases.map(
+      (item: { case_id: string }) => item.case_id
+    );
+    expect(new Set(caseIds).size).toBe(caseIds.length);
   });
 });
