@@ -1,6 +1,6 @@
 {
   "corpus_id": "methodome-methodology-corpus-v1",
-  "family_count": 39,
+  "family_count": 40,
   "note": "Files from one textbook/course/guideline family are grouped so evidence weight is not inflated by chapter-level PDF splitting.",
   "families": [
     {
@@ -776,9 +776,10 @@
       "title": "Multiple imputation by chained equations for systematically and sporadically missing multilevel data",
       "organization": "Statistical Methods in Medical Research",
       "year": 2018,
-      "file_count": 1,
+      "file_count": 2,
       "file_source_ids": [
-        "src-085-resche-rigon-white-multilevel-mice"
+        "src-085-resche-rigon-white-multilevel-mice",
+        "src-087-resche-rigon-white-multilevel-mice-duplicate"
       ],
       "domains": [
         "missing_data",
@@ -788,6 +789,26 @@
         "clustered_data"
       ],
       "authority_tier": "A",
+      "role": "supporting",
+      "priority": "medium"
+    },
+    {
+      "family_id": "family-royston-white-mice-implementation-stata",
+      "title": "Multiple Imputation by Chained Equations (MICE): Implementation in Stata",
+      "organization": "Journal of Statistical Software",
+      "year": 2011,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-086-royston-white-mice-implementation-stata"
+      ],
+      "domains": [
+        "missing_data",
+        "multiple_imputation",
+        "mice",
+        "imputation_models",
+        "diagnostics"
+      ],
+      "authority_tier": "B",
       "role": "supporting",
       "priority": "medium"
     }
