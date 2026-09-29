@@ -85,6 +85,8 @@ export interface QualitativeCoding {
   source: "model" | "researcher";
   rationale?: string;
   createdBy: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
