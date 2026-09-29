@@ -80,6 +80,8 @@ export function ResearchWorkspaceHome({
   const [conversationInput, setConversationInput] = useState("");
   const [conversationBusy, setConversationBusy] = useState(false);
   const lastAutomaticAction = useRef("");
+  const analysisPollCount = useRef(0);
+  const analysisPollBusy = useRef(false);
 
   async function refresh() {
     const [next, currentPlan] = await Promise.all([
@@ -113,12 +115,64 @@ export function ResearchWorkspaceHome({
     busy
   ]);
 
+  useEffect(() => {
+    const action = payload?.orchestrator.automaticAction;
+    const key = `${action ?? ""}:${payload?.readiness.nextAction.code ?? ""}`;
+
+    if (
+      action !== "run_analyses" ||
+      busy ||
+      lastAutomaticAction.current !== key
+    ) {
+      analysisPollCount.current = 0;
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      if (analysisPollBusy.current) return;
+      if (analysisPollCount.current >= 80) {
+        window.clearInterval(timer);
+        setNotice(
+          "The approved analyses are still running. Methodome will show the updated state when you refresh the workspace."
+        );
+        return;
+      }
+
+      analysisPollBusy.current = true;
+      analysisPollCount.current += 1;
+      void refresh()
+        .catch((err) =>
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Methodome could not refresh the running analyses."
+          )
+        )
+        .finally(() => {
+          analysisPollBusy.current = false;
+        });
+    }, 2500);
+
+    return () => window.clearInterval(timer);
+  }, [
+    payload?.orchestrator.automaticAction,
+    payload?.readiness.nextAction.code,
+    busy,
+    projectId
+  ]);
+
   async function advance(action?: OrchestratorAutomaticAction) {
     setBusy(action ?? "advance");
     setError("");
     setNotice("");
     try {
       const result = await advanceProjectOrchestrator(projectId, action);
+      if (
+        action === "propose_qualitative_codings" &&
+        Number(result.mutation?.remainingUncoded ?? 0) > 0
+      ) {
+        lastAutomaticAction.current = "";
+      }
       setPayload({
         orchestrator: result.orchestrator,
         readiness: result.readiness,
@@ -217,6 +271,11 @@ export function ResearchWorkspaceHome({
   }
 
   const { orchestrator, readiness } = payload;
+  const automaticKey = `${orchestrator.automaticAction ?? ""}:${readiness.nextAction.code}`;
+  const waitingOnAnalysis =
+    orchestrator.automaticAction === "run_analyses" &&
+    lastAutomaticAction.current === automaticKey &&
+    !busy;
   const completeTasks = orchestrator.tasks.filter((task) => task.status === "complete").length;
   const waitingTasks = orchestrator.tasks.filter((task) => task.status === "waiting" || task.status === "blocked").length;
 
@@ -311,11 +370,16 @@ export function ResearchWorkspaceHome({
             <div className="now-actions orchestration-working" aria-live="polite">
               <ActivitySpinner label={orchestrator.nextAction.label} />
               <span>
-                <b>{busy ? "Methodome is working…" : "Methodome can handle this step automatically."}</b>
+                <b>
+                  {busy || waitingOnAnalysis
+                    ? "Methodome is working…"
+                    : "Methodome can handle this step automatically."}
+                </b>
                 <small>{orchestrator.nextAction.detail}</small>
               </span>
-              {!busy && lastAutomaticAction.current ===
-                `${orchestrator.automaticAction}:${readiness.nextAction.code}` && (
+              {!busy &&
+                orchestrator.automaticAction !== "run_analyses" &&
+                lastAutomaticAction.current === automaticKey && (
                 <Button
                   variant="quiet"
                   onClick={() => {
