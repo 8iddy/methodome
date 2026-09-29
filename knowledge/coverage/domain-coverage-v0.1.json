@@ -107,7 +107,7 @@
     {
       "domain": "survival_time_to_event",
       "status": "ruled",
-      "notes": "Censoring recognition and survival-method routing represented; competing-risk rule remains to be extracted."
+      "notes": "Censoring recognition, ordinary survival routing, and a competing-risk gate are represented; recurrent-event and frailty rules remain to be extracted."
     },
     {
       "domain": "diagnostic_accuracy",
