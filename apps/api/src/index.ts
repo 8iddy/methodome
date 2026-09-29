@@ -2846,10 +2846,40 @@ app.get("/projects/:projectId/conversation", async (c) => {
   const projectId = c.req.param("projectId");
   const access = await requireProject(c, projectId);
   if ("response" in access) return access.response;
+
   const state = await computeProjectReadiness(c, projectId);
+  const orchestrator = buildOrchestratorView(state.readiness, state.plan);
+  const now = new Date().toISOString();
+  const threadId = await ensureProjectThread(
+    c.env.DB,
+    projectId,
+    `thread_${projectId}`,
+    now
+  );
+
+  await syncConversationDecisions(c.env.DB, {
+    projectId,
+    threadId,
+    decisions: orchestrator.decisions
+      .filter((decision) => decision.blocking)
+      .map((decision) => ({
+        id: decision.id,
+        kind: decision.kind,
+        prompt: decision.prompt,
+        ...(decision.options ? { options: decision.options } : {}),
+        context: {
+          questionId: decision.questionId ?? null,
+          analysisId: decision.analysisId ?? null,
+          concept: decision.concept ?? null,
+          role: decision.role ?? null
+        }
+      })),
+    now
+  });
+
   return c.json({
     messages: await listProjectMessages(c.env.DB, projectId),
-    orchestrator: buildOrchestratorView(state.readiness, state.plan),
+    orchestrator,
     methodologyKnowledgeVersion
   });
 });
@@ -3182,34 +3212,6 @@ app.post(
       );
     }
 
-    const stored = await getProjectConversationDecision(
-      c.env.DB,
-      projectId,
-      decisionId
-    );
-    if (!stored) {
-      return c.json(
-        {
-          error: {
-            code: "CONVERSATION_DECISION_NOT_FOUND",
-            message: "That research decision is no longer available."
-          }
-        },
-        404
-      );
-    }
-    if (stored.status !== "open") {
-      return c.json(
-        {
-          error: {
-            code: "CONVERSATION_DECISION_ALREADY_RESOLVED",
-            message: "That research decision has already been resolved."
-          }
-        },
-        409
-      );
-    }
-
     const state = await computeProjectReadiness(c, projectId);
     const view = buildOrchestratorView(state.readiness, state.plan);
     const decision = view.decisions.find(
@@ -3222,6 +3224,61 @@ app.post(
             code: "CONVERSATION_DECISION_STALE",
             message:
               "The project has changed since this question was created. Methodome refreshed the current research state instead."
+          }
+        },
+        409
+      );
+    }
+
+    const now = new Date().toISOString();
+    const threadId = await ensureProjectThread(
+      c.env.DB,
+      projectId,
+      `thread_${projectId}`,
+      now
+    );
+    await syncConversationDecisions(c.env.DB, {
+      projectId,
+      threadId,
+      decisions: view.decisions
+        .filter((item) => item.blocking)
+        .map((item) => ({
+          id: item.id,
+          kind: item.kind,
+          prompt: item.prompt,
+          ...(item.options ? { options: item.options } : {}),
+          context: {
+            questionId: item.questionId ?? null,
+            analysisId: item.analysisId ?? null,
+            concept: item.concept ?? null,
+            role: item.role ?? null
+          }
+        })),
+      now
+    });
+
+    const stored = await getProjectConversationDecision(
+      c.env.DB,
+      projectId,
+      decisionId
+    );
+    if (!stored) {
+      return c.json(
+        {
+          error: {
+            code: "CONVERSATION_DECISION_NOT_FOUND",
+            message: "Methodome could not persist that current research decision."
+          }
+        },
+        500
+      );
+    }
+    if (stored.status !== "open") {
+      return c.json(
+        {
+          error: {
+            code: "CONVERSATION_DECISION_ALREADY_RESOLVED",
+            message: "That research decision has already been resolved."
           }
         },
         409
@@ -3571,13 +3628,13 @@ app.post(
       );
     }
 
-    const now = new Date().toISOString();
+    const resolvedAt = new Date().toISOString();
     const resolved = await resolveProjectConversationDecision(c.env.DB, {
       projectId,
       decisionKey: decisionId,
       response,
       resolvedBy: getUserId(c),
-      now
+      now: resolvedAt
     });
     if (!resolved) {
       return c.json(
@@ -3591,12 +3648,6 @@ app.post(
       );
     }
 
-    const threadId = await ensureProjectThread(
-      c.env.DB,
-      projectId,
-      `thread_${projectId}`,
-      now
-    );
     const messageId = makeId("msg");
     await appendProjectMessage(c.env.DB, {
       id: messageId,
@@ -3612,7 +3663,7 @@ app.post(
       },
       attachmentFileIds: [],
       createdBy: getUserId(c),
-      createdAt: now,
+      createdAt: resolvedAt,
       deduplicationKey: `decision-response:${decisionId}`
     });
 
