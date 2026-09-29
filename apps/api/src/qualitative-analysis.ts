@@ -174,26 +174,27 @@ export async function proposeQualitativeCodings(input: {
     4200
   );
 
-  const parsed = codingProposalSchema.parse(payload);
-  const bySegment = new Map(
-    parsed.assignments.map((assignment) => [assignment.segmentId, assignment])
-  );
-  const complete: CodingProposal = {
-    assignments: input.segments.map(
-      (segment) =>
-        bySegment.get(segment.id) ?? {
-          segmentId: segment.id,
-          codeIds: [],
-          rationale: "No code proposed."
-        }
-    )
-  };
-
-  return validateCodebookReferences(
-    complete,
+  const parsed = validateCodebookReferences(
+    codingProposalSchema.parse(payload),
     input.codebook,
     input.segments.map((segment) => segment.id)
   );
+  const returnedSegmentIds = new Set(
+    parsed.assignments.map((assignment) => assignment.segmentId)
+  );
+  const missingSegmentIds = input.segments
+    .map((segment) => segment.id)
+    .filter((segmentId) => !returnedSegmentIds.has(segmentId));
+  if (
+    parsed.assignments.length !== input.segments.length ||
+    missingSegmentIds.length > 0
+  ) {
+    throw new Error(
+      `Qualitative coding response did not account for every source segment. Missing: ${missingSegmentIds.join(", ") || "unknown"}.`
+    );
+  }
+
+  return parsed;
 }
 
 export async function proposeQualitativeThemes(input: {
