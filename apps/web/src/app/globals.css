@@ -1525,3 +1525,27 @@ html[data-theme="dark"] .auth-theme .theme-toggle{border-color:var(--line);color
   .auth-brand{top:16px;left:16px}
   .auth-theme{top:12px;right:16px}
 }
+
+
+/* Activity feedback */
+.activity-spinner{
+  display:inline-grid;
+  place-items:center;
+  width:14px;
+  height:14px;
+  flex:0 0 14px;
+}
+.activity-spinner>span{
+  width:12px;
+  height:12px;
+  border:1.5px solid currentColor;
+  border-right-color:transparent;
+  border-radius:50%;
+  animation:methodomeSpin .72s linear infinite;
+}
+.button .activity-spinner{margin-right:1px}
+.button:disabled{cursor:wait;opacity:.72}
+@keyframes methodomeSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){
+  .activity-spinner>span{animation-duration:1.6s}
+}
