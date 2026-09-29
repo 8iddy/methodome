@@ -1827,7 +1827,7 @@ app.post("/projects/:projectId/analysis-plan", async (c) => {
         supportStatus: candidate.methodologyStatus,
         ruleIds: candidate.methodologyRuleIds
       })),
-      addedAfterLock: analysis.addedAfterLock
+      addedAfterLock: false
     });
   }
 
