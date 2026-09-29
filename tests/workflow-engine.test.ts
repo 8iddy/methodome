@@ -260,7 +260,7 @@ describe("project readiness", () => {
       })
     );
     expect(withSource.questions[0]?.status).toBe("qualitative_ready");
-    expect(withSource.nextAction.code).toBe("build_analysis_plan");
+    expect(withSource.nextAction.code).toBe("prepare_qualitative_analysis");
   });
 
   it("moves from a locked quantitative plan to results only after planned analyses complete", () => {
