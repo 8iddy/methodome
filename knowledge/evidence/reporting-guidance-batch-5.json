@@ -1,0 +1,43 @@
+{
+  "batch_id": "reporting-guidance-batch-5",
+  "status": "draft",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-report-strobe-001",
+      "topic": "observational_reporting",
+      "statement": "STROBE asks observational studies to report statistical methods, methods for confounding, subgroup and interaction analyses, missing-data handling, design-specific handling such as sampling strategy or matching, sensitivity analyses, participant missingness, and unadjusted and adjusted estimates with precision.",
+      "source_id": "src-038-strobe-statement",
+      "section": "Items 12-17: Statistical methods and Results",
+      "page": "1-2",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-report-consort-001",
+      "topic": "trial_reporting",
+      "statement": "CONSORT 2025 asks randomized trials to make the protocol and statistical analysis plan accessible, report analysis populations and missing-data handling, distinguish prespecified from post-hoc additional analyses, and report primary-outcome effect estimates with precision and participant counts.",
+      "source_id": "src-040-consort-2025",
+      "section": "Items 3, 21, 22 and structured abstract/results requirements",
+      "page": null,
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-report-stard-001",
+      "topic": "diagnostic_accuracy_reporting",
+      "statement": "STARD 2015 asks diagnostic-accuracy studies to report methods for accuracy estimation, handling of indeterminate and missing results, prespecified versus exploratory variability analyses, cross-tabulation against the reference standard, and accuracy estimates with precision.",
+      "source_id": "src-043-stard-2015",
+      "section": "Items 14-17 and 23-24",
+      "page": null,
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-report-tripod-001",
+      "topic": "prediction_model_reporting",
+      "statement": "TRIPOD+AI asks prediction-model studies to report missing-data handling, data use and partitioning, predictor handling, model type and rationale, internal validation, performance measures such as discrimination and calibration, model-performance estimates with confidence intervals, and enough model specification to permit external prediction and evaluation.",
+      "source_id": "src-042-tripodai",
+      "section": "Items 11-12 and 21-23",
+      "page": null,
+      "support_type": "direct"
+    }
+  ]
+}
