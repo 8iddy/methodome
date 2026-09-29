@@ -314,7 +314,7 @@ export function ConversationWorkspace({
         attachmentFileIds.push(upload.fileId);
       }
 
-      await sendProjectConversationMessage(
+      const sent = await sendProjectConversationMessage(
         projectId,
         message ||
           `I attached ${files.length} research file${files.length === 1 ? "" : "s"}.`,
@@ -323,6 +323,7 @@ export function ConversationWorkspace({
       setContent("");
       setFiles([]);
       await refresh();
+      if (!sent.queued) setBusy(false);
     } catch (reason) {
       setBusy(false);
       setError(
