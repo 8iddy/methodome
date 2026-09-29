@@ -124,9 +124,12 @@ describe("methodology knowledge corpus", () => {
         "gap",
         "out_of_runtime"
       ]).toContain(item.methodology_status);
-      expect(methodRegistry[item.method_id]).toBeTruthy();
-      expect(item.registry_maturity).toBe(methodRegistry[item.method_id].maturity);
-      expect(item.executable).toBe(methodRegistry[item.method_id].executable);
+      const method = methodRegistry[item.method_id];
+      expect(method).toBeTruthy();
+      if (!method) throw new Error(`Unknown audited method: ${item.method_id}`);
+
+      expect(item.registry_maturity).toBe(method.maturity);
+      expect(item.executable).toBe(method.executable);
     }
   });
 
