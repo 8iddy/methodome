@@ -1,5 +1,5 @@
 Methodome production deployment trigger
 
 Triggered at: 2026-09-29
-Release: automatic mapping persistence hotfix
-Merged commit: 56eef662b7ac976e53221e4557d7e328082a5e2f
+Release: conversation-first Methodome architecture
+Merged commit: 33b52234cc598824d539d41ef77dce41e0b38a51
