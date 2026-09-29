@@ -61,6 +61,17 @@ def test_logistic_regression_runs_and_returns_odds_ratios():
         476945.562,
         rel_tol=1e-4,
     )
+    assert not any(
+        "low relative to the fitted parameters" in warning
+        or "events per variable" in warning.lower()
+        for warning in result["warnings"]
+    )
+    sparse_review = next(
+        item
+        for item in result["diagnostics"]
+        if item["id"] == "sparse_data_review"
+    )
+    assert "does not use a fixed events-per-variable cutoff" in sparse_review["message"]
 
 
 def test_chi_square_flags_expected_counts():
@@ -290,3 +301,49 @@ def test_group_comparison_rejects_covariates():
         assert False, "expected ValueError"
     except ValueError as exc:
         assert "no covariates" in str(exc)
+
+
+def test_logistic_regression_refuses_zero_cell_separation():
+    csv_text = (
+        "group,y\n"
+        "A,0\nA,0\nA,0\nA,0\n"
+        "B,0\nB,1\nB,1\nB,1\n"
+    )
+
+    try:
+        run_analysis(
+            {
+                "methodId": "binary_logistic_regression",
+                "csv": csv_text,
+                "outcome": "y",
+                "predictors": ["group"],
+            }
+        )
+        assert False, "expected separation safeguard to block ordinary ML"
+    except ValueError as exc:
+        message = str(exc).lower()
+        assert "separation" in message
+        assert "ordinary maximum-likelihood" in message
+
+
+def test_logistic_regression_refuses_complete_score_separation():
+    csv_text = (
+        "x,y\n"
+        "1,0\n2,0\n3,0\n4,0\n"
+        "5,1\n6,1\n7,1\n8,1\n"
+    )
+
+    try:
+        run_analysis(
+            {
+                "methodId": "binary_logistic_regression",
+                "csv": csv_text,
+                "outcome": "y",
+                "predictors": ["x"],
+            }
+        )
+        assert False, "expected complete-separation safeguard to block ordinary ML"
+    except ValueError as exc:
+        message = str(exc).lower()
+        assert "separation" in message or "did not converge" in message
+        assert "do not report" in message or "not reportable" in message or "separation-aware" in message

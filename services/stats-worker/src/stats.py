@@ -7,7 +7,7 @@ import statistics
 import sys
 from typing import Any
 
-ENGINE_VERSION = "python-worker-0.3.0"
+ENGINE_VERSION = "python-worker-0.3.1"
 PACKAGE_VERSION = sys.version.split()[0]
 _NORMAL_975 = 1.959963984540054
 _EPS = 1e-14
@@ -1542,6 +1542,34 @@ def _log_likelihood(
     return total
 
 
+def _binary_zero_cell_separation(
+    x: list[list[float]],
+    y: list[float],
+    terms: list[str],
+) -> str | None:
+    if not x:
+        return None
+
+    for column_index in range(1, len(x[0])):
+        values = [row[column_index] for row in x]
+        unique = set(values)
+        if unique != {0.0, 1.0}:
+            continue
+
+        counts = {
+            (feature, outcome): 0
+            for feature in (0.0, 1.0)
+            for outcome in (0.0, 1.0)
+        }
+        for feature, outcome in zip(values, y):
+            counts[(feature, outcome)] += 1
+
+        if any(count == 0 for count in counts.values()):
+            return terms[column_index]
+
+    return None
+
+
 def logistic_regression(
     rows: list[dict[str, str]],
     outcome: str,
@@ -1583,6 +1611,14 @@ def logistic_regression(
         raise ValueError(
             "Binary outcome has no variation after "
             "missing values are removed."
+        )
+
+    separation_term = _binary_zero_cell_separation(x, y, terms)
+    if separation_term:
+        raise ValueError(
+            "Ordinary maximum-likelihood logistic regression is not reliable "
+            f"because a zero outcome-by-predictor cell indicates separation for {separation_term}. "
+            "Use a separation-aware estimator or expert review."
         )
 
     beta = [0.0] * p
@@ -1656,9 +1692,16 @@ def logistic_regression(
             for i in range(p)
         ]
 
-        inv_information = _invert(
-            information
-        )
+        try:
+            inv_information = _invert(
+                information
+            )
+        except ValueError as exc:
+            raise ValueError(
+                "Ordinary maximum-likelihood logistic regression could not be estimated "
+                "because the information matrix is singular or nearly singular. "
+                "Review multicollinearity, sparse data, and separation."
+            ) from exc
         step = _matvec(
             inv_information,
             gradient,
@@ -1702,6 +1745,29 @@ def logistic_regression(
             success = True
             fit_message = "Converged."
             break
+
+    if not success:
+        raise ValueError(
+            "Ordinary maximum-likelihood logistic regression did not converge. "
+            "Do not report the fitted coefficients; review separation, sparse data, "
+            "multicollinearity, and model specification."
+        )
+
+    raw_scores = [
+        sum(value * coefficient for value, coefficient in zip(row, beta))
+        for row in x
+    ]
+    event_scores = [score for score, outcome_value in zip(raw_scores, y) if outcome_value == 1.0]
+    non_event_scores = [score for score, outcome_value in zip(raw_scores, y) if outcome_value == 0.0]
+    if (
+        min(event_scores) >= max(non_event_scores) - 1e-10
+        or min(non_event_scores) >= max(event_scores) - 1e-10
+    ):
+        raise ValueError(
+            "Ordinary maximum-likelihood logistic regression is not reportable because "
+            "the fitted linear predictor completely or quasi-completely separates the outcome classes. "
+            "Use a separation-aware estimator or expert review."
+        )
 
     probabilities = []
     for row in x:
@@ -1747,7 +1813,14 @@ def logistic_regression(
         ]
         for i in range(p)
     ]
-    covariance = _invert(information)
+    try:
+        covariance = _invert(information)
+    except ValueError as exc:
+        raise ValueError(
+            "Ordinary maximum-likelihood logistic regression is not reportable because "
+            "the final information matrix is singular or nearly singular. "
+            "Review multicollinearity, sparse data, and separation."
+        ) from exc
     se = [
         math.sqrt(
             max(
@@ -1792,21 +1865,6 @@ def logistic_regression(
 
     warnings: list[str] = []
 
-    if events < 10 * max(1, p - 1):
-        warnings.append(
-            "The number of outcome events is low "
-            "relative to the fitted parameters."
-        )
-
-    if any(
-        abs(value) > 25
-        for value in beta
-    ):
-        warnings.append(
-            "Large fitted coefficients may indicate "
-            "separation or sparse data."
-        )
-
     return _result(
         "binary_logistic_regression",
         n,
@@ -1828,6 +1886,35 @@ def logistic_regression(
                 "label": "Outcome events",
                 "status": "passed",
                 "value": events,
+            },
+            {
+                "id": "outcome_non_events",
+                "label": "Outcome non-events",
+                "status": "passed",
+                "value": n - events,
+            },
+            {
+                "id": "fitted_parameters",
+                "label": "Fitted parameters including intercept",
+                "status": "passed",
+                "value": p,
+            },
+            {
+                "id": "separation",
+                "label": "Detected complete/quasi-complete separation",
+                "status": "passed",
+                "value": False,
+                "message": "No separation was detected by the implemented zero-cell and fitted-score safeguards.",
+            },
+            {
+                "id": "sparse_data_review",
+                "label": "Sparse-data review",
+                "status": "review",
+                "value": f"events={events}; non-events={n - events}; parameters={p}",
+                "message": (
+                    "Review outcome balance, predictor sparsity and coefficient stability. "
+                    "Methodome does not use a fixed events-per-variable cutoff as a pass/fail rule."
+                ),
             },
         ],
         warnings,
