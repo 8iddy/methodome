@@ -65,6 +65,24 @@
       "section": "Lesson 12: Multicollinearity & Other Regression Pitfalls",
       "page": "Overview",
       "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-fisher-001",
+      "topic": "fisher_exact",
+      "statement": "For two independent small samples with discrete nominal or ordinal outcomes that fall into two mutually exclusive classes, Fisher's exact probability test is an exact nonparametric method for the resulting 2x2 contingency table.",
+      "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
+      "section": "7.3.3: How can we determine whether two processes produce the same proportion of defectives? Case 2: An Exact Test for Small Samples",
+      "page": null,
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-fisher-002",
+      "topic": "fisher_exact",
+      "statement": "For two independent proportions, when the large-sample normal-approximation condition is not met, Fisher's exact method is one available alternative.",
+      "source_id": "src-068-penn-state-stat-200-elementary-statistics",
+      "section": "Lesson 9.1: Two Independent Proportions",
+      "page": "2 of 27",
+      "support_type": "direct"
     }
   ]
 }
