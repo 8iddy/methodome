@@ -633,11 +633,6 @@ async function orchestratorMapVariables(
   if (!state.specification) {
     throw new Error("Confirm the study specification before resolving variables.");
   }
-  if (state.mappings.length > 0) {
-    throw new Error(
-      "Variable mappings already exist. Review only the unresolved mappings rather than replacing prior decisions."
-    );
-  }
 
   const specificationRecord = await getCurrentStudySpecificationRecord(
     c.env.DB,
@@ -652,24 +647,44 @@ async function orchestratorMapVariables(
     projectId,
     state.specification
   );
+  const existingByConcept = new Map(
+    state.mappings.map((mapping) => [
+      normalizeConcept(mapping.researchConcept),
+      mapping
+    ])
+  );
 
-  const mappings = generated.suggestions.map((suggestion) => ({
-    id: stableMappingId(suggestion.researchConcept),
-    researchConcept: suggestion.researchConcept,
-    ...(suggestion.datasetVariable
-      ? { datasetVariable: suggestion.datasetVariable }
-      : {}),
-    mappingStatus: suggestion.mappingStatus,
-    evidence: [
-      ...suggestion.evidence,
-      ...(suggestion.mappingStatus === "direct_match" && suggestion.datasetVariable
-        ? ["Methodome accepted this exact metadata match automatically."]
-        : [])
-    ],
-    ...(suggestion.mappingStatus === "direct_match" && suggestion.datasetVariable
-      ? { confirmedBy: "methodome:auto:exact_metadata" }
-      : {})
-  }));
+  const mappings = generated.suggestions
+    .filter((suggestion) => {
+      const existing = existingByConcept.get(
+        normalizeConcept(suggestion.researchConcept)
+      );
+      return !existing?.confirmedBy;
+    })
+    .map((suggestion) => {
+      const existing = existingByConcept.get(
+        normalizeConcept(suggestion.researchConcept)
+      );
+      return {
+        id: existing?.id ?? stableMappingId(suggestion.researchConcept),
+        researchConcept: suggestion.researchConcept,
+        ...(suggestion.datasetVariable
+          ? { datasetVariable: suggestion.datasetVariable }
+          : {}),
+        mappingStatus: suggestion.mappingStatus,
+        evidence: [
+          ...suggestion.evidence,
+          ...(suggestion.mappingStatus === "direct_match" &&
+          suggestion.datasetVariable
+            ? ["Methodome accepted this exact metadata match automatically."]
+            : [])
+        ],
+        ...(suggestion.mappingStatus === "direct_match" &&
+        suggestion.datasetVariable
+          ? { confirmedBy: "methodome:auto:exact_metadata" }
+          : {})
+      };
+    });
 
   await saveVariableMappings(c.env.DB, {
     projectId,
@@ -701,7 +716,9 @@ async function orchestratorMapVariables(
       autoResolvedCount,
       reviewCount,
       unresolvedCount,
-      mappingCount: mappings.length
+      mappingCount: mappings.length,
+      preservedResearcherConfirmedMappings:
+        state.mappings.filter((mapping) => Boolean(mapping.confirmedBy)).length
     }
   });
 
