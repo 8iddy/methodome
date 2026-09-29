@@ -111,6 +111,36 @@
         }
       ],
       "validation_status": "draft"
+    },
+    {
+      "rule_id": "competing-risks-001",
+      "topic": "competing_risks",
+      "decision": "Do not treat a competing event that prevents the event of interest as ordinary noninformative censoring.",
+      "conditions": [
+        "Outcome is time-to-event",
+        "A distinct event can occur first and prevent observation of the event of interest"
+      ],
+      "action": "Set competingRisks=true and route the analysis to a competing-risk method family rather than ordinary survival analysis alone; distinguish cause-specific and subdistribution targets before method choice.",
+      "assumptions": [],
+      "diagnostics": [
+        "Event coding",
+        "Competing-event frequency",
+        "Target estimand: cause-specific hazard versus cumulative-incidence/subdistribution target"
+      ],
+      "warnings": [
+        "Conventional survival analysis can be biased in the presence of competing risks.",
+        "Cause-specific and subdistribution hazard models answer different questions and should not be treated as interchangeable."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-033-survival-analysis-in-the-presence-of-competing-risks",
+          "support": "The source states that competing risks can hinder observation of the outcome and that conventional survival analysis can be biased, and presents cause-specific and subdistribution hazard models.",
+          "section": "Abstract and Introduction",
+          "page": null
+        }
+      ],
+      "validation_status": "draft"
     }
   ]
 }
