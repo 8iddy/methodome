@@ -230,6 +230,218 @@
         ],
         "recognized_domain": "psychometrics"
       }
+    },
+    {
+      "case_id": "syn-011",
+      "question": "Is mean haemoglobin different between two independent treatment groups?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "cross_sectional",
+        "paired": false,
+        "clustered": false,
+        "survey_weights": false
+      },
+      "variables": {
+        "outcome": {
+          "type": "continuous"
+        },
+        "group": {
+          "type": "binary"
+        }
+      },
+      "expected": {
+        "recognized_domain": "independent_two_sample_t",
+        "required_checks": [
+          "independence",
+          "distribution",
+          "variance"
+        ],
+        "blocked": false
+      }
+    },
+    {
+      "case_id": "syn-012",
+      "question": "Did mean blood pressure change from baseline to follow-up in the same participants?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "longitudinal",
+        "paired": true,
+        "repeated": true
+      },
+      "variables": {
+        "outcome": {
+          "type": "continuous"
+        },
+        "pair_id": {
+          "type": "identifier"
+        }
+      },
+      "expected": {
+        "recognized_domain": "paired_t",
+        "analyze_within_pair_differences": true,
+        "avoid": [
+          "independent_two_sample_t"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-013",
+      "question": "Do mean waiting times differ across four independent clinic types?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "cross_sectional",
+        "clustered": false
+      },
+      "variables": {
+        "outcome": {
+          "type": "continuous"
+        },
+        "group": {
+          "type": "categorical_nominal",
+          "levels": 4
+        }
+      },
+      "expected": {
+        "recognized_domain": "anova",
+        "prefer_over_unadjusted_pairwise_t_tests": true
+      }
+    },
+    {
+      "case_id": "syn-014",
+      "question": "Do satisfaction scores differ across four independent groups when parametric conditions are unsuitable?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "cross_sectional",
+        "clustered": false
+      },
+      "variables": {
+        "outcome": {
+          "type": "categorical_ordinal"
+        },
+        "group": {
+          "type": "categorical_nominal",
+          "levels": 4
+        }
+      },
+      "expected": {
+        "recognized_domain": "kruskal_wallis",
+        "block_plain_anova_if_measurement_or_assumptions_unsuitable": true
+      }
+    },
+    {
+      "case_id": "syn-015",
+      "question": "What is the typical length of stay?",
+      "objective_type": "descriptive",
+      "data_features": {
+        "distribution": "right_skewed",
+        "outliers": true
+      },
+      "variables": {
+        "outcome": {
+          "type": "continuous"
+        }
+      },
+      "expected": {
+        "primary_centre_summary": "median",
+        "also_report": [
+          "distribution_shape",
+          "spread"
+        ],
+        "avoid": [
+          "mean_only"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-016",
+      "question": "What proportion of facilities experienced a stockout?",
+      "objective_type": "descriptive",
+      "variables": {
+        "outcome": {
+          "type": "binary"
+        }
+      },
+      "expected": {
+        "summaries": [
+          "count",
+          "proportion"
+        ],
+        "avoid": [
+          "numeric_mean_without_binary_context"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-017",
+      "question": "What is the effect of the programme on facility readiness using treated and comparison districts before and after implementation?",
+      "objective_type": "causal",
+      "design": {
+        "study_design": "longitudinal",
+        "comparison_group": true,
+        "before_after": true
+      },
+      "expected": {
+        "recognized_domain": "difference_in_differences",
+        "required_assumption": "parallel_or_equal_trends",
+        "do_not_reduce_to_pre_post_only": true
+      }
+    },
+    {
+      "case_id": "syn-018",
+      "question": "What is the treatment effect on 12-month outcome in this observational cohort?",
+      "objective_type": "causal",
+      "design": {
+        "study_design": "cohort",
+        "randomized": false
+      },
+      "expected": {
+        "requires_identification_gate": true,
+        "required_assumptions": [
+          "exchangeability",
+          "positivity",
+          "consistency"
+        ],
+        "avoid": [
+          "ordinary_adjusted_association_as_causal_proof"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-019",
+      "question": "How well does the model predict 30-day readmission in new patients?",
+      "objective_type": "prediction",
+      "variables": {
+        "outcome": {
+          "type": "binary"
+        }
+      },
+      "expected": {
+        "required_evaluation": [
+          "discrimination",
+          "calibration",
+          "validation"
+        ],
+        "warning": "apparent_development_performance_can_be_optimistic"
+      }
+    },
+    {
+      "case_id": "syn-020",
+      "question": "What is time to cardiovascular death when non-cardiovascular death can prevent observing the event of interest?",
+      "objective_type": "prognostic",
+      "variables": {
+        "outcome": {
+          "type": "time_to_event"
+        }
+      },
+      "data_features": {
+        "competing_event": true
+      },
+      "expected": {
+        "recognized_domain": "competing_risks",
+        "avoid": [
+          "ordinary_survival_analysis_that_treats_competing_event_as_noninformative_censoring"
+        ]
+      }
     }
   ]
 }
