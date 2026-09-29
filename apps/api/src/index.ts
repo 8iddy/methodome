@@ -494,6 +494,264 @@ async function computeProjectReadiness(
   };
 }
 
+
+async function runProtocolExtractionForProject(
+  c: import("hono").Context<AppBindings>,
+  projectId: string
+) {
+  if (!c.env.FILES) {
+    throw new Error("Research file storage is required for protocol extraction.");
+  }
+  if (!c.env.AI) {
+    throw new Error("Workers AI is required for protocol extraction.");
+  }
+
+  const policy = await getProjectPolicy(c.env.DB, projectId);
+  if (policy) {
+    assertModelRequestAllowed(policy, {
+      processorId: "workers-ai",
+      providerKind: "internal",
+      payloadKind: "document_text",
+      containsIdentifiers: policy.containsIdentifiableData
+    });
+  }
+
+  const protocolFiles = await listProjectFiles(c.env.DB, projectId, "protocol");
+  const fileId = protocolFiles[0]?.id;
+  if (!fileId) throw new Error("Upload a protocol before extraction.");
+
+  const file = await getFileRecord(c.env.DB, fileId, getUserId(c));
+  if (!file || file.projectId !== projectId || file.fileKind !== "protocol") {
+    throw new Error("The protocol file could not be read.");
+  }
+  if (file.checksumSha256 === "pending") {
+    throw new Error("Finish uploading the protocol before extraction.");
+  }
+
+  const object = await c.env.FILES.get(file.objectKey);
+  if (!object) throw new Error("The stored protocol file could not be read.");
+
+  const text = await researchFileToText({
+    env: c.env,
+    filename: file.filename,
+    ...(file.mediaType ? { mediaType: file.mediaType } : {}),
+    bytes: await object.arrayBuffer()
+  });
+  const extraction = await extractProtocolWithAi(c.env, text);
+  const id = makeId("extract");
+
+  await saveProtocolExtraction(c.env.DB, {
+    id,
+    projectId,
+    protocolFileId: file.id,
+    protocolChecksum: file.checksumSha256,
+    extraction,
+    provider: "cloudflare-workers-ai",
+    model: PROTOCOL_EXTRACTION_MODEL,
+    promptVersion: PROTOCOL_EXTRACTION_PROMPT_VERSION
+  });
+
+  await addAudit(c, {
+    projectId,
+    action: "orchestrator_protocol_information_extracted",
+    objectType: "protocol_extraction",
+    objectId: id,
+    modelId: PROTOCOL_EXTRACTION_MODEL,
+    after: {
+      protocolFileId: file.id,
+      protocolChecksum: file.checksumSha256,
+      promptVersion: PROTOCOL_EXTRACTION_PROMPT_VERSION,
+      researchQuestionCount: extraction.researchQuestions.length
+    }
+  });
+
+  return extraction;
+}
+
+async function createOrchestratedDraftPlan(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+): Promise<AnalysisPlan> {
+  if (state.plan) return state.plan;
+  if (!state.specification || !state.resolvedSpecification) {
+    throw new Error("Confirm the study specification before building a plan.");
+  }
+  if (!state.resolvedDatasetVersionId) {
+    throw new Error("A quantitative analysis dataset is required before building a plan.");
+  }
+
+  const analyses: PlannedAnalysis[] = [];
+  for (const question of state.resolvedSpecification.researchQuestions) {
+    if (question.objectiveType === "qualitative") continue;
+
+    const outcomes = question.outcomes.filter((item) => item.datasetVariable);
+    const predictors = question.predictors.flatMap((item) =>
+      item.datasetVariable ? [item.datasetVariable] : []
+    );
+    const covariates = question.covariates.flatMap((item) =>
+      item.datasetVariable ? [item.datasetVariable] : []
+    );
+
+    if (outcomes.length === 0) continue;
+
+    for (const outcome of outcomes) {
+      const scoped = structuredClone(state.resolvedSpecification);
+      const scopedQuestion = scoped.researchQuestions.find(
+        (item) => item.id === question.id
+      );
+      if (!scopedQuestion) continue;
+      scopedQuestion.outcomes = [outcome];
+
+      const selection = selectCandidateMethods(scoped, question.id);
+      const executable = selection.candidates.filter(
+        (candidate) => candidate.executable
+      );
+      if (executable.length === 0) {
+        throw new Error(
+          `No executable candidate is available for ${question.id} outcome ${outcome.concept}.`
+        );
+      }
+
+      const selected = executable.length === 1 ? executable[0] : undefined;
+      const requiredDecisions = selected?.decisionRequired
+        ? [selected.decisionRequired]
+        : executable.length > 1
+          ? [
+              `Choose one method from: ${executable
+                .map((candidate) => candidate.displayName)
+                .join(", ")}.`
+            ]
+          : [];
+
+      analyses.push({
+        id: makeId("analysis"),
+        researchQuestionId: question.id,
+        outcome: outcome.datasetVariable!,
+        predictors,
+        covariates,
+        candidateMethodIds: executable.map((candidate) => candidate.methodId),
+        ...(selected ? { selectedMethodId: selected.methodId } : {}),
+        requiredDecisions,
+        warnings: selection.warnings,
+        diagnostics: Array.from(
+          new Set(executable.flatMap((candidate) => candidate.requiredChecks))
+        ),
+        addedAfterLock: false
+      });
+    }
+  }
+
+  if (analyses.length === 0) {
+    throw new Error(
+      "No quantitative research question is ready for an executable draft plan."
+    );
+  }
+
+  const now = new Date().toISOString();
+  const plan = buildAnalysisPlan({
+    id: makeId("plan"),
+    projectId,
+    versionId: `plan-${Date.now()}`,
+    datasetVersionId: state.resolvedDatasetVersionId,
+    studySpecificationVersion: state.specification.version,
+    status: "planned_before_analysis",
+    analyses,
+    createdBy: getUserId(c),
+    createdAt: now
+  });
+
+  await saveAnalysisPlan(c.env.DB, plan);
+  await addAudit(c, {
+    projectId,
+    action: "orchestrator_analysis_plan_created",
+    objectType: "analysis_plan",
+    objectId: plan.id,
+    after: plan
+  });
+  return plan;
+}
+
+function analysisJobSignature(input: {
+  methodId: string;
+  outcome?: string;
+  predictors: string[];
+  covariates: string[];
+}): string {
+  return JSON.stringify({
+    methodId: input.methodId,
+    outcome: input.outcome ?? null,
+    predictors: input.predictors,
+    covariates: input.covariates
+  });
+}
+
+async function enqueueOrchestratedPlan(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  plan: AnalysisPlan
+) {
+  if (!plan.lockedAt || !plan.lockHash) {
+    throw new Error("The analysis plan must be locked before execution.");
+  }
+  if (!plan.datasetVersionId) {
+    throw new Error("The locked plan does not identify an analysis dataset.");
+  }
+
+  const existing = await listAnalysisJobsForPlan(c.env.DB, projectId, plan.id);
+  const protectedSignatures = new Set(
+    existing
+      .filter(({ state }) => !["failed", "cancelled"].includes(state))
+      .map(({ job }) => analysisJobSignature(job))
+  );
+
+  const queued: string[] = [];
+  for (const analysis of plan.analyses) {
+    if (!analysis.selectedMethodId) {
+      throw new Error(
+        `Analysis ${analysis.id} has no approved method and cannot be executed.`
+      );
+    }
+
+    const signature = analysisJobSignature({
+      methodId: analysis.selectedMethodId,
+      outcome: analysis.outcome,
+      predictors: analysis.predictors,
+      covariates: analysis.covariates
+    });
+    if (protectedSignatures.has(signature)) continue;
+
+    const job: AnalysisJob = {
+      jobId: makeId("job"),
+      projectId,
+      datasetVersionId: plan.datasetVersionId,
+      analysisPlanId: plan.id,
+      methodId: analysis.selectedMethodId,
+      outcome: analysis.outcome,
+      predictors: analysis.predictors,
+      covariates: analysis.covariates,
+      filters: [],
+      requestedBy: getUserId(c),
+      registryVersion,
+      createdAt: new Date().toISOString()
+    };
+
+    await createAnalysisJob(c.env.DB, job, "queued");
+    await c.env.ANALYSIS_QUEUE.send({ jobId: job.jobId, projectId });
+    await addAudit(c, {
+      projectId,
+      action: "orchestrator_analysis_job_created",
+      objectType: "analysis_job",
+      objectId: job.jobId,
+      after: job
+    });
+    protectedSignatures.add(signature);
+    queued.push(job.jobId);
+  }
+
+  return queued;
+}
+
 const createProjectSchema = z.object({
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).optional(),
