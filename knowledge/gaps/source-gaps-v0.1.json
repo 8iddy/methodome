@@ -29,6 +29,20 @@
       "need": "Primary source-backed rule for Spearman correlation, including ordinal/monotonic use and diagnostics.",
       "reason": "The currently extracted STAT 200 correlation source focuses on Pearson correlation.",
       "status": "open"
+    },
+    {
+      "gap_id": "gap-negative-binomial-001",
+      "topic": "negative_binomial_regression",
+      "need": "Primary source-backed decision rule for when negative-binomial regression should replace or supplement Poisson regression, including overdispersion diagnostics.",
+      "reason": "The current corpus yields direct support for routing Poisson counts to Poisson regression, but the scanned Agresti text has not yet yielded extractable count-model guidance and no other extracted source gives a sufficient negative-binomial decision rule.",
+      "status": "open"
+    },
+    {
+      "gap_id": "gap-poisson-dispersion-001",
+      "topic": "poisson_regression",
+      "need": "Source-backed operational guidance for dispersion assessment, excess zeros, and model adequacy before automated Poisson recommendation.",
+      "reason": "Current extracted guidance supports Poisson regression for Poisson counts but does not support a complete automated diagnostic threshold.",
+      "status": "open"
     }
   ]
 }
