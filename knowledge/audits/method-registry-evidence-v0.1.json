@@ -22,15 +22,17 @@
       "registry_maturity": "validated",
       "executable": true,
       "computational_status": "existing_runtime_validated",
-      "methodology_status": "partial",
+      "methodology_status": "source_backed_draft",
       "evidence_sources": [
         "src-061-penn-state-stat-200-elementary-statistics"
       ],
       "rule_ids": [
-        "var-type-001"
+        "var-type-001",
+        "descriptive-categorical-001",
+        "descriptive-continuous-001"
       ],
-      "finding": "Variable-type dependence is source-backed, but a complete variable-type-specific descriptive summary rule set has not yet been encoded.",
-      "action": "Keep executable. Do not treat the registry maturity label as proof that automated descriptive choices are expert-benchmark validated."
+      "finding": "Variable-type dependence, categorical count/proportion summaries, and quantitative mean-versus-median decisions by distribution shape and outliers are source-backed.",
+      "action": "Keep executable; extend count/rate/date summaries and validate automatic descriptive choices against the expert methodology benchmark."
     },
     {
       "method_id": "pearson_correlation",
