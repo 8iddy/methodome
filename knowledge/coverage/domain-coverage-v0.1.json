@@ -76,8 +76,8 @@
     },
     {
       "domain": "multinomial_ordinal_logistic",
-      "status": "registered",
-      "notes": "Categorical-analysis source family present but not yet extracted into rules."
+      "status": "ruled",
+      "notes": "Nominal versus ordinal response-scale routing is now source-backed with draft rules. Model-specific assumptions and diagnostics, including ordinal-model assumptions, remain pending before autonomous recommendation."
     },
     {
       "domain": "poisson_negative_binomial",
