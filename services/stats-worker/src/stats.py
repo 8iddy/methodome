@@ -2015,12 +2015,26 @@ def logistic_regression(
         sum(value * coefficient for value, coefficient in zip(row, beta))
         for row in x
     ]
-    event_scores = [score for score, outcome_value in zip(raw_scores, y) if outcome_value == 1.0]
-    non_event_scores = [score for score, outcome_value in zip(raw_scores, y) if outcome_value == 0.0]
-    if (
-        min(event_scores) >= max(non_event_scores) - 1e-10
-        or min(non_event_scores) >= max(event_scores) - 1e-10
-    ):
+    event_scores = [
+        score
+        for score, outcome_value in zip(raw_scores, y)
+        if outcome_value == 1.0
+    ]
+    non_event_scores = [
+        score
+        for score, outcome_value in zip(raw_scores, y)
+        if outcome_value == 0.0
+    ]
+    score_tolerance = 1e-10
+    events_above_non_events = (
+        min(event_scores) >= max(non_event_scores) - score_tolerance
+        and max(event_scores) > min(non_event_scores) + score_tolerance
+    )
+    non_events_above_events = (
+        min(non_event_scores) >= max(event_scores) - score_tolerance
+        and max(non_event_scores) > min(event_scores) + score_tolerance
+    )
+    if events_above_non_events or non_events_above_events:
         raise ValueError(
             "Ordinary maximum-likelihood logistic regression is not reportable because "
             "the fitted linear predictor completely or quasi-completely separates the outcome classes. "
