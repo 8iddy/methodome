@@ -397,7 +397,11 @@ async function resolveStudySpecificationForMethods(
   ]);
   const confirmed = new Map(
     mappings
-      .filter((mapping) => mapping.confirmedBy && mapping.datasetVariable)
+      .filter(
+        (mapping) =>
+          Boolean(mapping.datasetVariable) &&
+          (Boolean(mapping.confirmedBy) || mapping.mappingStatus === "direct_match")
+      )
       .map((mapping) => [normalizeConcept(mapping.researchConcept), mapping])
   );
   const preferred = requestedDatasetVersionId
@@ -685,11 +689,7 @@ async function orchestratorMapVariables(
           suggestion.datasetVariable
             ? ["Methodome accepted this exact metadata match automatically."]
             : [])
-        ],
-        ...(suggestion.mappingStatus === "direct_match" &&
-        suggestion.datasetVariable
-          ? { confirmedBy: "methodome:auto:exact_metadata" }
-          : {})
+        ]
       };
     });
 
