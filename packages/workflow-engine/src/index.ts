@@ -421,7 +421,7 @@ function mappingSummary(
       continue;
     }
     reviewedCount += 1;
-    if (mapping.datasetVariable) representedCount += 1;
+    if (mapping?.datasetVariable) representedCount += 1;
     else gapCount += 1;
   }
 
