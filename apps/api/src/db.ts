@@ -194,6 +194,27 @@ export async function createAnalysisJob(
     .run();
 }
 
+export async function listAnalysisJobsForPlan(
+  db: D1Database,
+  projectId: string,
+  analysisPlanId: string
+): Promise<Array<{ job: AnalysisJob; state: JobState }>> {
+  const result = await db
+    .prepare(
+      `SELECT job_specification_json, state
+       FROM analysis_jobs
+       WHERE project_id = ? AND analysis_plan_id = ?
+       ORDER BY created_at ASC`
+    )
+    .bind(projectId, analysisPlanId)
+    .all<{ job_specification_json: string; state: JobState }>();
+
+  return result.results.map((row) => ({
+    job: JSON.parse(row.job_specification_json) as AnalysisJob,
+    state: row.state
+  }));
+}
+
 export async function getAnalysisJob(
   db: D1Database,
   jobId: string,
