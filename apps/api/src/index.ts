@@ -2698,6 +2698,7 @@ function inferResearchFileKindFromName(file: {
 
 async function inferResearchFileKind(
   c: ApiContext,
+  projectId: string,
   file: {
     filename: string;
     mediaType?: string;
@@ -2729,7 +2730,7 @@ async function inferResearchFileKind(
       lower.endsWith(".docx") ||
       lower.endsWith(".doc")
     ) {
-      const policy = await getProjectPolicy(c.env.DB, c.req.param("projectId"));
+      const policy = await getProjectPolicy(c.env.DB, projectId);
       if (policy) {
         assertModelRequestAllowed(policy, {
           processorId: "workers-ai",
@@ -2893,8 +2894,14 @@ app.post("/projects/:projectId/conversation/messages", async (c) => {
 
     const inferred =
       file.fileKind === "other"
-        ? await inferResearchFileKind(c, file)
-        : file.fileKind;
+        ? await inferResearchFileKind(c, projectId, file)
+        : (file.fileKind as
+            | "protocol"
+            | "instrument"
+            | "codebook"
+            | "dataset"
+            | "transcript"
+            | "other");
     if (file.fileKind === "other" && inferred !== "other") {
       await updateProjectFileKind(c.env.DB, projectId, file.id, inferred);
     }
@@ -3256,7 +3263,8 @@ app.post(
       const priorEvidence = existing?.evidence ?? [];
       const mappingStatus = confirmAbsent
         ? "no_match"
-        : existing?.datasetVariable === datasetVariable &&
+        : existing &&
+            existing.datasetVariable === datasetVariable &&
             ["direct_match", "probable_match", "uncertain"].includes(
               existing.mappingStatus
             )
