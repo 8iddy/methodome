@@ -79,6 +79,9 @@ def test_logistic_regression_runs_and_returns_odds_ratios():
     diagnostic_ids = {item["id"] for item in result["diagnostics"]}
     assert "max_abs_pearson_residual" in diagnostic_ids
     assert "max_abs_deviance_residual" in diagnostic_ids
+    assert "coefficient_stability_review" in diagnostic_ids
+    assert "standard_error_stability_review" in diagnostic_ids
+    assert "fitted_probability_range" in diagnostic_ids
 
 
 def test_chi_square_flags_expected_counts():
@@ -308,6 +311,42 @@ def test_group_comparison_rejects_covariates():
         assert False, "expected ValueError"
     except ValueError as exc:
         assert "no covariates" in str(exc)
+
+
+
+
+def test_logistic_sparse_outcome_is_reviewed_without_fixed_epv_rejection():
+    csv_text = (
+        "x,y\n"
+        "0,1\n0,0\n0,0\n0,0\n0,0\n0,0\n0,0\n0,0\n0,0\n0,0\n"
+        "1,1\n1,0\n1,0\n1,0\n1,0\n1,0\n1,0\n1,0\n1,0\n1,0\n"
+    )
+    result = run_analysis(
+        {
+            "methodId": "binary_logistic_regression",
+            "csv": csv_text,
+            "outcome": "y",
+            "predictors": ["x"],
+        }
+    )
+
+    assert result["n"] == 20
+    diagnostics = {item["id"]: item for item in result["diagnostics"]}
+
+    assert diagnostics["outcome_events"]["value"] == 2
+    assert diagnostics["outcome_non_events"]["value"] == 18
+    assert diagnostics["sparse_data_review"]["status"] == "review"
+    assert (
+        "does not use a fixed events-per-variable cutoff"
+        in diagnostics["sparse_data_review"]["message"]
+    )
+    assert diagnostics["coefficient_stability_review"]["status"] == "review"
+    assert diagnostics["standard_error_stability_review"]["status"] == "review"
+    assert diagnostics["fitted_probability_range"]["status"] == "passed"
+    assert not any(
+        "10" in warning and "event" in warning.lower()
+        for warning in result["warnings"]
+    )
 
 
 def test_logistic_regression_refuses_zero_cell_separation():
