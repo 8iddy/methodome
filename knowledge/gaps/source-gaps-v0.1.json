@@ -1,0 +1,20 @@
+{
+  "tracker_id": "methodome-methodology-source-gaps-v0.1",
+  "updated_date": "2026-09-29",
+  "gaps": [
+    {
+      "gap_id": "gap-fisher-001",
+      "topic": "fisher_exact",
+      "need": "Primary source-backed decision rule distinguishing Fisher exact from chi-square for sparse contingency tables.",
+      "reason": "Current corpus source extracted for chi-square provides expected-count conditions but does not provide a sufficiently explicit Fisher-exact decision rule in the extracted text.",
+      "status": "open"
+    },
+    {
+      "gap_id": "gap-spearman-001",
+      "topic": "spearman_correlation",
+      "need": "Primary source-backed rule for Spearman correlation, including ordinal/monotonic use and diagnostics.",
+      "reason": "The currently extracted STAT 200 correlation source focuses on Pearson correlation.",
+      "status": "open"
+    }
+  ]
+}
