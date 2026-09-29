@@ -3,47 +3,6 @@
   "status": "draft",
   "rules": [
     {
-      "rule_id": "fisher-exact-001",
-      "topic": "fisher_exact",
-      "decision": "Prefer an exact small-sample procedure over an asymptotic two-proportion or chi-square approximation when a 2x2 independent table is sparse.",
-      "conditions": [
-        "Two independent groups",
-        "Binary/categorical outcome forming a 2x2 table",
-        "Large-sample approximation assumptions are not satisfied"
-      ],
-      "action": "Consider Fisher exact test and do not rely on an ordinary chi-square or z approximation solely because the table is 2x2.",
-      "assumptions": [
-        "Independent observations",
-        "Fixed/observed 2x2 contingency table structure"
-      ],
-      "diagnostics": [
-        "Observed cell counts",
-        "Expected counts",
-        "Group sizes"
-      ],
-      "warnings": [
-        "Do not use expected-count thresholds mechanically without considering the exact table structure and analysis objective."
-      ],
-      "exceptions": [
-        "For larger RxC tables or complex survey/clustered data, use a method appropriate to that structure rather than automatically applying 2x2 Fisher exact."
-      ],
-      "source_evidence": [
-        {
-          "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
-          "support": "NIST identifies Fisher Exact Probability Test as an exact nonparametric option for two small independent samples in a 2x2 table.",
-          "section": "7.3.3 Comparing two proportions",
-          "page": null
-        },
-        {
-          "source_id": "src-068-penn-state-stat-200-elementary-statistics",
-          "support": "Penn State states that Fisher's exact method may be used when normal-approximation assumptions for two independent proportions are not met.",
-          "section": "Lesson 9",
-          "page": "2 of 27"
-        }
-      ],
-      "validation_status": "draft"
-    },
-    {
       "rule_id": "wilcoxon-rank-sum-001",
       "topic": "nonparametric_two_sample",
       "decision": "Use a rank-based two-sample procedure as an alternative when independent-sample mean-comparison assumptions are unsuitable and the estimand matches a distributional/location comparison.",
