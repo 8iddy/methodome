@@ -227,6 +227,42 @@ async function main() {
       "first scientific checkpoint"
     );
 
+    for (let checkpoint = 0; checkpoint < 4; checkpoint += 1) {
+      const studyDecision = conversation.orchestrator.decisions.find(
+        (decision) => decision.kind === "confirm_study_design"
+      );
+      if (!studyDecision) break;
+
+      if (studyDecision.options?.length) {
+        const association =
+          studyDecision.options.find(
+            (option) => option.id === "association"
+          ) ?? studyDecision.options[0];
+        if (!association) {
+          throw new Error(
+            `Study-design checkpoint did not expose a usable interpretation: ${JSON.stringify(
+              studyDecision
+            )}`
+          );
+        }
+        await resolveDecision(studyDecision.id, {
+          choiceId: association.id
+        });
+      } else {
+        await resolveDecision(studyDecision.id, { approved: true });
+      }
+      console.log("PASS in-thread study interpretation confirmation");
+
+      conversation = await waitForConversation(
+        (payload) =>
+          payload.orchestrator.status === "waiting_for_researcher" &&
+          !payload.orchestrator.decisions.some(
+            (decision) => decision.id === studyDecision.id
+          ),
+        "post-study-interpretation checkpoint"
+      );
+    }
+
     const methodDecision = conversation.orchestrator.decisions.find(
       (decision) => decision.kind === "select_method"
     );
@@ -340,6 +376,7 @@ async function main() {
     const actions = new Set(audit.payload.events.map((event) => event.action));
     for (const action of [
       "orchestrator_protocol_information_extracted",
+      "conversation_study_interpretation_confirmed",
       "orchestrator_variable_mappings_proposed",
       "conversation_analysis_method_selected",
       "conversation_analysis_plan_approved",
