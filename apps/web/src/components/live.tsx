@@ -2153,7 +2153,9 @@ function LiveVariables({ projectId }: { projectId: string }) {
 
       const nextRows = Array.from(usageMap.values()).map(({ concept, usages }) => {
         const stored = existing.get(conceptKey(concept));
-        if (stored) {
+        const candidate = suggested.get(conceptKey(concept));
+
+        if (stored?.confirmedBy) {
           return {
             researchConcept: concept,
             usages,
@@ -2162,22 +2164,26 @@ function LiveVariables({ projectId }: { projectId: string }) {
               : {}),
             mappingStatus: stored.mappingStatus,
             evidence: stored.evidence,
-            confirmed: Boolean(stored.confirmedBy)
+            confirmed: true
           };
         }
 
-        const candidate = suggested.get(conceptKey(concept));
+        const refreshed = candidate ?? stored;
         return {
           researchConcept: concept,
           usages,
-          ...(candidate?.datasetVariable
-            ? { datasetVariable: candidate.datasetVariable }
+          ...(refreshed?.datasetVariable
+            ? { datasetVariable: refreshed.datasetVariable }
             : {}),
-          mappingStatus: candidate?.mappingStatus ?? "no_match",
+          mappingStatus: refreshed?.mappingStatus ?? "no_match",
           evidence:
-            candidate?.evidence ??
+            refreshed?.evidence ??
             ["Methodome did not find enough evidence to resolve this concept automatically."],
-          confirmed: false
+          confirmed:
+            Boolean(
+              refreshed?.datasetVariable &&
+                refreshed.mappingStatus === "direct_match"
+            )
         };
       });
 
