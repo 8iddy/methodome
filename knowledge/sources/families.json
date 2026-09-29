@@ -1,6 +1,6 @@
 {
   "corpus_id": "methodome-methodology-corpus-v1",
-  "family_count": 31,
+  "family_count": 33,
   "note": "Files from one textbook/course/guideline family are grouped so evidence weight is not inflated by chapter-level PDF splitting.",
   "families": [
     {
@@ -629,6 +629,46 @@
       "authority_tier": "A",
       "role": "reporting",
       "priority": "low"
+    },
+    {
+      "family_id": "family-correlation-coefficients-appropriate-use-and-interpretation",
+      "title": "Correlation Coefficients: Appropriate Use and Interpretation",
+      "organization": "Anesthesia & Analgesia",
+      "year": 2018,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-075-correlation-coefficients-appropriate-use-and-interpretation"
+      ],
+      "domains": [
+        "correlation",
+        "pearson_correlation",
+        "spearman_correlation",
+        "association",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data",
+      "title": "Quasi-Poisson vs. Negative Binomial Regression: How Should We Model Overdispersed Count Data?",
+      "organization": "Ecology / Ecological Society of America",
+      "year": 2007,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data"
+      ],
+      "domains": [
+        "count_regression",
+        "poisson_regression",
+        "negative_binomial_regression",
+        "overdispersion",
+        "model_selection"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
     }
   ]
 }
