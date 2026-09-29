@@ -74,6 +74,7 @@ export type WorkflowStageStatus =
 
 export type OrchestratorAutomaticAction =
   | "extract_protocol"
+  | "map_variables"
   | "create_draft_plan"
   | "run_analyses"
   | "prepare_qualitative_analysis"
