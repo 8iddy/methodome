@@ -31,17 +31,24 @@ export function DocumentationContent() {
         </div>
       </nav>
 
-      {documentationSections.map((section) => (
-        <section className="panel" id={section.id} key={section.id}>
-          <h2>{section.title}</h2>
-          <p>{section.summary}</p>
-          <ul>
-            {section.points.map((point) => (
-              <li key={point}>{point}</li>
-            ))}
-          </ul>
-        </section>
-      ))}
+      {documentationSections.map((section) => {
+        const listSection = ["current-methods", "current-limits"].includes(section.id);
+        return (
+          <section className="panel documentation-section" id={section.id} key={section.id}>
+            <h2>{section.title}</h2>
+            <p className="documentation-prose">
+              {section.summary} {!listSection ? section.points.join(" ") : ""}
+            </p>
+            {listSection && (
+              <ul className="documentation-list">
+                {section.points.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }
