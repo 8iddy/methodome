@@ -181,7 +181,7 @@
       "conditions": [
         "Multiple imputation is selected as the missing-data strategy"
       ],
-      "action": "Include variables in the substantive analysis and, as feasible, observed variables predictive of the missing values and variables associated with the missingness process. Check that variable types, transformations and study structure are represented appropriately.",
+      "action": "Include variables in the substantive analysis and, as feasible, observed variables predictive of the missing values and variables associated with the missingness process. Use variable-appropriate conditional imputation models, preserve compatibility with the substantive analysis, create multiple imputed datasets, pool analysis estimates and uncertainty across imputations, and inspect imputation-model behaviour rather than treating software completion as validation.",
       "assumptions": [
         "The imputation model is compatible enough with the substantive analysis for the intended inference",
         "The stated MAR-type assumptions are scientifically plausible"
@@ -191,11 +191,17 @@
         "Distribution and plausibility of imputed values",
         "Compatibility with substantive model",
         "Convergence/stability for iterative procedures",
-        "Sensitivity to missingness assumptions"
+        "Sensitivity to missingness assumptions",
+        "Variable-specific imputation model and link/function",
+        "Pooling across imputed datasets",
+        "Perfect-prediction or separation failures in categorical imputation models",
+        "Observed-versus-imputed distribution checks"
       ],
       "warnings": [
         "Do not treat multiple imputation as automatically unbiased merely because software produced imputed datasets.",
-        "Do not use number or percentage missing as the sole reason to select multiple imputation."
+        "Do not use number or percentage missing as the sole reason to select multiple imputation.",
+        "MICE software convergence or completion does not by itself establish that the imputation model is scientifically or statistically adequate.",
+        "Perfect prediction in categorical imputation models can produce unstable or inappropriate imputations."
       ],
       "exceptions": [
         "MNAR analyses require additional assumptions and sensitivity models beyond an ordinary MAR imputation workflow."
@@ -206,6 +212,12 @@
           "support": "Recommends including substantive-analysis variables and variables predictive of missing values or the missingness process to make MAR assumptions more plausible.",
           "section": "Plausibility of missing at random assumption",
           "page": "4"
+        },
+        {
+          "source_id": "src-086-royston-white-mice-implementation-stata",
+          "support": "Royston and White describe the chained-equation algorithm, variable-specific imputation models, pooling with Rubin's rules, perfect-prediction problems, and the need to inspect imputation quality.",
+          "section": "Sections 2-4, 8.5 and 9",
+          "page": "2-18"
         }
       ],
       "validation_status": "draft"
