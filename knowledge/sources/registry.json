@@ -1,7 +1,7 @@
 {
   "corpus_id": "methodome-methodology-corpus-v1",
   "drive_folder_id": "1HExso0MBgFlAonZz3CR6aqMi3Ws4ODc8",
-  "file_count": 74,
+  "file_count": 76,
   "generated_date": "2026-09-29",
   "authority_tiers": {
     "A": "Authoritative guideline, official institutional source, major methodological text, or major methods paper.",
@@ -1493,6 +1493,50 @@
       "priority": "high",
       "metadata_status": "provisional",
       "extraction_status": "not_started"
+    },
+    {
+      "source_id": "src-075-correlation-coefficients-appropriate-use-and-interpretation",
+      "drive_id": "1HMQkw-ELpQDB_l4E6uop3sW_cnT95pei",
+      "file_name": "Correlation-coefficients.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 309910,
+      "source_family": "Correlation Coefficients: Appropriate Use and Interpretation",
+      "organization": "Anesthesia & Analgesia",
+      "year": 2018,
+      "domains": [
+        "correlation",
+        "pearson_correlation",
+        "spearman_correlation",
+        "association",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data",
+      "drive_id": "1VApEe0IAN3eZVOpR7zkM9wxQEiwLo1Ai",
+      "file_name": "QUASI-POISSON VS. NEGATIVE BINOMIAL REGRESSION_ HOW SHOULD WE MOD.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 254205,
+      "source_family": "Quasi-Poisson vs. Negative Binomial Regression: How Should We Model Overdispersed Count Data?",
+      "organization": "Ecology / Ecological Society of America",
+      "year": 2007,
+      "domains": [
+        "count_regression",
+        "poisson_regression",
+        "negative_binomial_regression",
+        "overdispersion",
+        "model_selection"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
     }
   ]
 }
