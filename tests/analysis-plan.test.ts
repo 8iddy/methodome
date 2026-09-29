@@ -64,6 +64,7 @@ describe("analysis plan locking", () => {
   });
 
   it("refuses to lock an unresolved plan", async () => {
+    const { selectedMethodId: _selected, ...unresolvedAnalysis } = analysis;
     const plan = createAnalysisPlan({
       id: "plan_unresolved",
       projectId: "proj_1",
@@ -72,9 +73,8 @@ describe("analysis plan locking", () => {
       status: "planned_before_analysis",
       analyses: [
         {
-          ...analysis,
-          id: "ana_unresolved",
-          selectedMethodId: undefined
+          ...unresolvedAnalysis,
+          id: "ana_unresolved"
         }
       ],
       createdBy: "user_1",
@@ -87,6 +87,7 @@ describe("analysis plan locking", () => {
   });
 
   it("updates a draft method only within its candidate set", () => {
+    const { selectedMethodId: _selected, ...unresolvedAnalysis } = analysis;
     const plan = createAnalysisPlan({
       id: "plan_choice",
       projectId: "proj_1",
@@ -95,8 +96,7 @@ describe("analysis plan locking", () => {
       status: "planned_before_analysis",
       analyses: [
         {
-          ...analysis,
-          selectedMethodId: undefined,
+          ...unresolvedAnalysis,
           candidateMethodIds: [
             "independent_two_sample_t",
             "mann_whitney"
