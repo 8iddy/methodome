@@ -3,6 +3,7 @@ import type { AnalysisPlan } from "@methodome/analysis-contracts";
 import type { CandidateSelection } from "@methodome/method-registry";
 import type { StudySpecification } from "@methodome/study-spec";
 import {
+  AUTO_MAPPING_EVIDENCE_MARKER,
   assessProjectReadiness,
   buildOrchestratorView,
   type ProjectWorkflowSnapshot,
@@ -86,12 +87,14 @@ function mapping(
   datasetVariable?: string,
   confirmed = true,
   mappingStatus: VariableMappingSnapshot["mappingStatus"] =
-    datasetVariable ? "direct_match" : "no_match"
+    datasetVariable ? "direct_match" : "no_match",
+  evidence: string[] = []
 ): VariableMappingSnapshot {
   return {
     researchConcept: concept,
     ...(datasetVariable ? { datasetVariable } : {}),
     mappingStatus,
+    evidence,
     ...(confirmed ? { confirmedBy: "user-1" } : {})
   };
 }
@@ -174,7 +177,13 @@ describe("project readiness", () => {
     const readiness = assessProjectReadiness(
       snapshot({
         mappings: [
-          mapping("stockout frequency", "stockout_days", false, "probable_match"),
+          mapping(
+            "stockout frequency",
+            "stockout_days",
+            false,
+            "probable_match",
+            [AUTO_MAPPING_EVIDENCE_MARKER]
+          ),
           mapping("routine data use", "data_use_score")
         ]
       })
