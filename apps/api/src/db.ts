@@ -3,6 +3,16 @@ import type { StudySpecification } from "@methodome/study-spec";
 import type { AnalysisJob, AnalysisResult, JobState } from "@methodome/analysis-contracts";
 import type { ProjectProcessingPolicy } from "@methodome/policy-engine";
 import type { HashedAuditEvent } from "@methodome/provenance";
+import type {
+  QualitativeAnalysisRecord,
+  QualitativeAnalysisStatus,
+  QualitativeCodebook,
+  QualitativeCodebookVersion,
+  QualitativeCoding,
+  QualitativeSegment,
+  QualitativeTheme,
+  QualitativeThemeVersion
+} from "@methodome/qualitative-analysis";
 
 function parseJson<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback;
@@ -1168,6 +1178,355 @@ export async function listProjectFiles(
     ...(row.media_type ? { mediaType: String(row.media_type) } : {}),
     checksumSha256: String(row.checksum_sha256),
     ...(row.size_bytes != null ? { sizeBytes: Number(row.size_bytes) } : {}),
+    createdBy: String(row.created_by),
+    createdAt: String(row.created_at)
+  }));
+}
+
+
+export async function createQualitativeAnalysis(
+  db: D1Database,
+  input: {
+    analysis: QualitativeAnalysisRecord;
+    segments: QualitativeSegment[];
+  }
+): Promise<void> {
+  const statements: D1PreparedStatement[] = [
+    db
+      .prepare(
+        `INSERT INTO qualitative_analyses
+         (id, project_id, research_question_id, status, source_file_ids_json,
+          created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        input.analysis.id,
+        input.analysis.projectId,
+        input.analysis.researchQuestionId,
+        input.analysis.status,
+        JSON.stringify(input.analysis.sourceFileIds),
+        input.analysis.createdBy,
+        input.analysis.createdAt,
+        input.analysis.updatedAt
+      )
+  ];
+
+  for (const segment of input.segments) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO qualitative_segments
+           (id, analysis_id, project_id, file_id, segment_index, text,
+            start_char, end_char, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+          segment.id,
+          segment.analysisId,
+          segment.projectId,
+          segment.fileId,
+          segment.segmentIndex,
+          segment.text,
+          segment.startChar,
+          segment.endChar,
+          segment.createdAt
+        )
+    );
+  }
+
+  await db.batch(statements);
+}
+
+export async function listQualitativeAnalyses(
+  db: D1Database,
+  projectId: string
+): Promise<QualitativeAnalysisRecord[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, project_id, research_question_id, status,
+              source_file_ids_json, created_by, created_at, updated_at
+       FROM qualitative_analyses
+       WHERE project_id = ?
+       ORDER BY created_at ASC`
+    )
+    .bind(projectId)
+    .all<Record<string, unknown>>();
+
+  return result.results.map((row) => ({
+    id: String(row.id),
+    projectId: String(row.project_id),
+    researchQuestionId: String(row.research_question_id),
+    status: String(row.status) as QualitativeAnalysisStatus,
+    sourceFileIds: parseJson<string[]>(
+      String(row.source_file_ids_json ?? "[]"),
+      []
+    ),
+    createdBy: String(row.created_by),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at)
+  }));
+}
+
+export async function getQualitativeAnalysis(
+  db: D1Database,
+  projectId: string,
+  analysisId: string
+): Promise<QualitativeAnalysisRecord | null> {
+  const row = await db
+    .prepare(
+      `SELECT id, project_id, research_question_id, status,
+              source_file_ids_json, created_by, created_at, updated_at
+       FROM qualitative_analyses
+       WHERE project_id = ? AND id = ?
+       LIMIT 1`
+    )
+    .bind(projectId, analysisId)
+    .first<Record<string, unknown>>();
+
+  return row
+    ? {
+        id: String(row.id),
+        projectId: String(row.project_id),
+        researchQuestionId: String(row.research_question_id),
+        status: String(row.status) as QualitativeAnalysisStatus,
+        sourceFileIds: parseJson<string[]>(
+          String(row.source_file_ids_json ?? "[]"),
+          []
+        ),
+        createdBy: String(row.created_by),
+        createdAt: String(row.created_at),
+        updatedAt: String(row.updated_at)
+      }
+    : null;
+}
+
+export async function updateQualitativeAnalysisStatus(
+  db: D1Database,
+  projectId: string,
+  analysisId: string,
+  status: QualitativeAnalysisStatus
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE qualitative_analyses
+       SET status = ?, updated_at = ?
+       WHERE project_id = ? AND id = ?`
+    )
+    .bind(status, new Date().toISOString(), projectId, analysisId)
+    .run();
+}
+
+export async function listQualitativeSegments(
+  db: D1Database,
+  analysisId: string
+): Promise<QualitativeSegment[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, analysis_id, project_id, file_id, segment_index,
+              text, start_char, end_char, created_at
+       FROM qualitative_segments
+       WHERE analysis_id = ?
+       ORDER BY file_id ASC, segment_index ASC`
+    )
+    .bind(analysisId)
+    .all<Record<string, unknown>>();
+
+  return result.results.map((row) => ({
+    id: String(row.id),
+    analysisId: String(row.analysis_id),
+    projectId: String(row.project_id),
+    fileId: String(row.file_id),
+    segmentIndex: Number(row.segment_index),
+    text: String(row.text),
+    startChar: Number(row.start_char),
+    endChar: Number(row.end_char),
+    createdAt: String(row.created_at)
+  }));
+}
+
+export async function saveQualitativeCodebookVersion(
+  db: D1Database,
+  input: QualitativeCodebookVersion
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO qualitative_codebook_versions
+       (id, analysis_id, version, source, codebook_json, model_json,
+        created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      input.id,
+      input.analysisId,
+      input.version,
+      input.source,
+      JSON.stringify(input.codebook),
+      input.model ? JSON.stringify(input.model) : null,
+      input.createdBy,
+      input.createdAt
+    )
+    .run();
+}
+
+export async function listQualitativeCodebookVersions(
+  db: D1Database,
+  analysisId: string
+): Promise<QualitativeCodebookVersion[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, analysis_id, version, source, codebook_json, model_json,
+              created_by, created_at
+       FROM qualitative_codebook_versions
+       WHERE analysis_id = ?
+       ORDER BY version ASC`
+    )
+    .bind(analysisId)
+    .all<Record<string, unknown>>();
+
+  return result.results.map((row) => ({
+    id: String(row.id),
+    analysisId: String(row.analysis_id),
+    version: Number(row.version),
+    source: String(row.source) as "model" | "researcher",
+    codebook: parseJson<QualitativeCodebook>(
+      String(row.codebook_json),
+      { codes: [] }
+    ),
+    ...(row.model_json
+      ? {
+          model: parseJson<Record<string, unknown>>(
+            String(row.model_json),
+            {}
+          )
+        }
+      : {}),
+    createdBy: String(row.created_by),
+    createdAt: String(row.created_at)
+  }));
+}
+
+export async function upsertQualitativeCodings(
+  db: D1Database,
+  codings: QualitativeCoding[]
+): Promise<void> {
+  if (codings.length === 0) return;
+  const statements = codings.map((coding) =>
+    db
+      .prepare(
+        `INSERT INTO qualitative_codings
+         (id, analysis_id, segment_id, code_id, status, source, rationale,
+          created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(analysis_id, segment_id, code_id) DO UPDATE SET
+           status = excluded.status,
+           source = excluded.source,
+           rationale = excluded.rationale,
+           created_by = excluded.created_by,
+           updated_at = excluded.updated_at`
+      )
+      .bind(
+        coding.id,
+        coding.analysisId,
+        coding.segmentId,
+        coding.codeId,
+        coding.status,
+        coding.source,
+        coding.rationale ?? null,
+        coding.createdBy,
+        coding.createdAt,
+        coding.updatedAt
+      )
+  );
+  await db.batch(statements);
+}
+
+export async function listQualitativeCodings(
+  db: D1Database,
+  analysisId: string
+): Promise<QualitativeCoding[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, analysis_id, segment_id, code_id, status, source,
+              rationale, created_by, created_at, updated_at
+       FROM qualitative_codings
+       WHERE analysis_id = ?
+       ORDER BY segment_id ASC, code_id ASC`
+    )
+    .bind(analysisId)
+    .all<Record<string, unknown>>();
+
+  return result.results.map((row) => ({
+    id: String(row.id),
+    analysisId: String(row.analysis_id),
+    segmentId: String(row.segment_id),
+    codeId: String(row.code_id),
+    status: String(row.status) as "proposed" | "confirmed" | "rejected",
+    source: String(row.source) as "model" | "researcher",
+    ...(row.rationale ? { rationale: String(row.rationale) } : {}),
+    createdBy: String(row.created_by),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at)
+  }));
+}
+
+export async function saveQualitativeThemeVersion(
+  db: D1Database,
+  input: QualitativeThemeVersion
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO qualitative_theme_versions
+       (id, analysis_id, version, source, themes_json, synthesis, model_json,
+        created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      input.id,
+      input.analysisId,
+      input.version,
+      input.source,
+      JSON.stringify(input.themes),
+      input.synthesis,
+      input.model ? JSON.stringify(input.model) : null,
+      input.createdBy,
+      input.createdAt
+    )
+    .run();
+}
+
+export async function listQualitativeThemeVersions(
+  db: D1Database,
+  analysisId: string
+): Promise<QualitativeThemeVersion[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, analysis_id, version, source, themes_json, synthesis,
+              model_json, created_by, created_at
+       FROM qualitative_theme_versions
+       WHERE analysis_id = ?
+       ORDER BY version ASC`
+    )
+    .bind(analysisId)
+    .all<Record<string, unknown>>();
+
+  return result.results.map((row) => ({
+    id: String(row.id),
+    analysisId: String(row.analysis_id),
+    version: Number(row.version),
+    source: String(row.source) as "model" | "researcher",
+    themes: parseJson<QualitativeTheme[]>(
+      String(row.themes_json),
+      []
+    ),
+    synthesis: String(row.synthesis),
+    ...(row.model_json
+      ? {
+          model: parseJson<Record<string, unknown>>(
+            String(row.model_json),
+            {}
+          )
+        }
+      : {}),
     createdBy: String(row.created_by),
     createdAt: String(row.created_at)
   }));
