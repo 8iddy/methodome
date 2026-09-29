@@ -309,6 +309,8 @@ function questionReadiness(
     };
   }
 
+  const readySelection = selection!;
+
   return {
     questionId: question.id,
     text: question.text,
@@ -317,8 +319,8 @@ function questionReadiness(
     status: "ready",
     variables: mapped.variables,
     blockers: [],
-    candidates: selection.candidates,
-    warnings: selection.warnings
+    candidates: readySelection.candidates,
+    warnings: readySelection.warnings
   };
 }
 
