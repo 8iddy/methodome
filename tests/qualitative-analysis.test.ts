@@ -161,4 +161,47 @@ describe("qualitative reference validation", () => {
       ).themes[0]?.evidenceSegmentIds
     ).toEqual(["s1"]);
   });
+
+  it("requires every code named by a theme to have confirmed cited evidence", () => {
+    const segments = [
+      segment("s1", "We can see stock balances."),
+      segment("s2", "The network is often unavailable.")
+    ];
+    const codings: QualitativeCoding[] = [
+      {
+        id: "c1",
+        analysisId: "qa1",
+        segmentId: "s1",
+        codeId: "stock_visibility",
+        status: "confirmed",
+        source: "model",
+        createdBy: "u1",
+        reviewedBy: "u1",
+        reviewedAt: "2026-09-29T00:05:00.000Z",
+        createdAt: "2026-09-29T00:00:00.000Z",
+        updatedAt: "2026-09-29T00:05:00.000Z"
+      }
+    ];
+
+    expect(() =>
+      validateThemeReferences(
+        {
+          themes: [
+            {
+              id: "theme_1",
+              label: "Information constraints",
+              summary: "Visibility and connectivity shape data use.",
+              codeIds: ["stock_visibility", "connectivity_barrier"],
+              evidenceSegmentIds: ["s1"]
+            }
+          ],
+          synthesis: "Candidate synthesis."
+        },
+        codebook,
+        codings,
+        segments.map((item) => item.id)
+      )
+    ).toThrow("without confirmed evidence");
+  });
+
 });
