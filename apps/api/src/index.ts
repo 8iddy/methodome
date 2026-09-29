@@ -589,9 +589,23 @@ async function createOrchestratedDraftPlan(
     throw new Error("A quantitative analysis dataset is required before building a plan.");
   }
 
+  const readyQuestionIds = new Set(
+    state.readiness.questions
+      .filter(
+        (question) =>
+          question.mode === "quantitative" && question.status === "ready"
+      )
+      .map((question) => question.questionId)
+  );
+
   const analyses: PlannedAnalysis[] = [];
   for (const question of state.resolvedSpecification.researchQuestions) {
-    if (question.objectiveType === "qualitative") continue;
+    if (
+      question.objectiveType === "qualitative" ||
+      !readyQuestionIds.has(question.id)
+    ) {
+      continue;
+    }
 
     const outcomes = question.outcomes.filter((item) => item.datasetVariable);
     const predictors = question.predictors.flatMap((item) =>
