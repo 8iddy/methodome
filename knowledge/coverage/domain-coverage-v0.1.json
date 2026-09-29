@@ -102,7 +102,7 @@
     {
       "domain": "causal_inference",
       "status": "ruled",
-      "notes": "Identification gate and difference-in-differences rule represented; IV, RDD, matching and IPW need method-specific rules."
+      "notes": "Identification gate and difference-in-differences rule represented; World Bank and Hernán/Robins sources are registered for IV, RDD, matching, standardization and IPW, but method-specific rules remain pending."
     },
     {
       "domain": "survival_time_to_event",
@@ -111,8 +111,8 @@
     },
     {
       "domain": "diagnostic_accuracy",
-      "status": "registered",
-      "notes": "Diagnostic-performance source present; rule extraction pending."
+      "status": "ruled",
+      "notes": "Diagnostic question routing plus sensitivity, specificity, predictive-value and threshold/ROC behaviour are represented; executable diagnostic workflow is still outside the current runtime."
     },
     {
       "domain": "prediction_prognosis",
@@ -121,8 +121,8 @@
     },
     {
       "domain": "psychometrics",
-      "status": "registered",
-      "notes": "COSMIN source registered; reliability/validity/factor-analysis rules pending."
+      "status": "ruled",
+      "notes": "COSMIN-backed reflective-versus-formative gate and measurement-property checks are represented; full reliability, validity, factor-analysis and invariance workflows remain to be expanded."
     },
     {
       "domain": "qualitative_analysis",
