@@ -34,6 +34,7 @@ describe("protocol extraction schema", () => {
       population: null,
       samplingDesign: null,
       repeatedMeasures: false,
+      paired: false,
       clustered: false,
       clusterConcept: null,
       surveyWeights: false,
@@ -67,6 +68,29 @@ describe("protocol extraction schema", () => {
     expect(parsed.studyDesign).toBeNull();
     expect(parsed.unitOfAnalysis).toBeNull();
     expect(parsed.samplingDesign).toBeNull();
+    expect(parsed.paired).toBeNull();
+  });
+
+  it("captures a simple paired design separately from generic repeated measures", () => {
+    const parsed = protocolExtractionSchema.parse({
+      researchQuestions: [
+        {
+          text: "Did blood pressure change from baseline to follow-up in the same participants?",
+          objectiveType: "association",
+          outcomes: ["follow-up blood pressure"],
+          predictors: ["baseline blood pressure"],
+          covariates: [],
+          estimand: "mean within-participant difference"
+        }
+      ],
+      studyDesign: "longitudinal",
+      unitOfAnalysis: "participant",
+      repeatedMeasures: true,
+      paired: true
+    });
+
+    expect(parsed.repeatedMeasures).toBe(true);
+    expect(parsed.paired).toBe(true);
   });
 });
 
@@ -91,6 +115,7 @@ describe("protocol extraction runtime", () => {
     population: "health facilities",
     samplingDesign: null,
     repeatedMeasures: false,
+    paired: false,
     clustered: false,
     clusterConcept: null,
     surveyWeights: false,
