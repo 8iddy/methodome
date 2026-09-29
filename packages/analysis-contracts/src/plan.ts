@@ -6,6 +6,15 @@ import type {
   UserId
 } from "@methodome/domain";
 
+export interface MethodologyProvenance {
+  methodId: string;
+  supportStatus:
+    | "source_supported"
+    | "source_supported_concept"
+    | "deferred";
+  ruleIds: string[];
+}
+
 export interface PlannedAnalysis {
   id: string;
   researchQuestionId: string;
@@ -17,6 +26,7 @@ export interface PlannedAnalysis {
   requiredDecisions: string[];
   warnings: string[];
   diagnostics: string[];
+  methodologyProvenance?: MethodologyProvenance[];
   addedAfterLock: boolean;
 }
 
