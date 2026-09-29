@@ -1,0 +1,271 @@
+{
+  "rule_set_id": "methodome-comparison-methods-v0.1",
+  "status": "draft",
+  "rules": [
+    {
+      "rule_id": "independent-two-sample-t-001",
+      "topic": "independent_two_sample_t_test",
+      "decision": "Use the two-sample t family only when the analytical target is a difference in population means for two independent groups.",
+      "conditions": [
+        "Outcome is quantitative",
+        "Exactly two groups or conditions are being compared",
+        "Observations in the two groups are independent",
+        "The estimand is a mean difference rather than a median, probability-of-superiority, distributional, prediction, or causal estimand",
+        "The design does not require a repeated-measures, cluster-aware, or complex-survey variance model"
+      ],
+      "action": "Treat a two-sample t procedure as a candidate. Inspect group distributions, influential outliers, sample sizes and variance structure. Use the Welch form when equal variances are not assumed; use a pooled form only when the equal-variance assumption is justified.",
+      "assumptions": [
+        "Independent observations across groups",
+        "A mean is a meaningful target for the outcome",
+        "The t-based sampling model is adequate for the data and sample structure"
+      ],
+      "diagnostics": [
+        "Group sample sizes",
+        "Group distributions and outliers",
+        "Variance heterogeneity",
+        "Independence, clustering and repeated observations"
+      ],
+      "warnings": [
+        "Do not encode n >= 30 as a universal eligibility threshold for t-tests.",
+        "Do not choose a t-test merely because there are two groups; the estimand and study design must match.",
+        "Do not use a normality test p-value as the sole automatic switch between t and rank-based procedures."
+      ],
+      "exceptions": [
+        "If observations are naturally matched or repeated on the same unit, use paired/repeated analysis instead.",
+        "If the design is clustered or survey-weighted, ordinary independent-sample standard errors are not sufficient."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-079-nist-two-sample-t-test-for-equal-means",
+          "support": "Defines the unpaired two-sample t statistic and Welch-Satterthwaite degrees of freedom, and distinguishes the pooled equal-variance special case.",
+          "section": "Two-Sample t-Test for Equal Means",
+          "page": "1-2"
+        },
+        {
+          "source_id": "src-068-penn-state-stat-200-elementary-statistics",
+          "support": "Supports routing independent quantitative two-group comparisons to independent mean inference, but its n >= 30 teaching language is not promoted to a universal Methodome cutoff.",
+          "section": "Lesson 9 Inference for Two Samples",
+          "page": "18-24"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "paired-t-001",
+      "topic": "paired_t_test",
+      "decision": "Use paired mean analysis when the same unit is measured twice or observations are naturally matched, and base the analysis on within-pair differences.",
+      "conditions": [
+        "Outcome is quantitative",
+        "Each observation in one condition has a defined corresponding observation in the other condition",
+        "The estimand is the mean within-pair difference"
+      ],
+      "action": "Construct one difference value per pair and analyze the mean of those differences. Diagnose the distribution and influential values of the difference scores rather than treating the two raw columns as independent samples.",
+      "assumptions": [
+        "Pairs are correctly matched",
+        "Pairs are independent of other pairs",
+        "The t-based model for the difference scores is adequate"
+      ],
+      "diagnostics": [
+        "Distribution of within-pair differences",
+        "Outliers among difference scores",
+        "Missing or broken pairs",
+        "Independence between pairs"
+      ],
+      "warnings": [
+        "Do not run an independent two-sample t-test on paired observations.",
+        "Do not assess the paired t procedure solely from the marginal distributions of the two raw measurements."
+      ],
+      "exceptions": [
+        "More than two repeated time points or more complex within-subject structures require a repeated-measures model rather than repeated pairwise t-tests."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
+          "support": "Defines natural pairing, before/after examples, calculation of within-pair differences, and the paired-sample t statistic.",
+          "section": "7.3.1.1 Analysis of paired observations",
+          "page": null
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "one-way-anova-001",
+      "topic": "one_way_anova",
+      "decision": "Ordinary one-way fixed-effect ANOVA is a candidate for comparing population means across multiple independent groups only when the design and error structure match the ordinary ANOVA model.",
+      "conditions": [
+        "Outcome is quantitative",
+        "A categorical fixed-effect factor defines multiple independent groups",
+        "The estimand concerns group means",
+        "Errors can reasonably be treated as independent"
+      ],
+      "action": "Fit the ANOVA model only after verifying design structure. Assess residuals for variance pattern, distributional shape, outliers, model form and order-related dependence before treating inference as adequate.",
+      "assumptions": [
+        "Independent errors",
+        "Approximately appropriate error distribution for the intended inference",
+        "Mean-zero errors under the fitted model",
+        "Comparable error variance for ordinary homoscedastic ANOVA"
+      ],
+      "diagnostics": [
+        "Residuals versus fitted values",
+        "Residuals versus observation order",
+        "Residual normality assessment",
+        "Outlier/influence review",
+        "Group variance pattern"
+      ],
+      "warnings": [
+        "Do not encode 'three or more groups = ordinary ANOVA'.",
+        "Assumptions apply to model errors/residuals, not merely raw outcome values.",
+        "Transformation is a model-remediation option, not an automatic response to a single diagnostic test."
+      ],
+      "exceptions": [
+        "Repeated measures, crossover designs, random effects, blocking, clustering or other correlated structures require a design-aware model.",
+        "If the scientific target is not a comparison of means, ordinary ANOVA may not answer the research question."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-055-penn-state-stat-502-anova-and-design-of-experiments",
+          "support": "Gives the ANOVA error assumptions and residual-based diagnostics including nonconstant variance, dependence, outliers and transformations.",
+          "section": "Lesson 3 ANOVA Models Part I",
+          "page": "3-6"
+        },
+        {
+          "source_id": "src-047-penn-state-stat-502-anova-and-design-of-experiments",
+          "support": "States that repeated observations on the same unit cannot be assumed independent and require modified modelling.",
+          "section": "Lesson 11 Introduction to Repeated Measures",
+          "page": "1 onward"
+        },
+        {
+          "source_id": "src-052-penn-state-stat-502-anova-and-design-of-experiments",
+          "support": "Distinguishes fixed from random effects and shows that random-effects and mixed models change model specification and hypothesis testing.",
+          "section": "Lesson 6 Random Effects and Introduction to Mixed Models",
+          "page": "1 onward"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "wilcoxon-signed-rank-001",
+      "topic": "wilcoxon_signed_rank",
+      "decision": "Use Wilcoxon signed-rank only for paired data when a rank-based analysis of within-pair differences is appropriate and the difference distribution is plausibly symmetric.",
+      "conditions": [
+        "Observations are paired or matched",
+        "A within-pair difference can be defined",
+        "A rank-based shift analysis is appropriate",
+        "The population distribution of differences is plausibly symmetric about the target"
+      ],
+      "action": "Compute within-pair differences, remove zero differences according to the selected implementation, rank the absolute nonzero differences, and use their signs and ranks for inference.",
+      "assumptions": [
+        "Correct pairing",
+        "Independent pairs",
+        "Symmetry of the distribution of differences for the usual signed-rank interpretation"
+      ],
+      "diagnostics": [
+        "Difference-score distribution",
+        "Symmetry of differences",
+        "Number of zero differences and ties",
+        "Outlying differences"
+      ],
+      "warnings": [
+        "Do not use Wilcoxon signed-rank as an automatic response to any failed normality test.",
+        "Do not confuse paired signed-rank with the independent-sample Wilcoxon-Mann-Whitney procedure."
+      ],
+      "exceptions": [
+        "If symmetry of differences is not plausible, another paired-data method may be more appropriate."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
+          "support": "Defines the signed-rank procedure for paired differences and explicitly requires a symmetric distribution of differences.",
+          "section": "6.5 A Nonparametric Alternative: The Wilcoxon Signed-Rank Test",
+          "page": "319 onward"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "mann-whitney-001",
+      "topic": "mann_whitney",
+      "decision": "Do not interpret Wilcoxon-Mann-Whitney as a generic test of equal medians or as an automatic 'non-normal t-test'.",
+      "conditions": [
+        "Two independent groups are being compared",
+        "Outcome is ordinal or quantitative and rank-based comparison is scientifically meaningful"
+      ],
+      "action": "Treat the procedure as a rank/distribution comparison. Where the probability-of-superiority estimand is appropriate, interpret the tested quantity as Pr(X1 < X2) + Pr(X1 = X2)/2 with null value 0.5. Use a location/median interpretation only when additional distributional assumptions justify it.",
+      "assumptions": [
+        "Independent groups",
+        "Observations can be ordered/ranked",
+        "The chosen interpretation matches the distributional assumptions"
+      ],
+      "diagnostics": [
+        "Group distribution shapes",
+        "Variance/spread differences",
+        "Ties",
+        "Outliers",
+        "Whether a pure location-shift interpretation is plausible"
+      ],
+      "warnings": [
+        "Mann-Whitney is not generally a test of medians.",
+        "A significant result can reflect distributional differences other than median/location.",
+        "Do not route automatically from 'non-normal outcome' to Mann-Whitney without considering the estimand."
+      ],
+      "exceptions": [
+        "Paired observations require a paired rank procedure such as signed-rank when its assumptions fit."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-080-divine-wilcoxon-mann-whitney-fails-test-medians",
+          "support": "Shows the tenuous relationship to medians, formulates the probability-of-superiority quantity actually tested, and discusses the stronger pure-shift assumptions needed for a location interpretation.",
+          "section": "Abstract and Sections 1-5",
+          "page": "278-283"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "kruskal-wallis-001",
+      "topic": "kruskal_wallis",
+      "decision": "Use Kruskal-Wallis only when several independent groups are being compared with a scientifically appropriate rank-based distributional target.",
+      "conditions": [
+        "Three or more independent groups are being compared",
+        "Outcome is ordinal or quantitative and can be ranked",
+        "A rank-based comparison is appropriate"
+      ],
+      "action": "Rank the observations across groups and test for evidence of between-group distributional/rank differences. Inspect group shapes, spreads, ties and design structure before attaching a location or median interpretation.",
+      "assumptions": [
+        "Independent observations across groups",
+        "Rankable outcome",
+        "The design is not paired, repeated, clustered or otherwise correlated without additional modelling"
+      ],
+      "diagnostics": [
+        "Group distribution shapes",
+        "Group spreads",
+        "Ties",
+        "Outliers",
+        "Independence and study design"
+      ],
+      "warnings": [
+        "Do not encode 'three or more groups + non-normal = Kruskal-Wallis'.",
+        "Do not describe Kruskal-Wallis as a universal median test without additional distributional assumptions.",
+        "A significant result does not by itself identify which groups differ."
+      ],
+      "exceptions": [
+        "Repeated or matched multi-condition observations require a repeated-measures rank method rather than Kruskal-Wallis."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
+          "support": "Provides the Kruskal-Wallis rank-based procedure for several populations with unknown distributions.",
+          "section": "7.4.1 Kruskal-Wallis test",
+          "page": null
+        },
+        {
+          "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
+          "support": "Treats Kruskal-Wallis as a nonparametric alternative in multi-group central-value comparisons and provides rank-based implementation context.",
+          "section": "8.6 A Nonparametric Alternative: The Kruskal-Wallis Test",
+          "page": "428-431"
+        }
+      ],
+      "validation_status": "draft"
+    }
+  ]
+}
