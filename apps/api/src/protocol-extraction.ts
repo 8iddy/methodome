@@ -39,6 +39,7 @@ export const protocolExtractionSchema = z.object({
   population: z.string().nullable().default(null),
   samplingDesign: z.string().nullable().default(null),
   repeatedMeasures: z.boolean().nullable().default(null),
+  paired: z.boolean().nullable().default(null),
   clustered: z.boolean().nullable().default(null),
   clusterConcept: z.string().nullable().default(null),
   surveyWeights: z.boolean().nullable().default(null),
@@ -112,6 +113,7 @@ const extractionJsonSchema = {
     population: { type: ["string", "null"] },
     samplingDesign: { type: ["string", "null"] },
     repeatedMeasures: { type: ["boolean", "null"] },
+    paired: { type: ["boolean", "null"] },
     clustered: { type: ["boolean", "null"] },
     clusterConcept: { type: ["string", "null"] },
     surveyWeights: { type: ["boolean", "null"] },
@@ -131,6 +133,7 @@ const extractionJsonSchema = {
     "population",
     "samplingDesign",
     "repeatedMeasures",
+    "paired",
     "clustered",
     "clusterConcept",
     "surveyWeights",
@@ -143,7 +146,7 @@ const extractionJsonSchema = {
 } as const;
 
 export const PROTOCOL_EXTRACTION_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
-export const PROTOCOL_EXTRACTION_PROMPT_VERSION = "protocol-extraction-v3";
+export const PROTOCOL_EXTRACTION_PROMPT_VERSION = "protocol-extraction-v4";
 const PROTOCOL_EXTRACTION_MAX_TOKENS = 4096;
 const PROTOCOL_INPUT_CHAR_LIMIT = 68000;
 
