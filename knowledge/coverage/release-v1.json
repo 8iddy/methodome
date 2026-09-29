@@ -1,0 +1,98 @@
+{
+  "release_id": "methodome-methodology-knowledge-v1",
+  "release_date": "2026-09-29",
+  "release_status": "source_supported",
+  "source_freeze": {
+    "google_drive_folder_id": "1HExso0MBgFlAonZz3CR6aqMi3Ws4ODc8",
+    "raw_files": 87,
+    "source_families": 40,
+    "duplicate_files_registered_without_independent_evidence_vote": 1
+  },
+  "corpus": {
+    "evidence_records": 107,
+    "operational_rules": 62,
+    "synthetic_methodology_regression_cases": 32
+  },
+  "status_meaning": {
+    "source_supported": "Evidence statements and operational rules are traceable to registered sources and have passed corpus consistency review.",
+    "validated": "Reserved for a later expert-labelled protocol-to-analysis benchmark. No v1 rule is being called methodology-validated merely because it is source-supported."
+  },
+  "executable_runtime_methods": [
+    "descriptive_statistics",
+    "pearson_correlation",
+    "spearman_correlation",
+    "chi_square",
+    "fisher_exact",
+    "linear_regression",
+    "binary_logistic_regression"
+  ],
+  "source_supported_nonruntime_branches": [
+    "independent_two_sample_t",
+    "paired_t",
+    "one_way_anova",
+    "wilcoxon_signed_rank",
+    "mann_whitney",
+    "kruskal_wallis",
+    "complex_survey_analysis",
+    "repeated_measures_and_cluster_gates",
+    "causal_identification_and_difference_in_differences",
+    "interrupted_time_series",
+    "diagnostic_accuracy",
+    "competing_risks",
+    "psychometric_safeguards",
+    "statistical_analysis_plan",
+    "reporting_guidance"
+  ],
+  "deferred_non_blocking": [
+    {
+      "topic": "advanced_count_models",
+      "includes": [
+        "negative_binomial_selection",
+        "zero_inflated_models",
+        "hurdle_models",
+        "full_poisson_dispersion_remediation"
+      ],
+      "reason": "Rules deliberately stop short of autonomous selection; current runtime does not execute these models."
+    },
+    {
+      "topic": "deep_general_mice_guidance",
+      "includes": [
+        "White_Royston_Wood_2011_enrichment"
+      ],
+      "reason": "Existing v1 sources support conservative MI/MICE safeguards; deeper implementation guidance is a v1.1 enrichment."
+    },
+    {
+      "topic": "qualitative_analysis_execution",
+      "reason": "Qualitative objectives are recognized and protected from inappropriate quantitative routing, but autonomous coding/thematic analysis is outside v1."
+    },
+    {
+      "topic": "advanced_bayesian_sem_and_specialized_models",
+      "reason": "Outside the first autonomous analysis boundary."
+    }
+  ],
+  "hard_safeguards": [
+    "No universal n>=30 t-test rule.",
+    "No three-or-more-groups implies ordinary ANOVA rule.",
+    "No Mann-Whitney equals generic median test or non-normal t-test rule.",
+    "No overdispersion automatically implies negative-binomial rule.",
+    "No fixed 10-events-per-variable pass/fail rule.",
+    "No ordinary maximum-likelihood logistic estimates accepted under detected separation.",
+    "No missingness-percentage threshold automatically selects multiple imputation.",
+    "No complex survey treated as iid by using weights alone.",
+    "No repeated, clustered or paired observations silently treated as independent.",
+    "No observational adjusted association automatically labeled causal.",
+    "No Cronbach alpha alone treated as proof of validity or unidimensionality.",
+    "No interrupted time series reduced to a simple pre/post comparison."
+  ],
+  "next_validation_stage": {
+    "requirement": "expert-labelled protocol-to-analysis benchmark",
+    "planned_scale": [
+      20,
+      40,
+      100,
+      250,
+      500
+    ],
+    "note": "Synthetic cases are software regression tests, not substitutes for expert methodological validation."
+  }
+}
