@@ -110,6 +110,33 @@
       "section": "Lesson 9: More on Transformations",
       "page": "41 of 73",
       "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-spearman-001",
+      "topic": "spearman_correlation",
+      "statement": "Spearman rank correlation can be used for ordinal data, nonnormally distributed continuous data, or data with relevant outliers as a measure of monotonic association.",
+      "source_id": "src-075-correlation-coefficients-appropriate-use-and-interpretation",
+      "section": "Abstract and Spearman discussion",
+      "page": "1763-1765",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-spearman-002",
+      "topic": "spearman_correlation",
+      "statement": "Spearman correlation does not require normally distributed data and can be used for nonlinear monotonic relationships that are continuously increasing or decreasing.",
+      "source_id": "src-075-correlation-coefficients-appropriate-use-and-interpretation",
+      "section": "Assumptions of a Pearson Correlation",
+      "page": "1765",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-spearman-003",
+      "topic": "correlation_diagnostics",
+      "statement": "Correlation analysis should inspect relationship form and relevant outliers, and ordinary Pearson or Spearman correlation assumes each observed x-y pair is independent of the other pairs; repeated observations from the same subject violate this independence condition.",
+      "source_id": "src-075-correlation-coefficients-appropriate-use-and-interpretation",
+      "section": "Assumptions and interpretation",
+      "page": "1764-1765",
+      "support_type": "direct"
     }
   ]
 }
