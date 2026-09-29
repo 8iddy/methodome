@@ -581,7 +581,10 @@ function chooseNextAction(
     );
   }
 
-  if (mapping.totalConcepts > 0 && snapshot.mappings.length === 0) {
+  if (
+    mapping.totalConcepts > 0 &&
+    snapshot.mappings.length < mapping.totalConcepts
+  ) {
     return action(
       "map_variables",
       "Resolve analytical variables",
