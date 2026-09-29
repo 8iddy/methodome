@@ -1,0 +1,124 @@
+{
+  "batch_id": "method-selection-causal-sap-batch-2",
+  "status": "draft",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-fisher-001",
+      "topic": "fisher_exact",
+      "statement": "For two independent groups with a binary classification, Fisher's exact test is an exact small-sample alternative when large-sample approximations are not suitable.",
+      "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
+      "section": "7.3.3 Comparing two proportions",
+      "page": null,
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-fisher-002",
+      "topic": "fisher_exact",
+      "statement": "Penn State guidance states that when normal-approximation assumptions for two independent proportions are not met, Fisher's exact method, bootstrap, or randomization methods may be used.",
+      "source_id": "src-068-penn-state-stat-200-elementary-statistics",
+      "section": "Lesson 9: Inference for Two Samples",
+      "page": "2 of 27",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-nonparam-001",
+      "topic": "nonparametric_two_sample",
+      "statement": "The Wilcoxon rank-sum test is presented as a nonparametric alternative for comparing two population central values with independent samples and is equivalent to the Mann-Whitney U test.",
+      "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
+      "section": "Chapter 6.3",
+      "page": "305-313",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-nonparam-002",
+      "topic": "nonparametric_paired",
+      "statement": "The Wilcoxon signed-rank test is presented as a nonparametric alternative for paired-data inference.",
+      "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
+      "section": "Chapter 6.5",
+      "page": "319 onward",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-anova-001",
+      "topic": "anova",
+      "statement": "One-way analysis of variance compares population means across more than two groups under independence, equal-variance, and normality conditions; independence is the most critical of these design conditions.",
+      "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
+      "section": "Chapter 8.3-8.4",
+      "page": "414-421",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-kruskal-001",
+      "topic": "kruskal_wallis",
+      "statement": "Kruskal-Wallis is presented as a nonparametric alternative for comparing more than two population central values when the usual ANOVA conditions are unsuitable.",
+      "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
+      "section": "Chapter 8.6",
+      "page": "428 onward",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-causal-001",
+      "topic": "causal_identification",
+      "statement": "Hernán and Robins treat exchangeability, positivity, and consistency as core identifiability conditions for causal inference from observational data.",
+      "source_id": "src-027-causal-inference-what-if",
+      "section": "Chapter 3: Observational studies",
+      "page": "27-38",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-causal-002",
+      "topic": "causal_inference",
+      "statement": "Randomization is valued because it is expected to produce exchangeability between treated and untreated groups with respect to potential outcomes.",
+      "source_id": "src-027-causal-inference-what-if",
+      "section": "Chapter 2.1 Randomization",
+      "page": "13-17",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-causal-003",
+      "topic": "impact_evaluation",
+      "statement": "Impact Evaluation in Practice distinguishes randomized assignment, instrumental variables, regression discontinuity, difference-in-differences, and matching as different strategies whose validity depends on their own assignment rules and assumptions.",
+      "source_id": "src-028-impact-evaluation-in-practice-2nd-ed",
+      "section": "Part Two: How to Evaluate",
+      "page": "63-156",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-causal-004",
+      "topic": "difference_in_differences",
+      "statement": "The World Bank guidance explicitly identifies an equal-trends assumption as a key condition for difference-in-differences designs.",
+      "source_id": "src-028-impact-evaluation-in-practice-2nd-ed",
+      "section": "Chapter 7",
+      "page": "129-141",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-sap-001",
+      "topic": "prespecification",
+      "statement": "ICH E9 states that the precise definition of the primary variable used in analysis should be specified in the protocol to avoid multiplicity and post-hoc definition concerns.",
+      "source_id": "src-024-ich-e9-statistical-principles-for-clinical-trials",
+      "section": "2.2.2 Primary and Secondary Variables",
+      "page": "7-8",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-sap-002",
+      "topic": "analysis_sets",
+      "statement": "ICH E9 treats prespecification, analysis sets, missing values/outliers, estimation and hypothesis testing, multiplicity adjustments, and subgroup/covariate analysis as distinct analysis-plan considerations.",
+      "source_id": "src-024-ich-e9-statistical-principles-for-clinical-trials",
+      "section": "Section V Data Analysis Considerations",
+      "page": "23-29",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-sap-003",
+      "topic": "statistical_analysis_plan",
+      "statement": "Gamble et al. provide a minimum-content framework for statistical analysis plans intended to improve transparency and reproducibility of clinical-trial analysis.",
+      "source_id": "src-026-guidelines-for-the-content-of-statistical-analysis-plans-in-clinical-trials",
+      "section": "Recommendations and Conclusions",
+      "page": "2337-2343",
+      "support_type": "direct"
+    }
+  ]
+}
