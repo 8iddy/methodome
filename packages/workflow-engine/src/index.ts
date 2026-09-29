@@ -1062,6 +1062,25 @@ export function buildOrchestratorView(
     });
   }
 
+
+  if (
+    decisions.length === 0 &&
+    [
+      "add_protocol",
+      "upload_dataset",
+      "prepare_qualitative_analysis",
+      "review_project"
+    ].includes(readiness.nextAction.code) &&
+    readiness.nextAction.requiresResearcher
+  ) {
+    decisions.push({
+      id: `decision:input:${readiness.nextAction.code}`,
+      kind: "provide_input",
+      prompt: readiness.nextAction.detail,
+      blocking: true
+    });
+  }
+
   if (plan && !plan.lockedAt) {
     for (const analysis of plan.analyses) {
       if (analysis.selectedMethodId) continue;
