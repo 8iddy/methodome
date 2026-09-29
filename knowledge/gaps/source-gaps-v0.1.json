@@ -7,7 +7,14 @@
       "topic": "fisher_exact",
       "need": "Primary source-backed decision rule distinguishing Fisher exact from chi-square for sparse contingency tables.",
       "reason": "Current corpus source extracted for chi-square provides expected-count conditions but does not provide a sufficiently explicit Fisher-exact decision rule in the extracted text.",
-      "status": "open"
+      "status": "closed",
+      "resolution": {
+        "source_ids": [
+          "src-002-nistsematech-e-handbook-of-statistical-methods",
+          "src-074-principles-of-epidemiology-in-public-health-practice-3rd-ed"
+        ],
+        "note": "NIST explicitly recommends Fisher exact for small independent-sample 2x2 discrete data; CDC independently notes Fisher may be more appropriate for smaller studies."
+      }
     },
     {
       "gap_id": "gap-spearman-001",
