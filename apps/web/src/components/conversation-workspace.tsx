@@ -238,6 +238,10 @@ export function ConversationWorkspace({
   const [knowledgeVersion, setKnowledgeVersion] = useState("");
   const [content, setContent] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [fileStates, setFileStates] = useState<
+    Record<string, "queued" | "uploading" | "uploaded">
+  >({});
+  const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const threadEnd = useRef<HTMLDivElement>(null);
@@ -290,6 +294,27 @@ export function ConversationWorkspace({
     await refresh();
   }
 
+  function fileKey(file: File) {
+    return `${file.name}:${file.size}:${file.lastModified}`;
+  }
+
+  function addFiles(next: File[]) {
+    setFiles((current) => {
+      const existing = new Set(current.map(fileKey));
+      return [
+        ...current,
+        ...next.filter((file) => !existing.has(fileKey(file)))
+      ];
+    });
+    setFileStates((current) => {
+      const updated = { ...current };
+      for (const file of next) {
+        if (!updated[fileKey(file)]) updated[fileKey(file)] = "queued";
+      }
+      return updated;
+    });
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const message = content.trim();
@@ -300,6 +325,8 @@ export function ConversationWorkspace({
     try {
       const attachmentFileIds: string[] = [];
       for (const file of files) {
+        const key = fileKey(file);
+        setFileStates((current) => ({ ...current, [key]: "uploading" }));
         const upload = await createUpload(projectId, {
           filename: file.name,
           mediaType: file.type || "application/octet-stream",
@@ -312,6 +339,7 @@ export function ConversationWorkspace({
           file.type || "application/octet-stream"
         );
         attachmentFileIds.push(upload.fileId);
+        setFileStates((current) => ({ ...current, [key]: "uploaded" }));
       }
 
       const sent = await sendProjectConversationMessage(
@@ -322,6 +350,7 @@ export function ConversationWorkspace({
       );
       setContent("");
       setFiles([]);
+      setFileStates({});
       await refresh();
       if (!sent.queued) setBusy(false);
     } catch (reason) {
@@ -387,12 +416,39 @@ export function ConversationWorkspace({
                     : "METHODOME"}
               </small>
               <p>{message.content}</p>
-              {message.attachmentFileIds.length > 0 && (
-                <span className="attachment-count">
-                  {message.attachmentFileIds.length} attached file
-                  {message.attachmentFileIds.length === 1 ? "" : "s"}
-                </span>
-              )}
+              {message.attachmentFileIds.length > 0 && (() => {
+                const classified = Array.isArray(
+                  message.metadata?.classifiedAttachments
+                )
+                  ? (message.metadata.classifiedAttachments as Array<{
+                      fileId?: string;
+                      filename?: string;
+                      fileKind?: string;
+                    }>)
+                  : [];
+                return classified.length > 0 ? (
+                  <div className="conversation-attachments">
+                    {classified.map((attachment, index) => (
+                      <span
+                        key={attachment.fileId ?? `${attachment.filename}-${index}`}
+                        className="conversation-attachment-chip"
+                      >
+                        <strong>{attachment.filename ?? "Research file"}</strong>
+                        <small>
+                          {attachment.fileKind
+                            ? human(attachment.fileKind)
+                            : "Research file"}
+                        </small>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="attachment-count">
+                    {message.attachmentFileIds.length} attached file
+                    {message.attachmentFileIds.length === 1 ? "" : "s"}
+                  </span>
+                );
+              })()}
             </article>
           ))}
 
@@ -416,14 +472,48 @@ export function ConversationWorkspace({
         </div>
 
         <form
-          className="conversation-compose conversation-compose-primary"
+          className={`conversation-compose conversation-compose-primary ${dragging ? "is-dragging" : ""}`}
           onSubmit={submit}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={(event) => {
+            if (event.currentTarget === event.target) setDragging(false);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragging(false);
+            addFiles(Array.from(event.dataTransfer.files));
+          }}
         >
           {files.length > 0 && (
             <div className="composer-files">
-              {files.map((file) => (
-                <span key={`${file.name}-${file.size}`}>{file.name}</span>
-              ))}
+              {files.map((file) => {
+                const state = fileStates[fileKey(file)] ?? "queued";
+                return (
+                  <span className="composer-file" key={fileKey(file)}>
+                    {state === "uploading" && (
+                      <ActivitySpinner label={`Uploading ${file.name}`} />
+                    )}
+                    {state === "uploaded" && (
+                      <span className="composer-file-complete" aria-hidden="true">
+                        ✓
+                      </span>
+                    )}
+                    <span>
+                      <strong>{file.name}</strong>
+                      <small>
+                        {state === "uploading"
+                          ? "Uploading…"
+                          : state === "uploaded"
+                            ? "Uploaded"
+                            : "Ready to upload"}
+                      </small>
+                    </span>
+                  </span>
+                );
+              })}
             </div>
           )}
           <textarea
@@ -441,7 +531,7 @@ export function ConversationWorkspace({
                 type="file"
                 multiple
                 onChange={(event) =>
-                  setFiles(Array.from(event.target.files ?? []))
+                  addFiles(Array.from(event.target.files ?? []))
                 }
                 disabled={busy}
               />
