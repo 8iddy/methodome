@@ -32,6 +32,7 @@ import {
   type QualitativeSegment
 } from "@methodome/qualitative-analysis";
 import {
+  AUTO_MAPPING_EVIDENCE_MARKER,
   assessProjectReadiness,
   buildOrchestratorView,
   type WorkflowSection
@@ -519,6 +520,7 @@ async function computeProjectReadiness(
           | "probable_match"
           | "uncertain"
           | "no_match",
+        evidence: mapping.evidence,
         ...(mapping.confirmedBy ? { confirmedBy: mapping.confirmedBy } : {})
       })),
       selections,
@@ -674,6 +676,7 @@ async function orchestratorMapVariables(
         mappingStatus: suggestion.mappingStatus,
         evidence: [
           ...suggestion.evidence,
+          AUTO_MAPPING_EVIDENCE_MARKER,
           ...(suggestion.mappingStatus === "direct_match" &&
           suggestion.datasetVariable
             ? ["Methodome accepted this exact metadata match automatically."]
