@@ -304,6 +304,47 @@
         }
       ],
       "validation_status": "draft"
+    },
+    {
+      "rule_id": "spearman-correlation-001",
+      "topic": "spearman_correlation",
+      "decision": "Use Spearman rank correlation when the research objective is association and a rank-based monotonic association measure fits the variable scale or data structure better than Pearson correlation.",
+      "conditions": [
+        "Research objective is to quantify strength and direction of association rather than agreement, prediction, or causal effect",
+        "Observation pairs are independent",
+        "At least one mapped variable is ordinal/ranked, or continuous data are materially non-normal, or a monotonic non-linear relationship is present, or relevant outliers make Pearson correlation unsuitable"
+      ],
+      "action": "Inspect the relationship graphically, verify monotonic form and independence, then consider Spearman rank correlation.",
+      "assumptions": [
+        "The association is monotonic",
+        "Observation pairs are independent",
+        "Variables can be meaningfully ranked"
+      ],
+      "diagnostics": [
+        "Scatterplot or equivalent relationship plot",
+        "Linear versus monotonic form",
+        "Influential or extreme observations",
+        "Independence or repeated-measures structure"
+      ],
+      "warnings": [
+        "Do not use a normality-test p-value alone as an automatic switch from Pearson to Spearman.",
+        "A coefficient near zero does not rule out a materially non-monotonic relationship.",
+        "Correlation does not establish causality.",
+        "Repeated measurements from the same unit require a correlation-aware method rather than ordinary Pearson or Spearman correlation."
+      ],
+      "exceptions": [
+        "If the relationship is materially non-monotonic, ordinary Pearson and Spearman coefficients can both be misleading.",
+        "If the objective is agreement rather than association, use an agreement method supported by the registry."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-075-correlation-coefficients-appropriate-use-and-interpretation",
+          "support": "The tutorial distinguishes Pearson linear association from Spearman monotonic association and directly supports Spearman for ordinal data, nonnormal continuous data, relevant outliers, and nonlinear monotonic form; it also states that observation pairs should be independent.",
+          "section": "Abstract; Assumptions of a Pearson Correlation",
+          "page": "1763-1765"
+        }
+      ],
+      "validation_status": "draft"
     }
   ]
 }
