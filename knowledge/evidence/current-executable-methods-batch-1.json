@@ -83,6 +83,33 @@
       "section": "Lesson 9.1: Two Independent Proportions",
       "page": "2 of 27",
       "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-logit-gof-001",
+      "topic": "logistic_regression_diagnostics",
+      "statement": "Logistic-regression goodness-of-fit procedures depend on the data structure: Pearson chi-square and deviance goodness-of-fit tests require replicated predictor patterns, while the Hosmer-Lemeshow test is presented for unreplicated data or data with few replicated observations.",
+      "source_id": "src-009-penn-state-stat-501-regression-methods",
+      "section": "Lesson 13: Goodness-of-Fit Tests",
+      "page": "18-19 of 33",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-logit-resid-001",
+      "topic": "logistic_regression_diagnostics",
+      "statement": "Deviance or Pearson residuals can be used for diagnostic plots in binary logistic regression, including residuals versus observation order.",
+      "source_id": "src-009-penn-state-stat-501-regression-methods",
+      "section": "Lesson 13: Logistic regression diagnostics and software procedures",
+      "page": "14, 29 of 33",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-poisson-001",
+      "topic": "poisson_regression",
+      "statement": "For a Poisson count response, ordinary linear-regression constant-variance assumptions are inappropriate; the source recommends Poisson regression rather than relying on a variance-stabilizing square-root transformation.",
+      "source_id": "src-013-penn-state-stat-501-regression-methods",
+      "section": "Lesson 9: More on Transformations",
+      "page": "41 of 73",
+      "support_type": "direct"
     }
   ]
 }
