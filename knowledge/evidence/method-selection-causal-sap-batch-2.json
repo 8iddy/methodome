@@ -4,24 +4,6 @@
   "extracted_date": "2026-09-29",
   "records": [
     {
-      "evidence_id": "ev-fisher-001",
-      "topic": "fisher_exact",
-      "statement": "For two independent groups with a binary classification, Fisher's exact test is an exact small-sample alternative when large-sample approximations are not suitable.",
-      "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
-      "section": "7.3.3 Comparing two proportions",
-      "page": null,
-      "support_type": "direct"
-    },
-    {
-      "evidence_id": "ev-fisher-002",
-      "topic": "fisher_exact",
-      "statement": "Penn State guidance states that when normal-approximation assumptions for two independent proportions are not met, Fisher's exact method, bootstrap, or randomization methods may be used.",
-      "source_id": "src-068-penn-state-stat-200-elementary-statistics",
-      "section": "Lesson 9: Inference for Two Samples",
-      "page": "2 of 27",
-      "support_type": "direct"
-    },
-    {
       "evidence_id": "ev-nonparam-001",
       "topic": "nonparametric_two_sample",
       "statement": "The Wilcoxon rank-sum test is presented as a nonparametric alternative for comparing two population central values with independent samples and is equivalent to the Mann-Whitney U test.",
