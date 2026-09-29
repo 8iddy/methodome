@@ -139,7 +139,7 @@ describe("qualitative reference validation", () => {
         codings,
         segments.map((item) => item.id)
       )
-    ).toThrow("without a confirmed supporting code");
+    ).toThrow("without confirmed evidence");
 
     expect(
       validateThemeReferences(
