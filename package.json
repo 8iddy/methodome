@@ -21,7 +21,8 @@
     "web:build": "npm --workspace @methodome/web run build",
     "check:integration": "npm run typecheck && npm test && npm run d1:migrate:local && npx wrangler deploy --dry-run --config wrangler.jsonc && npm run web:typecheck && npm run web:build",
     "deploy:production": "bash scripts/deploy-production.sh",
-    "smoke:production": "METHODOME_API_URL=https://api.methodome.com/api node scripts/e2e-smoke.mjs"
+    "smoke:production": "METHODOME_API_URL=https://api.methodome.com/api node scripts/e2e-smoke.mjs",
+    "smoke:conversation": "METHODOME_API_URL=https://api.methodome.com/api node scripts/e2e-conversation.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
