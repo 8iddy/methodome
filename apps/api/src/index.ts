@@ -3202,6 +3202,7 @@ app.put(
     );
 
     const now = new Date().toISOString();
+    const reviewerId = getUserId(c);
     const updates: QualitativeCoding[] = [];
 
     for (const decision of parsed.data.decisions) {
@@ -3238,13 +3239,14 @@ app.put(
       updates.push({
         ...existing,
         status: decision.status,
-        source: "researcher",
+        source: existing.source,
         ...(decision.rationale
           ? { rationale: decision.rationale }
           : existing.rationale
             ? { rationale: existing.rationale }
             : {}),
-        createdBy: getUserId(c),
+        reviewedBy: reviewerId,
+        reviewedAt: now,
         updatedAt: now
       });
     }
@@ -3274,19 +3276,19 @@ app.put(
         segmentId: assignment.segmentId,
         codeId: assignment.codeId,
         status: "confirmed",
-        source: "researcher",
+        source: existing?.source ?? "researcher",
         ...(assignment.rationale
           ? { rationale: assignment.rationale }
           : existing?.rationale
             ? { rationale: existing.rationale }
             : {}),
-        createdBy: getUserId(c),
+        createdBy: existing?.createdBy ?? reviewerId,
+        reviewedBy: reviewerId,
+        reviewedAt: now,
         createdAt: existing?.createdAt ?? now,
         updatedAt: now
       });
     }
-
-    await upsertQualitativeCodings(c.env.DB, updates);
 
     const reviewIds = Array.from(new Set(parsed.data.reviewedSegmentIds));
     for (const segmentId of reviewIds) {
@@ -3304,9 +3306,15 @@ app.put(
       }
     }
 
-    const refreshedCodings = await listQualitativeCodings(c.env.DB, analysisId);
+    const prospectiveByPair = new Map(existingByPair);
+    for (const coding of updates) {
+      prospectiveByPair.set(
+        `${coding.segmentId}\u0000${coding.codeId}`,
+        coding
+      );
+    }
     const unresolvedProposals = new Set(
-      refreshedCodings
+      Array.from(prospectiveByPair.values())
         .filter((coding) => coding.status === "proposed")
         .map((coding) => coding.segmentId)
     );
@@ -3322,6 +3330,8 @@ app.put(
         409
       );
     }
+
+    await upsertQualitativeCodings(c.env.DB, updates);
 
     await updateQualitativeSegmentCodingState(
       c.env.DB,
