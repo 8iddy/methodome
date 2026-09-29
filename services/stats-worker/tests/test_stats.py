@@ -303,6 +303,55 @@ def test_group_comparison_rejects_covariates():
         assert "no covariates" in str(exc)
 
 
+
+
+def test_logistic_sparse_outcome_is_reviewed_without_fixed_epv_rejection():
+    csv_text = (
+        "x,y\n"
+        "0,1\n0,0\n0,0\n0,0\n0,0\n0,0\n0,0\n0,0\n0,0\n0,0\n"
+        "1,1\n1,0\n1,0\n1,0\n1,0\n1,0\n1,0\n1,0\n1,0\n1,0\n"
+    )
+    result = run_analysis(
+        {
+            "methodId": "binary_logistic_regression",
+            "csv": csv_text,
+            "outcome": "y",
+            "predictors": ["x"],
+        }
+    )
+
+    assert result["n"] == 20
+    events = next(item for item in result["diagnostics"] if item["id"] == "outcome_events")
+    non_events = next(
+        item for item in result["diagnostics"] if item["id"] == "outcome_non_events"
+    )
+    sparse = next(
+        item for item in result["diagnostics"] if item["id"] == "sparse_data_review"
+    )
+    coefficient_review = next(
+        item
+        for item in result["diagnostics"]
+        if item["id"] == "coefficient_stability_review"
+    )
+    se_review = next(
+        item
+        for item in result["diagnostics"]
+        if item["id"] == "standard_error_stability_review"
+    )
+    probability_range = next(
+        item for item in result["diagnostics"] if item["id"] == "fitted_probability_range"
+    )
+
+    assert events["value"] == 2
+    assert non_events["value"] == 18
+    assert sparse["status"] == "review"
+    assert "does not use a fixed events-per-variable cutoff" in sparse["message"]
+    assert coefficient_review["status"] == "review"
+    assert se_review["status"] == "review"
+    assert probability_range["status"] == "passed"
+    assert not any("10" in warning and "event" in warning.lower() for warning in result["warnings"])
+
+
 def test_logistic_regression_refuses_zero_cell_separation():
     csv_text = (
         "group,y\n"
