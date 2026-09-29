@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Badge, Button } from "@/components/ui";
+import { ActivitySpinner, Badge, Button } from "@/components/ui";
 import {
   advanceProjectOrchestrator,
   confirmQualitativeCodebook,
@@ -69,6 +69,7 @@ export function ResearchWorkspaceHome({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const lastAutomaticAction = useRef("");
 
   async function refresh() {
     const [next, currentPlan] = await Promise.all([
@@ -77,6 +78,9 @@ export function ResearchWorkspaceHome({
     ]);
     setPayload(next);
     setPlan(currentPlan);
+    if (!next.orchestrator.automaticAction) {
+      lastAutomaticAction.current = "";
+    }
   }
 
   useEffect(() => {
@@ -84,6 +88,16 @@ export function ResearchWorkspaceHome({
       setError(err instanceof Error ? err.message : "Methodome could not read this project.")
     );
   }, [projectId]);
+
+  useEffect(() => {
+    const action = payload?.orchestrator.automaticAction;
+    if (!action || busy) return;
+
+    const key = `${action}:${payload?.readiness.nextAction.code ?? ""}`;
+    if (lastAutomaticAction.current === key) return;
+    lastAutomaticAction.current = key;
+    void advance(action);
+  }, [payload?.orchestrator.automaticAction, payload?.readiness.nextAction.code]);
 
   async function advance(action?: OrchestratorAutomaticAction) {
     setBusy(action ?? "advance");
@@ -177,11 +191,24 @@ export function ResearchWorkspaceHome({
           <p>{orchestrator.nextAction.detail}</p>
 
           {orchestrator.automaticAction && (
-            <div className="now-actions">
-              <Button onClick={() => void advance(orchestrator.automaticAction)}>
-                {busy ? "Working…" : "Continue"}
-              </Button>
-              <span className="action-note">This step does not require a research decision.</span>
+            <div className="now-actions orchestration-working" aria-live="polite">
+              <ActivitySpinner label={orchestrator.nextAction.label} />
+              <span>
+                <b>{busy ? "Methodome is working…" : "Methodome can handle this step automatically."}</b>
+                <small>{orchestrator.nextAction.detail}</small>
+              </span>
+              {!busy && lastAutomaticAction.current ===
+                `${orchestrator.automaticAction}:${readiness.nextAction.code}` && (
+                <Button
+                  variant="quiet"
+                  onClick={() => {
+                    lastAutomaticAction.current = "";
+                    void advance(orchestrator.automaticAction);
+                  }}
+                >
+                  Retry
+                </Button>
+              )}
             </div>
           )}
 
@@ -198,7 +225,7 @@ export function ResearchWorkspaceHome({
       {orchestrator.decisions.length > 0 && (
         <section className="decision-stack" aria-label="Research decisions">
           <div className="section-rule">
-            <span>YOUR DECISION</span>
+            <span>METHODOME NEEDS YOUR INPUT</span>
             <small>{orchestrator.decisions.length} item{orchestrator.decisions.length === 1 ? "" : "s"}</small>
           </div>
 
@@ -241,7 +268,7 @@ export function ResearchWorkspaceHome({
                 ) : (
                   <div className="decision-actions">
                     <Button href={decisionHref(projectId, decision, readiness)}>
-                      Review
+                      Answer this
                     </Button>
                   </div>
                 )}
@@ -251,7 +278,9 @@ export function ResearchWorkspaceHome({
         </section>
       )}
 
-      <section className="workspace-ledger">
+      <details className="workspace-inspection">
+        <summary>Inspect what Methodome has understood and completed</summary>
+        <section className="workspace-ledger">
         <div className="section-rule">
           <span>STUDY STATE</span>
           <small>{completeTasks} completed · {waitingTasks} waiting</small>
@@ -272,6 +301,7 @@ export function ResearchWorkspaceHome({
         </div>
       </section>
 
+      </section>
       <section className="workspace-questions">
         <div className="section-rule">
           <span>RESEARCH QUESTIONS</span>
@@ -311,6 +341,9 @@ export function ResearchWorkspaceHome({
           ))}
         </div>
       </section>
+
+      </section>
+      </details>
 
       <footer className="workspace-foot">
         <span>Registry {payload.registryVersion}</span>
