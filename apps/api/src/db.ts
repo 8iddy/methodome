@@ -130,20 +130,23 @@ export async function saveStudySpecification(
   id: string,
   projectId: string,
   specification: StudySpecification,
-  confirmedBy: string
+  confirmedBy?: string,
+  sourceModel?: Record<string, unknown>
 ): Promise<void> {
   await db
     .prepare(
       `INSERT INTO study_specifications
-       (id, project_id, version, specification_json, confirmed_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
+       (id, project_id, version, specification_json, source_model_json,
+        confirmed_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
       projectId,
       specification.version,
       JSON.stringify(specification),
-      confirmedBy,
+      sourceModel ? JSON.stringify(sourceModel) : null,
+      confirmedBy ?? null,
       new Date().toISOString()
     )
     .run();
@@ -1707,4 +1710,101 @@ export async function updateOrchestrationRun(
     `UPDATE project_orchestration_runs SET status = ?, iteration_count = ?, stop_reason = ?,
      error_message = ?, updated_at = ? WHERE id = ?`
   ).bind(input.status, input.iterationCount, input.stopReason ?? null, input.errorMessage ?? null, new Date().toISOString(), runId).run();
+}
+
+
+export interface ProjectConversationDecision {
+  id: string;
+  projectId: string;
+  decisionKey: string;
+  kind: string;
+  prompt: string;
+  options: Array<{ id: string; label: string; detail?: string }>;
+  context: Record<string, unknown>;
+  status: "open" | "resolved" | "superseded";
+  response?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getProjectConversationDecision(
+  db: D1Database,
+  projectId: string,
+  decisionKey: string
+): Promise<ProjectConversationDecision | null> {
+  const row = await db.prepare(
+    `SELECT id, project_id, decision_key, kind, prompt, options_json,
+            domain_context_json, status, response_json, created_at, updated_at
+     FROM project_conversation_decisions
+     WHERE project_id = ? AND decision_key = ?
+     LIMIT 1`
+  ).bind(projectId, decisionKey).first<Record<string, unknown>>();
+
+  return row
+    ? {
+        id: String(row.id),
+        projectId: String(row.project_id),
+        decisionKey: String(row.decision_key),
+        kind: String(row.kind),
+        prompt: String(row.prompt),
+        options: parseJson<Array<{ id: string; label: string; detail?: string }>>(
+          String(row.options_json ?? "[]"),
+          []
+        ),
+        context: parseJson<Record<string, unknown>>(
+          String(row.domain_context_json ?? "{}"),
+          {}
+        ),
+        status: String(row.status) as "open" | "resolved" | "superseded",
+        ...(row.response_json
+          ? {
+              response: parseJson<Record<string, unknown>>(
+                String(row.response_json),
+                {}
+              )
+            }
+          : {}),
+        createdAt: String(row.created_at),
+        updatedAt: String(row.updated_at)
+      }
+    : null;
+}
+
+export async function resolveProjectConversationDecision(
+  db: D1Database,
+  input: {
+    projectId: string;
+    decisionKey: string;
+    response: Record<string, unknown>;
+    resolvedBy: string;
+    now: string;
+  }
+): Promise<boolean> {
+  const result = await db.prepare(
+    `UPDATE project_conversation_decisions
+     SET status = 'resolved', response_json = ?, resolved_by = ?,
+         resolved_at = ?, updated_at = ?
+     WHERE project_id = ? AND decision_key = ? AND status = 'open'`
+  ).bind(
+    JSON.stringify(input.response),
+    input.resolvedBy,
+    input.now,
+    input.now,
+    input.projectId,
+    input.decisionKey
+  ).run();
+  return Number(result.meta.changes ?? 0) > 0;
+}
+
+export async function completeWaitingOrchestrationRuns(
+  db: D1Database,
+  projectId: string,
+  stopReason: string
+): Promise<void> {
+  const now = new Date().toISOString();
+  await db.prepare(
+    `UPDATE project_orchestration_runs
+     SET status = 'complete', stop_reason = ?, updated_at = ?
+     WHERE project_id = ? AND status = 'waiting'`
+  ).bind(stopReason, now, projectId).run();
 }
