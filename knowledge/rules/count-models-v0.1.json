@@ -33,6 +33,43 @@
         }
       ],
       "validation_status": "draft"
+    },
+    {
+      "rule_id": "count-overdispersion-001",
+      "topic": "count_regression_overdispersion",
+      "decision": "Do not automatically replace Poisson regression with negative-binomial regression solely because overdispersion is present.",
+      "conditions": [
+        "Outcome is a count and Poisson regression is a candidate",
+        "Observed or model-based evidence indicates variance greater than the Poisson mean-variance assumption"
+      ],
+      "action": "Flag ordinary Poisson inference for review and compare overdispersion-capable alternatives. When quasi-Poisson and negative-binomial regression are candidates, assess how the variance scales with the mean and prefer the model whose variance structure is more defensible for the data and research setting.",
+      "assumptions": [
+        "Outcome is non-negative count data",
+        "The selected model's mean-variance relationship is compatible with the observed data-generating structure"
+      ],
+      "diagnostics": [
+        "Dispersion assessment",
+        "Mean-variance relationship across the fitted range",
+        "Comparison of fitted effects and model adequacy under plausible overdispersion models"
+      ],
+      "warnings": [
+        "Overdispersion alone does not identify negative-binomial regression as the correct automatic choice.",
+        "Quasi-Poisson and negative-binomial regression weight observations differently and may produce materially different covariate estimates.",
+        "Excess zeros require a separate source-backed decision rule before zero-inflated or hurdle models can be recommended automatically."
+      ],
+      "exceptions": [
+        "If the Poisson mean-variance assumption is adequate, ordinary Poisson regression may remain appropriate.",
+        "Exposure-time offsets and rate models require their own source-backed conditions and should not be inferred from this rule alone."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data",
+          "support": "Ver Hoef & Boveng compare quasi-Poisson and negative-binomial regression for overdispersed counts and show that their linear versus quadratic mean-variance relationships alter weighting and can change covariate-effect estimates.",
+          "section": "Abstract and Introduction",
+          "page": "2766-2767"
+        }
+      ],
+      "validation_status": "draft"
     }
   ]
 }
