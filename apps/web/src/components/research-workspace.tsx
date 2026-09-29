@@ -97,7 +97,11 @@ export function ResearchWorkspaceHome({
     if (lastAutomaticAction.current === key) return;
     lastAutomaticAction.current = key;
     void advance(action);
-  }, [payload?.orchestrator.automaticAction, payload?.readiness.nextAction.code]);
+  }, [
+    payload?.orchestrator.automaticAction,
+    payload?.readiness.nextAction.code,
+    busy
+  ]);
 
   async function advance(action?: OrchestratorAutomaticAction) {
     setBusy(action ?? "advance");
