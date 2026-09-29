@@ -164,10 +164,12 @@
       "action": "Require an explicit missing-data strategy appropriate to the design, estimand and plausible missingness mechanism.",
       "assumptions": [],
       "diagnostics": [
-        "Quantify missingness by variable and analysis set; examine patterns and reasons where available."
+        "Quantify missingness by variable and analysis set; examine patterns and reasons where available.",
+        "Describe missingness patterns and observed predictors of missingness before selecting the primary strategy."
       ],
       "warnings": [
-        "Complete-case analysis is valid only under restrictive conditions and can be inappropriate as a default."
+        "Complete-case analysis is valid only under restrictive conditions and can be inappropriate as a default.",
+        "Do not choose complete-case analysis or multiple imputation from a percentage-missing threshold alone."
       ],
       "exceptions": [],
       "source_evidence": [
@@ -176,6 +178,12 @@
           "support": "The report describes restrictive validity conditions for complete-case analysis and alternative approaches including likelihood, Bayesian, GEE, Cox and multiple imputation.",
           "section": "Drawing Inferences from Incomplete Data",
           "page": "55"
+        },
+        {
+          "source_id": "src-084-sterne-multiple-imputation-potential-and-pitfalls",
+          "support": "Sterne et al. explain that complete-case analysis may be biased and may lose substantial precision and power, with validity depending on the missingness process.",
+          "section": "Consequences of missing data",
+          "page": "1-3"
         }
       ],
       "validation_status": "draft"
@@ -198,6 +206,12 @@
           "support": "The report calls for sensitivity analysis when missing data may substantially affect study findings.",
           "section": "Sensitivity analysis discussion",
           "page": null
+        },
+        {
+          "source_id": "src-084-sterne-multiple-imputation-potential-and-pitfalls",
+          "support": "Sterne et al. note that MAR versus MNAR cannot be distinguished from observed data alone and recommend sensitivity analysis for departures from unverifiable assumptions.",
+          "section": "Types of missing data / sensitivity analysis",
+          "page": "1-4"
         }
       ],
       "validation_status": "draft"
@@ -291,10 +305,12 @@
       "action": "Capture strata, primary sampling units/clusters, stages of selection, selection probabilities, and weights in the study specification before method selection.",
       "assumptions": [],
       "diagnostics": [
-        "Verify weight variable and strata/PSU variables exist in the dataset when required."
+        "Verify weight variable and strata/PSU variables exist in the dataset when required.",
+        "Confirm analysis weight, strata and PSU/cluster variables before ordinary iid analysis is allowed."
       ],
       "warnings": [
-        "Do not silently analyze a complex probability sample as a simple random sample."
+        "Do not silently analyze a complex probability sample as a simple random sample.",
+        "Sampling weights alone do not capture clustering and stratification for variance estimation."
       ],
       "exceptions": [],
       "source_evidence": [
@@ -303,6 +319,18 @@
           "support": "UN guidance treats selection probabilities, design variables, weighting, stratification, clustering and stages as core sample-design information.",
           "section": "Chapters 3, 5 and 6",
           "page": "43-55, 99-123"
+        },
+        {
+          "source_id": "src-081-nhanes-sample-design-module",
+          "support": "Official CDC/NCHS guidance shows that a complex multistage probability sample with PPS, stratification, clustering and unequal selection probabilities requires its design parameters to be carried into analysis.",
+          "section": "Sample Design",
+          "page": "1-3"
+        },
+        {
+          "source_id": "src-083-nhanes-variance-estimation-module",
+          "support": "Official CDC/NCHS guidance distinguishes the role of weights in point estimation from clustering and stratification in variance estimation.",
+          "section": "Variance Estimation",
+          "page": "1 onward"
         }
       ],
       "validation_status": "draft"
@@ -319,7 +347,9 @@
       "diagnostics": [
         "Compute sampling fraction when population size is known."
       ],
-      "warnings": [],
+      "warnings": [
+        "Do not generalize the NHANES negligible-FPC example to surveys with materially larger sampling fractions."
+      ],
       "exceptions": [],
       "source_evidence": [
         {
@@ -327,6 +357,12 @@
           "support": "UN guidance defines the finite population correction and notes it can often be ignored when the sampling fraction is small.",
           "section": "Sampling errors for survey data",
           "page": "133-134"
+        },
+        {
+          "source_id": "src-083-nhanes-variance-estimation-module",
+          "support": "NHANES provides a concrete case where a small first-stage sampling fraction makes the finite population correction close to one, illustrating that FPC relevance depends on the actual sampling fraction.",
+          "section": "Finite population correction",
+          "page": "3 onward"
         }
       ],
       "validation_status": "draft"
