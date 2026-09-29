@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { methodRegistry } from "@methodome/method-registry";
 
 const root = process.cwd();
 
@@ -100,6 +101,32 @@ describe("methodology knowledge corpus", () => {
         expect(sourceIds.has(record.source_id)).toBe(true);
         expect(["direct", "supporting"]).toContain(record.support_type);
       }
+    }
+  });
+
+  it("audits every method-registry entry without inventing extra methods", () => {
+    const audit = readJson(
+      "knowledge/audits/method-registry-evidence-v0.1.json"
+    );
+
+    const registryMethodIds = Object.keys(methodRegistry).sort();
+    const auditedMethodIds = audit.methods
+      .map((item: { method_id: string }) => item.method_id)
+      .sort();
+
+    expect(auditedMethodIds).toEqual(registryMethodIds);
+
+    for (const item of audit.methods) {
+      expect([
+        "source_backed_draft",
+        "source_backed_concept",
+        "partial",
+        "gap",
+        "out_of_runtime"
+      ]).toContain(item.methodology_status);
+      expect(methodRegistry[item.method_id]).toBeTruthy();
+      expect(item.registry_maturity).toBe(methodRegistry[item.method_id].maturity);
+      expect(item.executable).toBe(methodRegistry[item.method_id].executable);
     }
   });
 
