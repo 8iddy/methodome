@@ -1,0 +1,335 @@
+{
+  "rule_set_id": "methodome-core-methodology-rules-v0.1",
+  "status": "draft",
+  "rules": [
+    {
+      "rule_id": "rq-intent-001",
+      "topic": "research_question_intent",
+      "decision": "Distinguish prediction from explanation or causal inference before selecting methods.",
+      "conditions": [
+        "Research question aims to predict, forecast, classify, or estimate future/new-observation risk."
+      ],
+      "action": "Set objective type to prediction unless the protocol instead states a causal effect question.",
+      "assumptions": [],
+      "diagnostics": [],
+      "warnings": [
+        "Do not infer predictive validity from explanatory model fit alone."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-073-to-explain-or-to-predict",
+          "support": "Prediction and causal explanation are different modelling goals.",
+          "section": "Abstract and Introduction",
+          "page": "289-310"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "design-observational-001",
+      "topic": "study_design",
+      "decision": "Infer observational design from how exposure and outcome are ascertained over time.",
+      "conditions": [
+        "Protocol describes an observational study."
+      ],
+      "action": "Use cohort when exposure is recorded before follow-up for outcome occurrence; use case-control when sampling is based on outcome/case status with exposure assessed retrospectively; use cross-sectional when exposure and outcome are assessed at a defined point or period without follow-up.",
+      "assumptions": [],
+      "diagnostics": [],
+      "warnings": [
+        "Do not classify a mixed-methods label as the quantitative observational design."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-074-principles-of-epidemiology-in-public-health-practice-3rd-ed",
+          "support": "CDC distinguishes cohort, case-control and cross-sectional observational designs and describes cohort follow-up.",
+          "section": "Lesson One, Analytic Epidemiology",
+          "page": "1-46 to 1-48"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "estimand-001",
+      "topic": "estimands",
+      "decision": "Align the analysis target with the research question before selecting the statistical procedure.",
+      "conditions": [
+        "Research question seeks a treatment effect or other explicit target quantity."
+      ],
+      "action": "Represent the target as an estimand and require the planned statistical analysis to target that estimand.",
+      "assumptions": [],
+      "diagnostics": [],
+      "warnings": [
+        "Do not substitute a convenient estimable quantity for the question of interest without documenting the change."
+      ],
+      "exceptions": [
+        "The ICH source is trial-focused; extension to non-trial estimands requires additional supporting sources."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-025-ich-e9r1-estimands-and-sensitivity-analysis",
+          "support": "ICH E9(R1) states that estimands correspond to clinical questions and analysis should align to the estimand.",
+          "section": "A.1 Purpose and Scope",
+          "page": "2"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "repeated-001",
+      "topic": "repeated_measures",
+      "decision": "Do not analyze correlated repeated observations as independent observations.",
+      "conditions": [
+        "Same analytical unit contributes repeated measurements of an outcome."
+      ],
+      "action": "Set repeatedMeasures=true and require a method that accounts for within-unit correlation.",
+      "assumptions": [],
+      "diagnostics": [
+        "Check measurement schedule and within-unit correlation structure where method requires it."
+      ],
+      "warnings": [
+        "Ordinary independence-based standard errors and tests can be invalid."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-029-longitudinal-and-repeated-measures-analysis-tutorial",
+          "support": "Repeated measurements within subjects are correlated; ignoring correlation can invalidate estimates, standard errors, P values and confidence intervals.",
+          "section": "Introduction",
+          "page": "569"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "repeated-002",
+      "topic": "repeated_measures",
+      "decision": "Use the desired estimand/interpretation to distinguish marginal GEE from subject-specific mixed models.",
+      "conditions": [
+        "Repeated or otherwise correlated observations require regression modelling."
+      ],
+      "action": "Treat GEE as population-average/marginal and mixed-effects models as subject-specific/multilevel candidates, subject to outcome type and other requirements.",
+      "assumptions": [],
+      "diagnostics": [
+        "For GEE, specify a working correlation structure; for mixed models, assess random-effects specification and convergence."
+      ],
+      "warnings": [
+        "Do not present population-average and subject-specific effects as interchangeable."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-029-longitudinal-and-repeated-measures-analysis-tutorial",
+          "support": "The tutorial distinguishes GEE marginal population-average modelling from mixed-effect subject-specific modelling.",
+          "section": "Marginal Models: GEEs",
+          "page": null
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "cluster-001",
+      "topic": "clustered_design",
+      "decision": "Account for clustering in method selection and inference.",
+      "conditions": [
+        "Randomization, sampling, treatment delivery, or observation structure occurs in clusters."
+      ],
+      "action": "Set clustered=true, identify the cluster unit, and block ordinary independence-based planned analyses when clustering materially affects inference.",
+      "assumptions": [],
+      "diagnostics": [
+        "Record number of clusters and cluster-size distribution when available."
+      ],
+      "warnings": [
+        "Methods for individually randomized studies rarely transfer unchanged to cluster-randomized studies."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-030-key-considerations-for-cluster-randomized-trials",
+          "support": "Cluster randomized trials require distinct design and analysis considerations; individually randomized methods rarely apply unchanged.",
+          "section": "Abstract and key considerations",
+          "page": "IJE 2023;52"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "missing-001",
+      "topic": "missing_data",
+      "decision": "Do not default automatically to complete-case analysis.",
+      "conditions": [
+        "Analysis variables contain missing observations."
+      ],
+      "action": "Require an explicit missing-data strategy appropriate to the design, estimand and plausible missingness mechanism.",
+      "assumptions": [],
+      "diagnostics": [
+        "Quantify missingness by variable and analysis set; examine patterns and reasons where available."
+      ],
+      "warnings": [
+        "Complete-case analysis is valid only under restrictive conditions and can be inappropriate as a default."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-031-the-prevention-and-treatment-of-missing-data-in-clinical-trials",
+          "support": "The report describes restrictive validity conditions for complete-case analysis and alternative approaches including likelihood, Bayesian, GEE, Cox and multiple imputation.",
+          "section": "Drawing Inferences from Incomplete Data",
+          "page": "55"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "missing-002",
+      "topic": "missing_data",
+      "decision": "Require sensitivity analysis when conclusions depend materially on unverifiable missing-data assumptions.",
+      "conditions": [
+        "Missingness is substantial, plausibly informative, or the primary analysis depends on a missingness assumption that cannot be verified from observed data."
+      ],
+      "action": "Add sensitivity analysis to the analysis plan and report how conclusions change under plausible alternative assumptions.",
+      "assumptions": [],
+      "diagnostics": [],
+      "warnings": [],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-031-the-prevention-and-treatment-of-missing-data-in-clinical-trials",
+          "support": "The report calls for sensitivity analysis when missing data may substantially affect study findings.",
+          "section": "Sensitivity analysis discussion",
+          "page": null
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "survival-001",
+      "topic": "time_to_event",
+      "decision": "Recognize time-to-event outcomes as distinct from ordinary binary or continuous outcomes.",
+      "conditions": [
+        "Research question concerns time until an event and some units may be censored."
+      ],
+      "action": "Set outcome type to time_to_event and use survival-analysis candidates that account for censoring.",
+      "assumptions": [],
+      "diagnostics": [
+        "Record censoring definition and follow-up time; test method-specific assumptions such as proportional hazards when using Cox models."
+      ],
+      "warnings": [
+        "Treating censored follow-up time as an observed event time or dropping censored observations can bias results."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-032-survival-analysis-tutorial",
+          "support": "Time-to-event analysis must account for censoring; Kaplan-Meier, log-rank and Cox methods are standard approaches.",
+          "section": "Introduction",
+          "page": "792-798"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "prediction-001",
+      "topic": "prediction_models",
+      "decision": "Evaluate prediction models using both discrimination and calibration.",
+      "conditions": [
+        "Objective type is prediction."
+      ],
+      "action": "Require appropriate discrimination and calibration assessment in model evaluation; separate development performance from validation performance.",
+      "assumptions": [],
+      "diagnostics": [
+        "Discrimination",
+        "Calibration",
+        "Internal validation",
+        "External validation when available"
+      ],
+      "warnings": [
+        "Apparent performance on development data can be optimistic."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-035-developing-clinical-prediction-models-a-step-by-step-guide",
+          "support": "The BMJ guide defines discrimination and calibration and identifies overfitting/optimism and validation as central prediction-model concerns.",
+          "section": "Glossary and model performance",
+          "page": "BMJ 2024;386:e078276"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "mixed-001",
+      "topic": "mixed_methods",
+      "decision": "Classify mixed-methods integration design separately from the quantitative statistical design.",
+      "conditions": [
+        "Protocol contains both quantitative and qualitative components."
+      ],
+      "action": "Identify whether integration is convergent/concurrent, explanatory sequential, exploratory sequential, embedded/nested, or another stated design; retain quantitative and qualitative analysis requirements separately.",
+      "assumptions": [],
+      "diagnostics": [],
+      "warnings": [
+        "Do not treat 'mixed methods' or 'concurrent triangulation' as a sampling design or as a statistical method."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-037-best-practices-for-mixed-methods-research-in-the-health-sciences",
+          "support": "NIH guidance describes convergent designs as merging concurrent quantitative and qualitative data and sequential designs as one dataset building on another.",
+          "section": "The Nature and Design of Mixed Methods Research",
+          "page": "8"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "survey-001",
+      "topic": "survey_design",
+      "decision": "Preserve survey-design variables because they can change estimation and variance calculation.",
+      "conditions": [
+        "Protocol or metadata indicate probability sampling, stratification, clustering, multistage sampling, unequal selection probabilities, or sample weights."
+      ],
+      "action": "Capture strata, primary sampling units/clusters, stages of selection, selection probabilities, and weights in the study specification before method selection.",
+      "assumptions": [],
+      "diagnostics": [
+        "Verify weight variable and strata/PSU variables exist in the dataset when required."
+      ],
+      "warnings": [
+        "Do not silently analyze a complex probability sample as a simple random sample."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-072-designing-household-survey-samples-practical-guidelines",
+          "support": "UN guidance treats selection probabilities, design variables, weighting, stratification, clustering and stages as core sample-design information.",
+          "section": "Chapters 3, 5 and 6",
+          "page": "43-55, 99-123"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "survey-002",
+      "topic": "survey_design",
+      "decision": "Consider finite population correction when sampling without replacement from a finite population.",
+      "conditions": [
+        "Probability sample drawn without replacement and sampling fraction is not negligible."
+      ],
+      "action": "Record the finite population information needed for variance estimation; allow omission of FPC when the sampling fraction is small.",
+      "assumptions": [],
+      "diagnostics": [
+        "Compute sampling fraction when population size is known."
+      ],
+      "warnings": [],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-072-designing-household-survey-samples-practical-guidelines",
+          "support": "UN guidance defines the finite population correction and notes it can often be ignored when the sampling fraction is small.",
+          "section": "Sampling errors for survey data",
+          "page": "133-134"
+        }
+      ],
+      "validation_status": "draft"
+    }
+  ]
+}
