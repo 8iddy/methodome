@@ -12,10 +12,11 @@ import {
   sha256BytesHex,
   type AuditEventPayload
 } from "@methodome/provenance";
-import type { AnalysisJob, PlannedAnalysis } from "@methodome/analysis-contracts";
+import type { AnalysisJob, AnalysisPlan, PlannedAnalysis } from "@methodome/analysis-contracts";
 import {
   createAnalysisPlan as buildAnalysisPlan,
-  lockAnalysisPlan
+  lockAnalysisPlan,
+  updateAnalysisMethodSelections
 } from "@methodome/analysis-plan";
 import type { Project } from "@methodome/domain";
 import { assertModelRequestAllowed, type ProjectProcessingPolicy } from "@methodome/policy-engine";
@@ -64,6 +65,7 @@ import {
   getLatestAnalysisPlan,
   getLatestProtocolExtraction,
   listAnalysisHistory,
+  listAnalysisJobsForPlan,
   listAuditEvents,
   listDatasetVersions,
   listProjectFiles,
