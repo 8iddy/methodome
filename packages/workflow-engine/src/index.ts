@@ -844,6 +844,8 @@ export interface OrchestratorDecision {
   prompt: string;
   questionId?: string;
   analysisId?: string;
+  concept?: string;
+  role?: "outcome" | "predictor" | "covariate";
   options?: Array<{
     id: string;
     label: string;
@@ -911,6 +913,19 @@ function mappingDecisions(readiness: ProjectReadiness): OrchestratorDecision[] {
           kind: "confirm_study_design",
           prompt: blocker.message,
           questionId: blocker.questionId,
+          ...(blocker.concept ? { concept: blocker.concept } : {}),
+          ...(blocker.role ? { role: blocker.role } : {}),
+          ...(variable?.datasetVariable
+            ? {
+                options: [
+                  {
+                    id: variable.datasetVariable,
+                    label: variable.datasetVariable,
+                    detail: "Methodome's current evidence-backed suggestion."
+                  }
+                ]
+              }
+            : {}),
           blocking: true
         });
         continue;
@@ -947,6 +962,8 @@ function mappingDecisions(readiness: ProjectReadiness): OrchestratorDecision[] {
           kind: "resolve_mapping_gap",
           prompt: blocker.message,
           questionId: blocker.questionId,
+          ...(blocker.concept ? { concept: blocker.concept } : {}),
+          ...(blocker.role ? { role: blocker.role } : {}),
           blocking: true
         });
         continue;
@@ -1023,6 +1040,16 @@ export function buildOrchestratorView(
     readiness.nextAction.code === "map_variables"
       ? []
       : mappingDecisions(readiness);
+
+  if (readiness.nextAction.code === "confirm_study_design") {
+    decisions.push({
+      id: "decision:study-design",
+      kind: "confirm_study_design",
+      prompt:
+        "I have reconstructed the research questions and study structure from the protocol. Continue with this interpretation, or review it if something is wrong.",
+      blocking: true
+    });
+  }
 
   if (plan && !plan.lockedAt) {
     for (const analysis of plan.analyses) {
