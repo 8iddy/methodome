@@ -445,6 +445,91 @@ function action(
   return { code, label, detail, targetSection, requiresResearcher };
 }
 
+function qualitativeNextAction(
+  questions: QuestionReadiness[]
+): WorkflowAction | null {
+  const question =
+    questions.find(
+      (item) =>
+        item.mode === "qualitative" &&
+        item.status !== "qualitative_complete" &&
+        item.status !== "qualitative_source_required"
+    ) ?? null;
+
+  if (!question) return null;
+
+  if (question.status === "qualitative_ready") {
+    if (!question.qualitativeWorkstream) {
+      return action(
+        "prepare_qualitative_analysis",
+        "Prepare qualitative analysis",
+        "Create a source-linked qualitative workstream from the uploaded transcripts.",
+        "analysis",
+        false
+      );
+    }
+    return action(
+      "propose_qualitative_codebook",
+      "Propose an initial codebook",
+      "Methodome can draft a source-grounded codebook for researcher review.",
+      "analysis",
+      false
+    );
+  }
+
+  if (question.status === "qualitative_codebook_review") {
+    return action(
+      "review_qualitative_codebook",
+      "Review the qualitative codebook",
+      "A researcher must confirm or edit the proposed codebook before coding begins.",
+      "analysis",
+      true
+    );
+  }
+
+  if (question.status === "qualitative_coding") {
+    return action(
+      "propose_qualitative_codings",
+      "Continue source coding",
+      "Methodome can apply the confirmed codebook to the next uncoded source segments.",
+      "analysis",
+      false
+    );
+  }
+
+  if (question.status === "qualitative_coding_review") {
+    return action(
+      "review_qualitative_codings",
+      "Review qualitative coding",
+      "A researcher must confirm or reject proposed codes and review uncoded segments.",
+      "analysis",
+      true
+    );
+  }
+
+  if (question.status === "qualitative_theme_ready") {
+    return action(
+      "propose_qualitative_themes",
+      "Develop candidate themes",
+      "Confirmed coding is ready for source-linked theme development and synthesis.",
+      "analysis",
+      false
+    );
+  }
+
+  if (question.status === "qualitative_theme_review") {
+    return action(
+      "review_qualitative_themes",
+      "Review themes and synthesis",
+      "A researcher must confirm or revise candidate themes before qualitative analysis is complete.",
+      "analysis",
+      true
+    );
+  }
+
+  return null;
+}
+
 function chooseNextAction(
   snapshot: ProjectWorkflowSnapshot,
   mapping: MappingStageSummary,
@@ -529,9 +614,6 @@ function chooseNextAction(
       (question) =>
         question.mode === "quantitative" && question.status === "ready"
     );
-    const readyQualitative = questions.some(
-      (question) => question.status === "qualitative_ready"
-    );
 
     if (readyQuantitative) {
       return action(
@@ -543,13 +625,24 @@ function chooseNextAction(
       );
     }
 
-    if (readyQualitative) {
+    const qualitativeAction = qualitativeNextAction(questions);
+    if (qualitativeAction) return qualitativeAction;
+
+    const hasQualitative = questions.some(
+      (question) => question.mode === "qualitative"
+    );
+    const qualitativeComplete =
+      hasQualitative &&
+      questions
+        .filter((question) => question.mode === "qualitative")
+        .every((question) => question.status === "qualitative_complete");
+    if (qualitativeComplete) {
       return action(
-        "prepare_qualitative_analysis",
-        "Prepare qualitative analysis",
-        "Qualitative source material is ready for coding and synthesis.",
-        "analysis",
-        false
+        "review_results",
+        "Review results",
+        "The qualitative analysis is complete and ready for interpretation and reporting.",
+        "results",
+        true
       );
     }
 
@@ -582,23 +675,19 @@ function chooseNextAction(
     );
   }
 
-  if (
-    questions.some(
-      (question) =>
-        question.status === "qualitative_ready" ||
-        question.status === "qualitative_source_required"
-    )
-  ) {
-    return action(
-      "prepare_qualitative_analysis",
-      "Continue qualitative analysis",
-      "The quantitative plan is accounted for; continue the qualitative coding and synthesis workstream.",
-      "analysis",
-      false
-    );
-  }
+  const qualitativeAction = qualitativeNextAction(questions);
+  if (qualitativeAction) return qualitativeAction;
 
-  if (snapshot.completedAnalysisCount > 0) {
+  const hasQualitative = questions.some(
+    (question) => question.mode === "qualitative"
+  );
+  const qualitativeComplete =
+    !hasQualitative ||
+    questions
+      .filter((question) => question.mode === "qualitative")
+      .every((question) => question.status === "qualitative_complete");
+
+  if (snapshot.completedAnalysisCount > 0 && qualitativeComplete) {
     return action(
       "review_results",
       "Review results",
@@ -650,14 +739,35 @@ export function assessProjectReadiness(
       studyDesign: snapshot.specification ? "ready" : "missing",
       mappings: mapping.status,
       plan: snapshot.plan ? (snapshot.plan.lockedAt ? "locked" : "ready") : "missing",
-      analysis:
-        snapshot.plan &&
-        snapshot.plan.analyses.length > 0 &&
-        snapshot.completedAnalysisCount >= snapshot.plan.analyses.length
-          ? "complete"
-          : snapshot.plan?.lockedAt
-            ? "ready"
-            : "missing"
+      analysis: (() => {
+        const quantitativeQuestions = questions.filter(
+          (question) => question.mode === "quantitative"
+        );
+        const qualitativeQuestions = questions.filter(
+          (question) => question.mode === "qualitative"
+        );
+        const quantitativeComplete =
+          quantitativeQuestions.length === 0 ||
+          Boolean(
+            snapshot.plan &&
+              snapshot.plan.analyses.length > 0 &&
+              snapshot.completedAnalysisCount >= snapshot.plan.analyses.length
+          );
+        const qualitativeComplete =
+          qualitativeQuestions.length === 0 ||
+          qualitativeQuestions.every(
+            (question) => question.status === "qualitative_complete"
+          );
+
+        if (quantitativeComplete && qualitativeComplete) return "complete";
+        if (
+          snapshot.plan?.lockedAt ||
+          snapshot.qualitativeWorkstreams.length > 0
+        ) {
+          return "ready";
+        }
+        return "missing";
+      })()
     },
     mappingSummary: mapping,
     questions,
