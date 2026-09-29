@@ -52,6 +52,9 @@
       ],
       "@methodome/workflow-engine": [
         "packages/workflow-engine/src/index.ts"
+      ],
+      "@methodome/qualitative-analysis": [
+        "packages/qualitative-analysis/src/index.ts"
       ]
     },
     "types": [
