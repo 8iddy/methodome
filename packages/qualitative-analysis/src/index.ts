@@ -34,6 +34,7 @@ export interface QualitativeSegment {
   text: string;
   startChar: number;
   endChar: number;
+  codingState: "uncoded" | "proposed" | "reviewed";
   createdAt: string;
 }
 
