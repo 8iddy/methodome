@@ -2,90 +2,65 @@
 
 ## Goal
 
-Separate product interaction, research interpretation, analytical rules, statistical execution, storage, and optional model services. The application must remain usable with no language model connected.
+Methodome separates the researcher-facing conversation from scientific state, methodology rules, statistical execution, storage and model assistance. The researcher interacts with the research problem. The backend owns the analytical pipeline.
 
-## High level architecture
+## Runtime architecture
+
+The primary product surface is a Next.js research conversation. Messages and attachments are sent to the Methodome API, which persists the interaction in D1 and stores research files in R2. The API reconstructs canonical project state, applies the workflow engine and methodology rules, and queues safe background work. The browser displays progress and decisions but does not control the workflow.
+
+The quantitative execution path is:
 
 ```
 Browser
-  |
-Next.js application
-  |
-Cloudflare Worker API
-  |-- D1: application metadata
-  |-- R2: source files, derived data, reports, checkpoints
-  |-- Queues: analysis jobs
-  |-- Workflows: multi stage execution
-  |-- Model Adapter: optional model calls
-  |
-Execution Adapter
-  |-- Python container
-  |-- R container
-  |-- Quarto/report container
-  |-- external runner later
+  -> methodome-web
+  -> methodome-api
+  -> D1 / R2
+  -> methodome-analysis queue
+  -> methodome-api queue consumer
+  -> STATS service binding
+  -> methodome-stats Python Worker
+  -> structured result
+  -> D1
+  -> server-side orchestration resumes
+  -> conversation result
 ```
 
-## Front end
+The Python Worker remains the numerical authority for supported quantitative methods. The language model does not calculate statistical results.
 
-Use Next.js and TypeScript. Desktop is the main work environment. The application needs project navigation, uploads, data tables, schema comparison, study design forms, variable mapping, analysis plan review, execution states, results, diagnostics, and audit history.
+## Canonical research state
 
-## API layer
+Conversation messages are interaction history, not the scientific source of truth. Canonical research state remains in the existing project tables for files, dataset versions, protocol extractions, study specifications, variable mappings, analysis plans, jobs, results, qualitative analyses and audit events.
 
-Cloudflare Workers handle session validation, access control, project metadata, upload authorisation, job creation, model routing, result retrieval, policy enforcement, and provenance recording. Long statistical jobs must not run inside normal request handlers.
+The conversation references that state and presents it in a form a researcher can use without operating the internal pipeline.
 
-## Storage
+## Server-side orchestration
 
-D1 stores users, projects, membership, file metadata, study specifications, mappings, plans, jobs, result metadata, audit events, project policies, and validation configuration.
+A project message or research decision creates a bounded orchestration run. The API repeatedly reads canonical state, assesses readiness, performs one safe automatic action, persists the result, recomputes readiness and continues. It stops only when researcher judgment or new source material is required, an asynchronous statistical job is running, the project is complete, or an error prevents safe continuation.
 
-R2 stores original uploads, derived datasets, documents, transcripts, generated code, analysis artefacts, reports, and job checkpoints. Original uploads are immutable.
+The loop is deliberately bounded and its actions are idempotent. Existing plans, workstreams and analysis jobs are reused rather than recreated. When a Python analysis finishes, the queue consumer starts a new orchestration run so progress does not depend on the researcher keeping a browser tab open.
 
-## Execution adapter
+## Methodology knowledge
 
-The web application must not care where an analysis runs.
+The source-supported methodology corpus is bundled into a Worker-safe runtime package. Relevant rules can be retrieved for protocol interpretation, method selection, safeguards, diagnostics, reporting and explanation. Method decisions carry methodology version, rule, evidence and source provenance where available.
 
-```ts
-interface AnalysisRunner {
-  run(job: AnalysisJob): Promise<AnalysisResult>;
-  getStatus(jobId: string): Promise<JobStatus>;
-  cancel(jobId: string): Promise<void>;
-}
-```
+Operational safeguards remain deterministic. The language model may explain a rule or interpret documents in light of retrieved guidance, but it does not override method eligibility.
 
-Cloudflare Containers are the default runner. The same container images should later run on larger infrastructure when jobs exceed Cloudflare resource limits.
+## Language-model role
 
-## Python environment
+Workers AI currently assists with protocol interpretation, semantic variable mapping, qualitative proposals and grounded project conversation. Model output is schema validated before it can affect canonical state.
 
-Likely packages include pandas, NumPy, SciPy, statsmodels, scikit-learn, lifelines, PyMC, pyreadstat, and openpyxl.
+Models may interpret research text and explain verified state. They may not invent dataset fields, fabricate numerical results, bypass the method registry, silently redefine a research question, or directly execute arbitrary project mutations.
 
-## R environment
+## Storage and provenance
 
-Likely packages include tidyverse, broom, modelsummary, lme4, survival, survey, mice, lavaan, MASS, and nlme.
+D1 stores application and research metadata, canonical analytical state, persistent conversation history, orchestration runs and audit events. R2 stores original uploads and data objects. Original source uploads remain immutable; transformations create derived dataset versions with explicit provenance.
 
-## Model adapter
+Important methodological and analytical actions are written to the audit trail. Planned analyses retain plan hashes, registry versions and execution provenance.
 
-All model calls use one interface.
+## Specialist inspection surfaces
 
-```ts
-interface ModelProvider {
-  generateStructured<T>(request: StructuredModelRequest<T>): Promise<T>;
-  generateText(request: TextModelRequest): Promise<string>;
-}
-```
+The application still exposes study design, variable mapping, analysis plan, qualitative review, results and audit pages. These are inspection and correction surfaces. They are not stages that an ordinary researcher must navigate in sequence.
 
-Providers can include Workers AI, self hosted endpoints, OpenAI, Anthropic, Google, or later providers. No domain logic may depend on one provider.
+## Deployment boundary
 
-## Model role
-
-Models may extract structured study information, suggest mappings, summarise protocol text, explain statistical results, and later suggest qualitative codes. They must not calculate statistical values, bypass the method registry, silently modify data, or silently resolve substantive methodological choices.
-
-## Policy engine
-
-Every external model call checks project data class, allowed processors, provider, payload type, identifiable content, and qualitative content. The result is allow, block, or require user action. Enforcement happens in code.
-
-## Authentication
-
-Do not bind Methodome to Cloudflare Access alone. Private deployments may use Access. A public product needs account creation, sign in, recovery, session management, and later organisation membership.
-
-## Observability
-
-Track API failures, analysis failures, execution time, model calls, model cost, compute cost, storage use, registry warnings, and overrides. Do not log sensitive payloads unless explicitly required.
+Cloudflare Workers and D1/R2/Queues form the current application platform. The statistics service is a separate Python Worker reached through a service binding. Do not restore the older architecture in which the Python Worker consumes the analysis queue directly.
