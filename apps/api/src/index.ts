@@ -120,9 +120,12 @@ import {
   updateStoredAnalysisPlan,
   userOwnsProjects,
   appendProjectMessage,
+  completeWaitingOrchestrationRuns,
   createOrchestrationRun,
   ensureProjectThread,
+  getProjectConversationDecision,
   listProjectMessages,
+  resolveProjectConversationDecision,
   syncConversationDecisions,
   updateOrchestrationRun,
   updateProjectFileKind
