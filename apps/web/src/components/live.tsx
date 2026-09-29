@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Badge, Button, PageHeader, ThemeToggle } from "@/components/ui";
+import { ActivitySpinner, Badge, Button, PageHeader, ThemeToggle } from "@/components/ui";
 import { ProjectPage as PrototypeProjectPage } from "@/components/workspace";
 import { ResearchAnalysisSurface, ResearchSectionContext, ResearchWorkspaceHome } from "@/components/research-workspace";
 import {
@@ -903,6 +903,9 @@ function LiveProjectFiles({
   );
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [activity, setActivity] = useState<
+    "idle" | "preparing" | "uploading" | "extracting" | "complete" | "error"
+  >("idle");
   const [extraction, setExtraction] = useState<ProtocolExtraction | null>(null);
 
   async function refresh() {
@@ -926,6 +929,7 @@ function LiveProjectFiles({
   async function upload() {
     if (!file) return;
     setBusy(true);
+    setActivity("preparing");
     setStatus("");
     try {
       const intent = await createUpload(projectId, {
@@ -934,27 +938,34 @@ function LiveProjectFiles({
         fileKind: kind,
         sizeBytes: file.size
       });
+
+      setActivity("uploading");
       await uploadFile(intent.uploadPath, file, file.type || "application/octet-stream");
       setFile(null);
 
       if (mode === "protocol") {
-        setStatus("Protocol uploaded. Extracting study information…");
+        setActivity("extracting");
+        setStatus("Protocol uploaded. Methodome is extracting the study now.");
         try {
           const extracted = await extractProtocol(projectId, intent.fileId);
           setExtraction(extracted);
+          setActivity("complete");
           setStatus(
-            `Protocol uploaded and study information extracted. Review ${extracted.researchQuestions.length} research question${extracted.researchQuestions.length === 1 ? "" : "s"} before analysis planning.`
+            `Protocol uploaded and study information extracted. Methodome found ${extracted.researchQuestions.length} research question${extracted.researchQuestions.length === 1 ? "" : "s"}.`
           );
         } catch (err) {
+          setActivity("error");
           setStatus(
-            `Protocol uploaded. Automatic extraction needs review: ${message(err)}`
+            `The protocol upload completed, but study extraction needs attention: ${message(err)}`
           );
         }
       } else {
+        setActivity("complete");
         setStatus("Research file uploaded.");
       }
       await refresh();
     } catch (err) {
+      setActivity("error");
       setStatus(message(err));
     } finally {
       setBusy(false);
@@ -965,12 +976,15 @@ function LiveProjectFiles({
     const latest = files[0];
     if (!latest) return;
     setBusy(true);
+    setActivity("extracting");
     setStatus("Extracting study information…");
     try {
       const extracted = await extractProtocol(projectId, latest.id);
       setExtraction(extracted);
+      setActivity("complete");
       setStatus("Study information extracted from the latest protocol.");
     } catch (err) {
+      setActivity("error");
       setStatus(message(err));
     } finally {
       setBusy(false);
@@ -1012,13 +1026,79 @@ function LiveProjectFiles({
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           />
         </label>
-        <Button onClick={() => void upload()}>{busy ? "Working…" : "Upload file"}</Button>
+        <Button
+          onClick={() => void upload()}
+          loading={busy}
+          loadingLabel={
+            activity === "uploading"
+              ? "Uploading…"
+              : activity === "extracting"
+                ? "Extracting…"
+                : "Preparing…"
+          }
+          disabled={!file && !busy}
+        >
+          Upload file
+        </Button>
         {mode === "protocol" && files.length > 0 && (
-          <Button variant="secondary" onClick={() => void reExtract()}>
+          <Button
+            variant="secondary"
+            onClick={() => void reExtract()}
+            loading={busy && activity === "extracting"}
+            loadingLabel="Extracting…"
+          >
             Re-extract latest protocol
           </Button>
         )}
-        {status && <p className="confirmation" role="status">{status}</p>}
+        {activity !== "idle" && (
+          <div className="activity-flow" aria-live="polite">
+            <div className={activity === "error" && activity !== "extracting" ? "activity-step error" : "activity-step"}>
+              {activity === "preparing" || activity === "uploading" ? (
+                <ActivitySpinner label="Uploading research file" />
+              ) : activity === "error" && !extraction ? (
+                <span className="activity-step-mark error">!</span>
+              ) : (
+                <span className="activity-step-mark complete">✓</span>
+              )}
+              <span>
+                <b>Upload research file</b>
+                <small>
+                  {activity === "preparing"
+                    ? "Preparing secure storage"
+                    : activity === "uploading"
+                      ? "Uploading to Methodome"
+                      : "Upload complete"}
+                </small>
+              </span>
+            </div>
+            {mode === "protocol" && (
+              <div className={`activity-step ${activity === "error" ? "error" : ""}`}>
+                {activity === "extracting" ? (
+                  <ActivitySpinner label="Extracting study information" />
+                ) : activity === "complete" ? (
+                  <span className="activity-step-mark complete">✓</span>
+                ) : activity === "error" ? (
+                  <span className="activity-step-mark error">!</span>
+                ) : (
+                  <span className="activity-step-mark">2</span>
+                )}
+                <span>
+                  <b>Extract study information</b>
+                  <small>
+                    {activity === "extracting"
+                      ? "Reading research questions, objectives and study design"
+                      : activity === "complete"
+                        ? "Extraction complete"
+                        : activity === "error"
+                          ? "Extraction needs attention"
+                          : "Starts automatically after upload"}
+                  </small>
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+        {status && <p className="confirmation" role="status">{status}</p>
         {mode === "instruments" && (
           <div className="action-row">
             {files.length > 0 ? (
