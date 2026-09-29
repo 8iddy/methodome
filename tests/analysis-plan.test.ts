@@ -16,6 +16,18 @@ const analysis = {
   requiredDecisions: [],
   warnings: [],
   diagnostics: ["separation"],
+  methodologyProvenance: [
+    {
+      methodId: "binary_logistic_regression",
+      supportStatus: "source_supported" as const,
+      ruleIds: [
+        "logistic-regression-001",
+        "logistic-gof-001",
+        "logistic-separation-001",
+        "logistic-sparse-events-001"
+      ]
+    }
+  ],
   addedAfterLock: false
 };
 
@@ -37,6 +49,46 @@ describe("analysis plan locking", () => {
 
     expect(first.lockHash).toBe(second.lockHash);
     expect(first.lockHash).toHaveLength(64);
+  });
+
+  it("includes methodology provenance in the deterministic lock hash", async () => {
+    const plan = createAnalysisPlan({
+      id: "plan_1",
+      projectId: "proj_1",
+      versionId: "v1",
+      studySpecificationVersion: "1.0",
+      status: "planned_before_analysis",
+      analyses: [analysis],
+      createdBy: "user_1",
+      createdAt: "2026-09-28T12:00:00.000Z"
+    });
+
+    const altered = createAnalysisPlan({
+      id: "plan_1",
+      projectId: "proj_1",
+      versionId: "v1",
+      studySpecificationVersion: "1.0",
+      status: "planned_before_analysis",
+      analyses: [
+        {
+          ...analysis,
+          methodologyProvenance: [
+            {
+              methodId: "binary_logistic_regression",
+              supportStatus: "source_supported" as const,
+              ruleIds: ["logistic-regression-001"]
+            }
+          ]
+        }
+      ],
+      createdBy: "user_1",
+      createdAt: "2026-09-28T12:00:00.000Z"
+    });
+
+    const first = await lockAnalysisPlan(plan, "2026-09-28T12:05:00.000Z");
+    const second = await lockAnalysisPlan(altered, "2026-09-28T12:05:00.000Z");
+
+    expect(first.lockHash).not.toBe(second.lockHash);
   });
 
   it("marks additions after locking as exploratory", async () => {

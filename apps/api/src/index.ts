@@ -1617,11 +1617,11 @@ const plannedAnalysisSchema = z.object({
   outcome: z.string().min(1),
   predictors: z.array(z.string()),
   covariates: z.array(z.string()),
-  candidateMethodIds: z.array(z.string()).min(1),
+  candidateMethodIds: z.array(z.string()).default([]),
   selectedMethodId: z.string().min(1).optional(),
-  requiredDecisions: z.array(z.string()),
-  warnings: z.array(z.string()),
-  diagnostics: z.array(z.string()),
+  requiredDecisions: z.array(z.string()).default([]),
+  warnings: z.array(z.string()).default([]),
+  diagnostics: z.array(z.string()).default([]),
   addedAfterLock: z.boolean().default(false)
 });
 
@@ -1704,6 +1704,8 @@ app.post("/projects/:projectId/analysis-plan", async (c) => {
     parsed.data.datasetVersionId
   );
 
+  const canonicalAnalyses: PlannedAnalysis[] = [];
+
   for (const analysis of parsed.data.analyses) {
     const question = resolvedForPlan.specification.researchQuestions.find(
       (item) => item.id === analysis.researchQuestionId
@@ -1758,11 +1760,13 @@ app.post("/projects/:projectId/analysis-plan", async (c) => {
       resolvedForPlan.specification,
       analysis.researchQuestionId
     );
-    if (analysis.selectedMethodId) {
-      const selectedCandidate = selection.candidates.find(
-        (candidate) => candidate.methodId === analysis.selectedMethodId
-      );
+    const selectedCandidate = analysis.selectedMethodId
+      ? selection.candidates.find(
+          (candidate) => candidate.methodId === analysis.selectedMethodId
+        )
+      : undefined;
 
+    if (analysis.selectedMethodId) {
       if (!selectedCandidate) {
         return c.json(
           {
@@ -1797,6 +1801,34 @@ app.post("/projects/:projectId/analysis-plan", async (c) => {
         );
       }
     }
+
+    const deterministicDecisions = selection.candidates.flatMap((candidate) =>
+      candidate.decisionRequired ? [candidate.decisionRequired] : []
+    );
+    const deterministicDiagnostics = selectedCandidate
+      ? selectedCandidate.requiredChecks
+      : selection.candidates.flatMap((candidate) => candidate.requiredChecks);
+
+    canonicalAnalyses.push({
+      id: analysis.id,
+      researchQuestionId: analysis.researchQuestionId,
+      outcome: analysis.outcome,
+      predictors: analysis.predictors,
+      covariates: analysis.covariates,
+      candidateMethodIds: selection.candidates.map((candidate) => candidate.methodId),
+      ...(analysis.selectedMethodId
+        ? { selectedMethodId: analysis.selectedMethodId }
+        : {}),
+      requiredDecisions: [...new Set(deterministicDecisions)],
+      warnings: [...new Set([...selection.warnings, ...analysis.warnings])],
+      diagnostics: [...new Set(deterministicDiagnostics)],
+      methodologyProvenance: selection.candidates.map((candidate) => ({
+        methodId: candidate.methodId,
+        supportStatus: candidate.methodologyStatus,
+        ruleIds: candidate.methodologyRuleIds
+      })),
+      addedAfterLock: false
+    });
   }
 
   const now = new Date().toISOString();
@@ -1809,7 +1841,7 @@ app.post("/projects/:projectId/analysis-plan", async (c) => {
       : {}),
     studySpecificationVersion: specification.version,
     status: parsed.data.status,
-    analyses: parsed.data.analyses as PlannedAnalysis[],
+    analyses: canonicalAnalyses,
     createdBy: getUserId(c),
     createdAt: now
   });

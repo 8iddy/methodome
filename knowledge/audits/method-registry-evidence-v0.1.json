@@ -1,8 +1,8 @@
 {
   "audit_id": "methodome-method-registry-evidence-audit-v0.1",
   "updated_date": "2026-09-29",
-  "registry_version": "0.2.0",
-  "purpose": "Audit every current method-registry entry against the v1 methodology corpus without conflating computational correctness, source support, and expert-benchmark validation.",
+  "registry_version": "0.3.0",
+  "purpose": "Audit every current method-registry entry against the v1 methodology corpus while exposing source-support status and rule provenance separately from software maturity and computational executability.",
   "status_definitions": {
     "source_supported": "A source-backed operational decision rule exists; expert methodology benchmark validation is still pending.",
     "source_supported_concept": "The method family/design distinction is source-backed, but exact automated selection remains outside the v1 autonomous boundary.",
