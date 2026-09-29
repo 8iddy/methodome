@@ -1,6 +1,6 @@
 {
   "rule_set_id": "methodome-comparison-methods-v0.1",
-  "status": "draft",
+  "status": "supported",
   "rules": [
     {
       "rule_id": "independent-two-sample-t-001",
@@ -48,7 +48,7 @@
           "page": "18-24"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "paired-t-001",
@@ -86,7 +86,7 @@
           "page": null
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "one-way-anova-001",
@@ -141,7 +141,7 @@
           "page": "1 onward"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "wilcoxon-signed-rank-001",
@@ -180,7 +180,7 @@
           "page": "319 onward"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "mann-whitney-001",
@@ -219,7 +219,7 @@
           "page": "278-283"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "kruskal-wallis-001",
@@ -265,7 +265,7 @@
           "page": "428-431"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     }
   ]
 }
