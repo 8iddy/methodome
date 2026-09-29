@@ -576,6 +576,65 @@ async function computeProjectReadiness(
 }
 
 
+function studySpecificationFromProtocolExtraction(
+  extraction: z.infer<typeof protocolExtractionSchema>
+): StudySpecification | null {
+  if (
+    !extraction.studyDesign ||
+    !extraction.unitOfAnalysis?.trim() ||
+    extraction.researchQuestions.length === 0
+  ) {
+    return null;
+  }
+
+  return parseStudySpecification({
+    version: `protocol-${Date.now()}`,
+    researchQuestions: extraction.researchQuestions.map((question, index) => ({
+      id: `rq${index + 1}`,
+      text: question.text,
+      objectiveType: question.objectiveType,
+      outcomes: question.outcomes.map((concept) => ({
+        concept,
+        datasetVariable: null,
+        variableType: null,
+        mappingStatus: null
+      })),
+      predictors: question.predictors.map((concept) => ({
+        concept,
+        datasetVariable: null,
+        variableType: null,
+        mappingStatus: null
+      })),
+      covariates: question.covariates.map((concept) => ({
+        concept,
+        datasetVariable: null,
+        variableType: null,
+        mappingStatus: null
+      })),
+      estimand: question.estimand
+    })),
+    studyDesign: extraction.studyDesign,
+    unitOfAnalysis: extraction.unitOfAnalysis.trim(),
+    repeatedMeasures: extraction.repeatedMeasures ?? false,
+    paired: extraction.paired ?? false,
+    clustered: extraction.clustered ?? false,
+    clusterVariable: extraction.clustered
+      ? extraction.clusterConcept?.trim() || null
+      : null,
+    surveyWeights: extraction.surveyWeights ?? false,
+    weightVariable: extraction.surveyWeights
+      ? extraction.weightConcept?.trim() || null
+      : null,
+    stratified: extraction.stratified ?? false,
+    strataVariable: extraction.stratified
+      ? extraction.strataConcept?.trim() || null
+      : null,
+    samplingDesign: extraction.samplingDesign?.trim() || null,
+    missingDataPlan: extraction.missingDataPlan?.trim() || null,
+    statedAnalysisPlan: extraction.statedAnalysisPlan?.trim() || null
+  });
+}
+
 async function runProtocolExtractionForProject(
   c: import("hono").Context<AppBindings>,
   projectId: string
@@ -645,6 +704,45 @@ async function runProtocolExtractionForProject(
       researchQuestionCount: extraction.researchQuestions.length
     }
   });
+
+  const existingSpecification = await getStudySpecification(c.env.DB, projectId);
+  const interpretedSpecification = existingSpecification
+    ? null
+    : studySpecificationFromProtocolExtraction(extraction);
+
+  if (interpretedSpecification) {
+    const specificationId = makeId("spec");
+    await saveStudySpecification(
+      c.env.DB,
+      specificationId,
+      projectId,
+      interpretedSpecification,
+      undefined,
+      {
+        source: "protocol_interpretation",
+        provider: "cloudflare-workers-ai",
+        model: PROTOCOL_EXTRACTION_MODEL,
+        promptVersion: PROTOCOL_EXTRACTION_PROMPT_VERSION,
+        extractionId: id,
+        methodologyKnowledgeVersion
+      }
+    );
+    await addAudit(c, {
+      projectId,
+      action: "orchestrator_study_specification_interpreted",
+      objectType: "study_specification",
+      objectId: specificationId,
+      modelId: PROTOCOL_EXTRACTION_MODEL,
+      after: {
+        version: interpretedSpecification.version,
+        researchQuestionCount: interpretedSpecification.researchQuestions.length,
+        studyDesign: interpretedSpecification.studyDesign,
+        unitOfAnalysis: interpretedSpecification.unitOfAnalysis,
+        methodologyKnowledgeVersion,
+        researcherConfirmed: false
+      }
+    });
+  }
 
   return extraction;
 }
