@@ -336,7 +336,7 @@ async function main() {
           objectiveType: "association",
           outcomes: [
             {
-              concept: "Outcome y",
+              concept: "y",
               datasetVariable: "y",
               variableType: "continuous",
               mappingStatus: "direct_match"
@@ -344,7 +344,7 @@ async function main() {
           ],
           predictors: [
             {
-              concept: "Predictor x",
+              concept: "x",
               datasetVariable: "x",
               variableType: "continuous",
               mappingStatus: "direct_match"
@@ -375,34 +375,70 @@ async function main() {
     );
     console.log("PASS study specification");
 
-    await request(
-      `/projects/${projectId}/variable-mappings`,
+    const mappingState = await request(
+      `/projects/${projectId}/orchestrator`,
+      {},
+      [200]
+    );
+    if (mappingState.payload?.orchestrator?.automaticAction !== "map_variables") {
+      throw new Error(
+        `Orchestrator did not take ownership of variable mapping: ${JSON.stringify(mappingState.payload)}`
+      );
+    }
+
+    const mapped = await request(
+      `/projects/${projectId}/orchestrator/advance`,
       {
-        method: "PUT",
+        method: "POST",
+        body: JSON.stringify({ action: "map_variables" })
+      },
+      [200]
+    );
+    if (mapped.payload?.mutation?.action !== "map_variables") {
+      throw new Error("Orchestrator did not execute the variable mapping action.");
+    }
+
+    const savedMappings = await request(
+      `/projects/${projectId}/variable-mappings`,
+      {},
+      [200]
+    );
+    const mappingByConcept = new Map(
+      savedMappings.payload.mappings.map((item) => [item.researchConcept, item])
+    );
+    for (const [concept, variable] of [["x", "x"], ["y", "y"]]) {
+      const resolved = mappingByConcept.get(concept);
+      if (
+        resolved?.datasetVariable !== variable ||
+        resolved?.mappingStatus !== "direct_match" ||
+        !resolved?.confirmedBy
+      ) {
+        throw new Error(
+          `Orchestrated exact mapping failed for ${concept}: ${JSON.stringify(resolved)}`
+        );
+      }
+    }
+    console.log("PASS orchestrated variable resolution");
+
+    const assistant = await request(
+      `/projects/${projectId}/assistant`,
+      {
+        method: "POST",
         body: JSON.stringify({
-          mappings: [
-            {
-              id: `map_${crypto.randomUUID().replaceAll("-", "")}`,
-              researchConcept: "Outcome y",
-              datasetVariable: "y",
-              mappingStatus: "direct_match",
-              evidence: ["Smoke test confirmed mapping."],
-              confirmed: true
-            },
-            {
-              id: `map_${crypto.randomUUID().replaceAll("-", "")}`,
-              researchConcept: "Predictor x",
-              datasetVariable: "x",
-              mappingStatus: "direct_match",
-              evidence: ["Smoke test confirmed mapping."],
-              confirmed: true
-            }
-          ]
+          message: "What does Methodome need from me next?",
+          history: []
         })
       },
       [200]
     );
-    console.log("PASS variable mappings");
+    if (
+      assistant.payload?.grounded !== true ||
+      typeof assistant.payload?.reply !== "string" ||
+      assistant.payload.reply.trim().length === 0
+    ) {
+      throw new Error("Grounded project conversation did not return a usable reply.");
+    }
+    console.log("PASS grounded project conversation");
 
     const candidates = await request(
       `/projects/${projectId}/method-candidates`,
