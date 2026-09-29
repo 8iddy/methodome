@@ -1,0 +1,634 @@
+{
+  "corpus_id": "methodome-methodology-corpus-v1",
+  "family_count": 31,
+  "note": "Files from one textbook/course/guideline family are grouped so evidence weight is not inflated by chapter-level PDF splitting.",
+  "families": [
+    {
+      "family_id": "family-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
+      "title": "An Introduction to Statistical Methods and Data Analysis, 6th ed.",
+      "organization": "Cengage",
+      "year": 2010,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed"
+      ],
+      "domains": [
+        "foundational_statistics",
+        "inference",
+        "regression",
+        "anova",
+        "experimental_design"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-best-practices-for-mixed-methods-research-in-the-health-sciences",
+      "title": "Best Practices for Mixed Methods Research in the Health Sciences",
+      "organization": "NIH OBSSR",
+      "year": null,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-037-best-practices-for-mixed-methods-research-in-the-health-sciences"
+      ],
+      "domains": [
+        "mixed_methods",
+        "qualitative_research",
+        "integration"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-categorical-data-analysis-3rd-ed",
+      "title": "Categorical Data Analysis, 3rd ed.",
+      "organization": "Wiley",
+      "year": null,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-022-categorical-data-analysis-3rd-ed"
+      ],
+      "domains": [
+        "categorical_data",
+        "logistic_regression",
+        "count_models",
+        "association_tests"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-causal-inference-what-if",
+      "title": "Causal Inference: What If",
+      "organization": "Hernán & Robins",
+      "year": 2025,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-027-causal-inference-what-if"
+      ],
+      "domains": [
+        "causal_inference",
+        "estimands",
+        "confounding",
+        "standardization",
+        "ipw"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-cosmin-manual-v20",
+      "title": "COSMIN Manual v2.0",
+      "organization": "COSMIN / Amsterdam UMC",
+      "year": 2024,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-036-cosmin-manual-v20"
+      ],
+      "domains": [
+        "psychometrics",
+        "measurement_properties",
+        "reliability",
+        "validity"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-designing-household-survey-samples-practical-guidelines",
+      "title": "Designing Household Survey Samples: Practical Guidelines",
+      "organization": "United Nations Statistics Division",
+      "year": 2008,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-072-designing-household-survey-samples-practical-guidelines"
+      ],
+      "domains": [
+        "sampling",
+        "survey_design",
+        "weights",
+        "stratification",
+        "cluster_sampling"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-developing-clinical-prediction-models-a-step-by-step-guide",
+      "title": "Developing clinical prediction models: a step-by-step guide",
+      "organization": "BMJ",
+      "year": 2024,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-035-developing-clinical-prediction-models-a-step-by-step-guide"
+      ],
+      "domains": [
+        "prediction_models",
+        "validation",
+        "calibration",
+        "discrimination"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-guidelines-for-the-content-of-statistical-analysis-plans-in-clinical-trials",
+      "title": "Guidelines for the Content of Statistical Analysis Plans in Clinical Trials",
+      "organization": "JAMA",
+      "year": 2017,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-026-guidelines-for-the-content-of-statistical-analysis-plans-in-clinical-trials"
+      ],
+      "domains": [
+        "statistical_analysis_plan",
+        "prespecification",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-ich-e9-statistical-principles-for-clinical-trials",
+      "title": "ICH E9 Statistical Principles for Clinical Trials",
+      "organization": "ICH",
+      "year": 1998,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-024-ich-e9-statistical-principles-for-clinical-trials"
+      ],
+      "domains": [
+        "clinical_trials",
+        "statistical_principles",
+        "analysis_populations",
+        "multiplicity"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-ich-e9r1-estimands-and-sensitivity-analysis",
+      "title": "ICH E9(R1) Estimands and Sensitivity Analysis",
+      "organization": "ICH",
+      "year": 2019,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-025-ich-e9r1-estimands-and-sensitivity-analysis"
+      ],
+      "domains": [
+        "estimands",
+        "sensitivity_analysis",
+        "clinical_trials"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-impact-evaluation-in-practice-2nd-ed",
+      "title": "Impact Evaluation in Practice, 2nd ed.",
+      "organization": "World Bank",
+      "year": 2016,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-028-impact-evaluation-in-practice-2nd-ed"
+      ],
+      "domains": [
+        "causal_inference",
+        "impact_evaluation",
+        "quasi_experimental"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-key-considerations-for-cluster-randomized-trials",
+      "title": "Key considerations for cluster randomized trials",
+      "organization": "International Journal of Epidemiology",
+      "year": 2023,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-030-key-considerations-for-cluster-randomized-trials"
+      ],
+      "domains": [
+        "cluster_randomized_trials",
+        "clustering",
+        "sample_size",
+        "analysis"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-longitudinal-and-repeated-measures-analysis-tutorial",
+      "title": "Longitudinal and repeated-measures analysis tutorial",
+      "organization": "Anesthesia & Analgesia",
+      "year": 2018,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-029-longitudinal-and-repeated-measures-analysis-tutorial"
+      ],
+      "domains": [
+        "longitudinal_data",
+        "repeated_measures",
+        "mixed_models",
+        "gee"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-penn-state-stat-501-regression-methods",
+      "title": "Penn State STAT 501 Regression Methods",
+      "organization": "Penn State",
+      "year": null,
+      "file_count": 13,
+      "file_source_ids": [
+        "src-009-penn-state-stat-501-regression-methods",
+        "src-010-penn-state-stat-501-regression-methods",
+        "src-011-penn-state-stat-501-regression-methods",
+        "src-012-penn-state-stat-501-regression-methods",
+        "src-013-penn-state-stat-501-regression-methods",
+        "src-014-penn-state-stat-501-regression-methods",
+        "src-015-penn-state-stat-501-regression-methods",
+        "src-016-penn-state-stat-501-regression-methods",
+        "src-017-penn-state-stat-501-regression-methods",
+        "src-018-penn-state-stat-501-regression-methods",
+        "src-019-penn-state-stat-501-regression-methods",
+        "src-020-penn-state-stat-501-regression-methods",
+        "src-021-penn-state-stat-501-regression-methods"
+      ],
+      "domains": [
+        "regression",
+        "model_diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-penn-state-stat-502-anova-and-design-of-experiments",
+      "title": "Penn State STAT 502 ANOVA and Design of Experiments",
+      "organization": "Penn State",
+      "year": null,
+      "file_count": 12,
+      "file_source_ids": [
+        "src-046-penn-state-stat-502-anova-and-design-of-experiments",
+        "src-047-penn-state-stat-502-anova-and-design-of-experiments",
+        "src-048-penn-state-stat-502-anova-and-design-of-experiments",
+        "src-049-penn-state-stat-502-anova-and-design-of-experiments",
+        "src-050-penn-state-stat-502-anova-and-design-of-experiments",
+        "src-051-penn-state-stat-502-anova-and-design-of-experiments",
+        "src-052-penn-state-stat-502-anova-and-design-of-experiments",
+        "src-053-penn-state-stat-502-anova-and-design-of-experiments",
+        "src-054-penn-state-stat-502-anova-and-design-of-experiments",
+        "src-055-penn-state-stat-502-anova-and-design-of-experiments",
+        "src-056-penn-state-stat-502-anova-and-design-of-experiments",
+        "src-057-penn-state-stat-502-anova-and-design-of-experiments"
+      ],
+      "domains": [
+        "anova",
+        "experimental_design",
+        "repeated_measures",
+        "mixed_models"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-principles-of-epidemiology-in-public-health-practice-3rd-ed",
+      "title": "Principles of Epidemiology in Public Health Practice, 3rd ed.",
+      "organization": "CDC",
+      "year": 2012,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-074-principles-of-epidemiology-in-public-health-practice-3rd-ed"
+      ],
+      "domains": [
+        "epidemiology",
+        "study_design",
+        "descriptive_epidemiology",
+        "analytic_epidemiology"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-survival-analysis-in-the-presence-of-competing-risks",
+      "title": "Survival Analysis in the Presence of Competing Risks",
+      "organization": "Journal of Epidemiology",
+      "year": null,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-033-survival-analysis-in-the-presence-of-competing-risks"
+      ],
+      "domains": [
+        "survival_analysis",
+        "competing_risks"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-survival-analysis-tutorial",
+      "title": "Survival analysis tutorial",
+      "organization": "Anesthesia & Analgesia",
+      "year": 2018,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-032-survival-analysis-tutorial"
+      ],
+      "domains": [
+        "survival_analysis",
+        "time_to_event",
+        "censoring"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-test-performance-metrics",
+      "title": "Test Performance Metrics",
+      "organization": "NCBI Bookshelf",
+      "year": null,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-034-test-performance-metrics"
+      ],
+      "domains": [
+        "diagnostic_accuracy",
+        "sensitivity",
+        "specificity",
+        "predictive_values"
+      ],
+      "authority_tier": "B",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-the-prevention-and-treatment-of-missing-data-in-clinical-trials",
+      "title": "The Prevention and Treatment of Missing Data in Clinical Trials",
+      "organization": "National Academies",
+      "year": 2010,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-031-the-prevention-and-treatment-of-missing-data-in-clinical-trials"
+      ],
+      "domains": [
+        "missing_data",
+        "sensitivity_analysis",
+        "clinical_trials"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-to-explain-or-to-predict",
+      "title": "To Explain or to Predict?",
+      "organization": "Statistical Science",
+      "year": 2010,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-073-to-explain-or-to-predict"
+      ],
+      "domains": [
+        "research_questions",
+        "prediction",
+        "explanation"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-consort-2025",
+      "title": "CONSORT 2025",
+      "organization": "CONSORT",
+      "year": 2025,
+      "file_count": 2,
+      "file_source_ids": [
+        "src-040-consort-2025",
+        "src-041-consort-2025"
+      ],
+      "domains": [
+        "randomized_trials",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "medium"
+    },
+    {
+      "family_id": "family-consort-2025-explanation-and-elaboration",
+      "title": "CONSORT 2025 Explanation and Elaboration",
+      "organization": "BMJ / CONSORT",
+      "year": 2025,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-039-consort-2025-explanation-and-elaboration"
+      ],
+      "domains": [
+        "randomized_trials",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "medium"
+    },
+    {
+      "family_id": "family-interrupted-time-series-analysis-for-single-series-and-comparative-designs",
+      "title": "Interrupted Time Series Analysis for Single Series and Comparative Designs",
+      "organization": "ICES / HSNRI",
+      "year": null,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-023-interrupted-time-series-analysis-for-single-series-and-comparative-designs"
+      ],
+      "domains": [
+        "time_series",
+        "quasi_experimental"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium"
+    },
+    {
+      "family_id": "family-penn-state-stat-200-elementary-statistics",
+      "title": "Penn State STAT 200 Elementary Statistics",
+      "organization": "Penn State",
+      "year": null,
+      "file_count": 13,
+      "file_source_ids": [
+        "src-059-penn-state-stat-200-elementary-statistics",
+        "src-060-penn-state-stat-200-elementary-statistics",
+        "src-061-penn-state-stat-200-elementary-statistics",
+        "src-062-penn-state-stat-200-elementary-statistics",
+        "src-063-penn-state-stat-200-elementary-statistics",
+        "src-064-penn-state-stat-200-elementary-statistics",
+        "src-065-penn-state-stat-200-elementary-statistics",
+        "src-066-penn-state-stat-200-elementary-statistics",
+        "src-067-penn-state-stat-200-elementary-statistics",
+        "src-068-penn-state-stat-200-elementary-statistics",
+        "src-069-penn-state-stat-200-elementary-statistics",
+        "src-070-penn-state-stat-200-elementary-statistics",
+        "src-071-penn-state-stat-200-elementary-statistics"
+      ],
+      "domains": [
+        "foundational_statistics",
+        "descriptive_analysis",
+        "statistical_inference"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium"
+    },
+    {
+      "family_id": "family-record-statement",
+      "title": "RECORD Statement",
+      "organization": "RECORD",
+      "year": null,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-044-record-statement"
+      ],
+      "domains": [
+        "routinely_collected_data",
+        "observational_studies",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "medium"
+    },
+    {
+      "family_id": "family-stard-2015",
+      "title": "STARD 2015",
+      "organization": "STARD",
+      "year": 2015,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-043-stard-2015"
+      ],
+      "domains": [
+        "diagnostic_accuracy",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "medium"
+    },
+    {
+      "family_id": "family-strobe-statement",
+      "title": "STROBE Statement",
+      "organization": "STROBE",
+      "year": null,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-038-strobe-statement"
+      ],
+      "domains": [
+        "observational_studies",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "medium"
+    },
+    {
+      "family_id": "family-tripodai",
+      "title": "TRIPOD+AI",
+      "organization": "BMJ / TRIPOD",
+      "year": 2024,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-042-tripodai"
+      ],
+      "domains": [
+        "prediction_models",
+        "machine_learning",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "medium"
+    },
+    {
+      "family_id": "family-nistsematech-e-handbook-of-statistical-methods",
+      "title": "NIST/SEMATECH e-Handbook of Statistical Methods",
+      "organization": "NIST",
+      "year": null,
+      "file_count": 8,
+      "file_source_ids": [
+        "src-001-nistsematech-e-handbook-of-statistical-methods",
+        "src-002-nistsematech-e-handbook-of-statistical-methods",
+        "src-003-nistsematech-e-handbook-of-statistical-methods",
+        "src-004-nistsematech-e-handbook-of-statistical-methods",
+        "src-005-nistsematech-e-handbook-of-statistical-methods",
+        "src-006-nistsematech-e-handbook-of-statistical-methods",
+        "src-007-nistsematech-e-handbook-of-statistical-methods",
+        "src-008-nistsematech-e-handbook-of-statistical-methods"
+      ],
+      "domains": [
+        "reliability",
+        "survival_analysis",
+        "bayesian_methods",
+        "comparative_analysis",
+        "hypothesis_testing",
+        "confidence_intervals",
+        "time_series",
+        "process_monitoring",
+        "multivariate_analysis",
+        "experimental_design",
+        "randomization",
+        "factorial_design",
+        "regression",
+        "model_selection",
+        "model_validation",
+        "data_collection",
+        "model_building",
+        "assumption_checks",
+        "measurement",
+        "measurement_error",
+        "exploratory_data_analysis",
+        "descriptive_analysis"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "low"
+    },
+    {
+      "family_id": "family-prisma-2020",
+      "title": "PRISMA 2020",
+      "organization": "PRISMA",
+      "year": 2020,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-045-prisma-2020"
+      ],
+      "domains": [
+        "systematic_reviews",
+        "reporting"
+      ],
+      "authority_tier": "A",
+      "role": "reporting",
+      "priority": "low"
+    }
+  ]
+}
