@@ -1731,6 +1731,138 @@ app.get("/projects/:projectId/readiness", async (c) => {
   });
 });
 
+const orchestratorAdvanceSchema = z.object({
+  action: z.enum([
+    "extract_protocol",
+    "create_draft_plan",
+    "run_analyses"
+  ]).optional()
+});
+
+app.get("/projects/:projectId/orchestrator", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const state = await computeProjectReadiness(c, projectId);
+  return c.json({
+    orchestrator: buildOrchestratorView(state.readiness, state.plan),
+    readiness: state.readiness,
+    registryVersion,
+    ...(state.resolvedDatasetVersionId
+      ? { datasetVersionId: state.resolvedDatasetVersionId }
+      : {})
+  });
+});
+
+app.post("/projects/:projectId/orchestrator/advance", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const parsed = orchestratorAdvanceSchema.safeParse(
+    await c.req.json().catch(() => ({}))
+  );
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_ORCHESTRATOR_ACTION",
+          message: "The orchestrator action is invalid.",
+          details: parsed.error.flatten()
+        }
+      },
+      400
+    );
+  }
+
+  const before = await computeProjectReadiness(c, projectId);
+  const view = buildOrchestratorView(before.readiness, before.plan);
+
+  if (!view.automaticAction) {
+    return c.json({
+      advanced: false,
+      orchestrator: view,
+      readiness: before.readiness,
+      message:
+        view.status === "waiting_for_researcher"
+          ? "Methodome is waiting for a researcher decision before continuing."
+          : "Methodome has no safe automatic action from the current state."
+    });
+  }
+
+  if (parsed.data.action && parsed.data.action !== view.automaticAction) {
+    return c.json(
+      {
+        error: {
+          code: "ORCHESTRATOR_ACTION_OUT_OF_SEQUENCE",
+          message:
+            "The requested action is not the current safe automatic action.",
+          details: {
+            requested: parsed.data.action,
+            current: view.automaticAction
+          }
+        }
+      },
+      409
+    );
+  }
+
+  let mutation:
+    | { action: "extract_protocol"; researchQuestionCount: number }
+    | { action: "create_draft_plan"; planId: string; analysisCount: number }
+    | { action: "run_analyses"; queuedJobIds: string[] };
+
+  try {
+    if (view.automaticAction === "extract_protocol") {
+      const extraction = await runProtocolExtractionForProject(c, projectId);
+      mutation = {
+        action: "extract_protocol",
+        researchQuestionCount: extraction.researchQuestions.length
+      };
+    } else if (view.automaticAction === "create_draft_plan") {
+      const plan = await createOrchestratedDraftPlan(c, projectId, before);
+      mutation = {
+        action: "create_draft_plan",
+        planId: plan.id,
+        analysisCount: plan.analyses.length
+      };
+    } else {
+      if (!before.plan) {
+        throw new Error("The locked analysis plan could not be loaded.");
+      }
+      mutation = {
+        action: "run_analyses",
+        queuedJobIds: await enqueueOrchestratedPlan(c, projectId, before.plan)
+      };
+    }
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: "ORCHESTRATOR_ADVANCE_BLOCKED",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Methodome could not safely advance the project."
+        }
+      },
+      409
+    );
+  }
+
+  const after = await computeProjectReadiness(c, projectId);
+  return c.json({
+    advanced: true,
+    mutation,
+    orchestrator: buildOrchestratorView(after.readiness, after.plan),
+    readiness: after.readiness,
+    ...(after.resolvedDatasetVersionId
+      ? { datasetVersionId: after.resolvedDatasetVersionId }
+      : {})
+  });
+});
+
 app.get("/projects/:projectId/method-candidates", async (c) => {
   const projectId = c.req.param("projectId");
   const access = await requireProject(c, projectId);
