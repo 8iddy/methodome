@@ -7,7 +7,7 @@ import statistics
 import sys
 from typing import Any
 
-ENGINE_VERSION = "python-worker-0.3.1"
+ENGINE_VERSION = "python-worker-0.3.2"
 PACKAGE_VERSION = sys.version.split()[0]
 _NORMAL_975 = 1.959963984540054
 _EPS = 1e-14
@@ -1373,6 +1373,252 @@ def _matvec(
     ]
 
 
+
+def _safe_correlation(a: list[float], b: list[float]) -> float | None:
+    if len(a) != len(b) or len(a) < 3:
+        return None
+    try:
+        return _pearson(a, b)
+    except ValueError:
+        return None
+
+
+def _vif_diagnostics(
+    x: list[list[float]],
+    terms: list[str],
+) -> list[dict[str, Any]]:
+    if not x or len(x[0]) <= 2:
+        return []
+
+    diagnostics: list[dict[str, Any]] = []
+    p = len(x[0])
+
+    for target_index in range(1, p):
+        target = [row[target_index] for row in x]
+        mean_target = statistics.fmean(target)
+        tss = sum((value - mean_target) ** 2 for value in target)
+
+        if tss <= _EPS:
+            diagnostics.append(
+                {
+                    "id": f"vif.{terms[target_index]}",
+                    "label": f"VIF: {terms[target_index]}",
+                    "status": "review",
+                    "value": "not_estimable",
+                    "message": (
+                        "This predictor has no usable variation after complete-case selection."
+                    ),
+                }
+            )
+            continue
+
+        auxiliary = [
+            [
+                1.0,
+                *[
+                    row[index]
+                    for index in range(1, p)
+                    if index != target_index
+                ],
+            ]
+            for row in x
+        ]
+
+        try:
+            inv_aux = _invert(_xtx(auxiliary))
+            beta_aux = _matvec(inv_aux, _xty(auxiliary, target))
+        except ValueError:
+            diagnostics.append(
+                {
+                    "id": f"vif.{terms[target_index]}",
+                    "label": f"VIF: {terms[target_index]}",
+                    "status": "review",
+                    "value": "not_estimable",
+                    "message": (
+                        "Auxiliary regression for this VIF is singular or nearly singular; "
+                        "review predictor redundancy and coding."
+                    ),
+                }
+            )
+            continue
+
+        fitted_aux = [
+            sum(value * coefficient for value, coefficient in zip(row, beta_aux))
+            for row in auxiliary
+        ]
+        rss = sum(
+            (observed - fitted) ** 2
+            for observed, fitted in zip(target, fitted_aux)
+        )
+        r_squared = max(0.0, min(1.0, 1.0 - rss / tss))
+        denominator = max(1.0 - r_squared, 1e-12)
+        vif = 1.0 / denominator
+
+        diagnostics.append(
+            {
+                "id": f"vif.{terms[target_index]}",
+                "label": f"VIF: {terms[target_index]}",
+                "status": "review",
+                "value": vif,
+                "message": (
+                    "Review this VIF together with predictor correlations and coefficient stability. "
+                    "Methodome does not use a single universal VIF cutoff as an automatic accept/reject rule."
+                ),
+            }
+        )
+
+    return diagnostics
+
+
+def _linear_residual_diagnostics(
+    x: list[list[float]],
+    fitted: list[float],
+    residuals: list[float],
+    inv_xtx: list[list[float]],
+    sigma2: float,
+) -> list[dict[str, Any]]:
+    leverages: list[float] = []
+    standardized: list[float] = []
+
+    for row, residual in zip(x, residuals):
+        projected = _matvec(inv_xtx, row)
+        leverage = sum(value * projected[index] for index, value in enumerate(row))
+        leverage = max(0.0, min(1.0, leverage))
+        leverages.append(leverage)
+
+        denominator = math.sqrt(
+            max(sigma2 * max(1.0 - leverage, 1e-12), 1e-12)
+        )
+        standardized.append(residual / denominator)
+
+    abs_residuals = [abs(value) for value in residuals]
+    scale_trend = _safe_correlation(abs_residuals, fitted)
+    lag_one = _safe_correlation(residuals[:-1], residuals[1:])
+
+    diagnostics: list[dict[str, Any]] = [
+        {
+            "id": "max_abs_standardized_residual",
+            "label": "Maximum absolute standardized residual",
+            "status": "review",
+            "value": max(abs(value) for value in standardized),
+            "message": (
+                "Review unusually large standardized residuals and the corresponding observations; "
+                "Methodome does not convert one residual threshold into an automatic model-validity verdict."
+            ),
+        },
+        {
+            "id": "max_leverage",
+            "label": "Maximum leverage",
+            "status": "review",
+            "value": max(leverages),
+            "message": (
+                "Review high-leverage observations together with residual size and substantive plausibility."
+            ),
+        },
+        {
+            "id": "residual_distribution_review",
+            "label": "Residual distribution review",
+            "status": "review",
+            "value": statistics.fmean(residuals),
+            "message": (
+                "Inspect the residual distribution or a normal probability plot before relying on standard t/F inference; "
+                "a single normality-test p-value is not used as an automatic switch."
+            ),
+        },
+    ]
+
+    if scale_trend is not None:
+        diagnostics.append(
+            {
+                "id": "absolute_residual_fitted_correlation",
+                "label": "Correlation of absolute residuals with fitted values",
+                "status": "review",
+                "value": scale_trend,
+                "message": (
+                    "Use this only as a screening signal for changing residual spread; inspect residuals versus fitted values "
+                    "rather than treating this correlation as a formal homoscedasticity test."
+                ),
+            }
+        )
+
+    if lag_one is not None:
+        diagnostics.append(
+            {
+                "id": "lag_one_residual_correlation",
+                "label": "Lag-one residual correlation",
+                "status": "review",
+                "value": lag_one,
+                "message": (
+                    "Interpret this only when observation order is substantively meaningful; inspect residuals versus order "
+                    "when serial or collection-order dependence is plausible."
+                ),
+            }
+        )
+
+    return diagnostics
+
+
+def _logistic_residual_diagnostics(
+    y: list[float],
+    probabilities: list[float],
+) -> list[dict[str, Any]]:
+    pearson_residuals: list[float] = []
+    deviance_residuals: list[float] = []
+
+    for outcome, probability in zip(y, probabilities):
+        probability = min(max(probability, 1e-12), 1.0 - 1e-12)
+        pearson_residuals.append(
+            (outcome - probability)
+            / math.sqrt(probability * (1.0 - probability))
+        )
+        if outcome == 1.0:
+            deviance_residuals.append(
+                math.sqrt(max(0.0, -2.0 * math.log(probability)))
+            )
+        else:
+            deviance_residuals.append(
+                -math.sqrt(max(0.0, -2.0 * math.log1p(-probability)))
+            )
+
+    lag_one = _safe_correlation(
+        deviance_residuals[:-1],
+        deviance_residuals[1:],
+    )
+
+    diagnostics: list[dict[str, Any]] = [
+        {
+            "id": "max_abs_pearson_residual",
+            "label": "Maximum absolute Pearson residual",
+            "status": "review",
+            "value": max(abs(value) for value in pearson_residuals),
+            "message": "Review observations with unusually large Pearson residuals.",
+        },
+        {
+            "id": "max_abs_deviance_residual",
+            "label": "Maximum absolute deviance residual",
+            "status": "review",
+            "value": max(abs(value) for value in deviance_residuals),
+            "message": "Review observations with unusually large deviance residuals.",
+        },
+    ]
+
+    if lag_one is not None:
+        diagnostics.append(
+            {
+                "id": "lag_one_deviance_residual_correlation",
+                "label": "Lag-one deviance-residual correlation",
+                "status": "review",
+                "value": lag_one,
+                "message": (
+                    "Interpret this only when row order is meaningful; residuals versus order should be reviewed "
+                    "when serial or collection-order dependence is plausible."
+                ),
+            }
+        )
+
+    return diagnostics
+
+
 def linear_regression(
     rows: list[dict[str, str]],
     outcome: str,
@@ -1481,24 +1727,36 @@ def linear_regression(
         else 0.0
     )
 
+    diagnostics: list[dict[str, Any]] = [
+        {
+            "id": "matrix_rank",
+            "label": "Design matrix rank",
+            "status": "passed",
+            "value": p,
+        },
+        {
+            "id": "r_squared",
+            "label": "R squared",
+            "status": "passed",
+            "value": r2,
+        },
+    ]
+    diagnostics.extend(
+        _linear_residual_diagnostics(
+            x,
+            fitted,
+            residuals,
+            inv_xtx,
+            sigma2,
+        )
+    )
+    diagnostics.extend(_vif_diagnostics(x, terms[:p]))
+
     return _result(
         "linear_regression",
         n,
         estimates,
-        [
-            {
-                "id": "matrix_rank",
-                "label": "Design matrix rank",
-                "status": "passed",
-                "value": p,
-            },
-            {
-                "id": "r_squared",
-                "label": "R squared",
-                "status": "passed",
-                "value": r2,
-            },
-        ],
+        diagnostics,
     )
 
 
@@ -1865,11 +2123,7 @@ def logistic_regression(
 
     warnings: list[str] = []
 
-    return _result(
-        "binary_logistic_regression",
-        n,
-        estimates,
-        [
+    diagnostics: list[dict[str, Any]] = [
             {
                 "id": "convergence",
                 "label": "Optimizer convergence",
@@ -1916,7 +2170,15 @@ def logistic_regression(
                     "Methodome does not use a fixed events-per-variable cutoff as a pass/fail rule."
                 ),
             },
-        ],
+        ]
+    diagnostics.extend(_logistic_residual_diagnostics(y, probabilities))
+    diagnostics.extend(_vif_diagnostics(x, terms[:p]))
+
+    return _result(
+        "binary_logistic_regression",
+        n,
+        estimates,
+        diagnostics,
         warnings,
     )
 
