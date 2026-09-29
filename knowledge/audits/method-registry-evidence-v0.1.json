@@ -73,8 +73,8 @@
         "linear-regression-001",
         "multicollinearity-001"
       ],
-      "finding": "Outcome eligibility, LINE assumptions, residual diagnostics and multicollinearity are source-supported.",
-      "action": "Keep executable inside the current iid/design boundary."
+      "finding": "Outcome eligibility, LINE assumptions, residual diagnostics and multicollinearity are source-supported. The runtime now emits leverage, standardized-residual, residual-pattern screening, and VIF review diagnostics without turning a single threshold into an automatic validity verdict.",
+      "action": "Keep executable inside the current iid/design boundary; require review of residual and multicollinearity diagnostics before coefficient-level interpretation."
     },
     {
       "method_id": "binary_logistic_regression",
@@ -92,8 +92,8 @@
         "logistic-separation-001",
         "logistic-sparse-events-001"
       ],
-      "finding": "Binary routing, fit diagnostics, separation and sparse-event safeguards are source-supported; a universal 10-EPV gate is rejected.",
-      "action": "Keep ordinary ML executable only within the safeguard boundary; Firth is not an automatic executable fallback."
+      "finding": "Binary routing, fit diagnostics, separation and sparse-event safeguards are source-supported. The runtime refuses detected separation/non-convergence and now emits Pearson/deviance residual and VIF review diagnostics; a universal 10-EPV gate is rejected.",
+      "action": "Keep ordinary ML executable only within the safeguard boundary; review residual, sparse-data and multicollinearity diagnostics. Firth is not an automatic executable fallback."
     },
     {
       "method_id": "mixed_effects_logistic_regression",
