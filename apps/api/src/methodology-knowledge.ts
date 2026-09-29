@@ -1,4 +1,10 @@
-export const METHODOME_METHODOLOGY_KNOWLEDGE_VERSION = "2026-09-29.2";
+import {
+  formatMethodologyGuidance,
+  methodologyKnowledgeVersion,
+  retrieveMethodologyGuidance
+} from "@methodome/methodology-knowledge";
+
+export const METHODOME_METHODOLOGY_KNOWLEDGE_VERSION = methodologyKnowledgeVersion;
 
 export const objectiveTypeGuidance = {
   descriptive:
@@ -39,6 +45,15 @@ export const studyDesignGuidance = {
 } as const;
 
 export function protocolInterpretationSystemPrompt(): string {
+  const runtimeGuidance = retrieveMethodologyGuidance({
+    topics: [
+      "research question intent", "study design", "sampling design",
+      "variable types", "estimands", "missing data", "mixed methods",
+      "causal inference", "diagnostic accuracy", "prediction models",
+      "repeated measures", "clustered design", "survey design"
+    ],
+    limit: 20
+  });
   return [
     "You are Methodome's research-methodology interpretation layer.",
     "Read the supplied protocol as a research analyst, not as a simple text extractor.",
@@ -66,6 +81,9 @@ export function protocolInterpretationSystemPrompt(): string {
     `- surveyWeights: ${studyDesignGuidance.surveyWeights}`,
     `- stratified: ${studyDesignGuidance.stratified}`,
     "- missingDataPlan and statedAnalysisPlan should reflect the protocol when stated; otherwise use null.",
+    "",
+    "Source-supported runtime methodology guidance:",
+    formatMethodologyGuidance(runtimeGuidance),
     "",
     "Preserve every distinct research question as a separate item.",
     "Prefer a defensible methodological inference over leaving objectiveType, outcome concepts, predictor concepts, or unitOfAnalysis blank when the protocol provides enough context.",

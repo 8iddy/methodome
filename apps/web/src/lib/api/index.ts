@@ -972,6 +972,36 @@ export async function getProjectOrchestrator(projectId: string) {
   }>(`/projects/${projectId}/orchestrator`);
 }
 
+export interface ProjectConversationMessage {
+  id: string;
+  projectId: string;
+  role: "researcher" | "methodome" | "activity" | "system";
+  messageKind: "message" | "checkpoint" | "result" | "activity" | "error";
+  content: string;
+  metadata: Record<string, unknown>;
+  attachmentFileIds: string[];
+  createdAt: string;
+}
+
+export async function getProjectConversation(projectId: string) {
+  return request<{
+    messages: ProjectConversationMessage[];
+    orchestrator: OrchestratorView;
+    methodologyKnowledgeVersion: string;
+  }>(`/projects/${projectId}/conversation`);
+}
+
+export async function sendProjectConversationMessage(
+  projectId: string,
+  content: string,
+  attachmentFileIds: string[] = []
+) {
+  return request<{ messageId: string; runId: string | null; queued: boolean }>(
+    `/projects/${projectId}/conversation/messages`,
+    { method: "POST", body: JSON.stringify({ content, attachmentFileIds }) }
+  );
+}
+
 export async function askProjectAssistant(
   projectId: string,
   message: string,

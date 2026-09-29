@@ -37,11 +37,15 @@ import {
   buildOrchestratorView,
   type WorkflowSection
 } from "@methodome/workflow-engine";
+import {
+  methodologyKnowledgeVersion,
+  retrieveMethodologyGuidance
+} from "@methodome/methodology-knowledge";
 import { requireAuth } from "./auth";
-import { consumeAnalysisQueue } from "./analysis-worker";
+import { isAnalysisQueueMessage, processAnalysisMessage } from "./analysis-worker";
 import { createAuth, emailVerificationEnabled } from "./better-auth";
 import { turnstileConfigurationIncomplete, turnstileEnabled, validateTurnstile } from "./auth-security";
-import type { Env, Variables } from "./env";
+import type { Env, MethodomeQueueMessage, OrchestrationQueueMessage, Variables } from "./env";
 import { makeId } from "./id";
 import {
   extractProtocolWithAi,
@@ -114,7 +118,14 @@ import {
   saveVariableMappings,
   updateProjectPolicy,
   updateStoredAnalysisPlan,
-  userOwnsProjects
+  userOwnsProjects,
+  appendProjectMessage,
+  createOrchestrationRun,
+  ensureProjectThread,
+  listProjectMessages,
+  syncConversationDecisions,
+  updateOrchestrationRun,
+  updateProjectFileKind
 } from "./db";
 
 type AppBindings = { Bindings: Env; Variables: Variables };
@@ -2267,6 +2278,214 @@ const orchestratorAdvanceSchema = z.object({
   ]).optional()
 });
 
+type ApiContext = import("hono").Context<AppBindings>;
+
+function backgroundContext(
+  env: Env,
+  userId: string,
+  userEmail?: string
+): ApiContext {
+  return {
+    env,
+    get: (key: string) => key === "userId" ? userId : key === "userEmail" ? userEmail : undefined
+  } as unknown as ApiContext;
+}
+
+async function executeAutomaticOrchestratorAction(
+  c: ApiContext,
+  projectId: string,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>,
+  action: NonNullable<ReturnType<typeof buildOrchestratorView>["automaticAction"]>
+): Promise<Record<string, unknown>> {
+  if (action === "extract_protocol") {
+    const extraction = await runProtocolExtractionForProject(c, projectId);
+    return { action, researchQuestionCount: extraction.researchQuestions.length };
+  }
+  if (action === "map_variables") {
+    return { action, ...(await orchestratorMapVariables(c, projectId, state)) };
+  }
+  if (action === "create_draft_plan") {
+    const plan = await createOrchestratedDraftPlan(c, projectId, state);
+    return { action, planId: plan.id, analysisCount: plan.analyses.length };
+  }
+  if (action === "run_analyses") {
+    if (!state.plan) throw new Error("The locked analysis plan could not be loaded.");
+    return { action, queuedJobIds: await enqueueOrchestratedPlan(c, projectId, state.plan) };
+  }
+  if (action === "prepare_qualitative_analysis") {
+    return { action, ...(await orchestratorPrepareQualitativeAnalysis(c, projectId, state)) };
+  }
+  if (action === "propose_qualitative_codebook") {
+    return { action, ...(await orchestratorProposeQualitativeCodebook(c, projectId, state)) };
+  }
+  if (action === "propose_qualitative_codings") {
+    return { action, ...(await orchestratorProposeQualitativeCodings(c, projectId, state)) };
+  }
+  return { action, ...(await orchestratorProposeQualitativeThemes(c, projectId, state)) };
+}
+
+async function runConversationOrchestrator(
+  env: Env,
+  message: OrchestrationQueueMessage
+): Promise<void> {
+  const c = backgroundContext(env, message.userId, message.userEmail);
+  const now = new Date().toISOString();
+  const threadId = await ensureProjectThread(env.DB, message.projectId, `thread_${message.projectId}`, now);
+  let iterations = 0;
+  await updateOrchestrationRun(env.DB, message.runId, { status: "running", iterationCount: 0 });
+
+  try {
+    for (; iterations < 12; iterations += 1) {
+      const state = await computeProjectReadiness(c, message.projectId);
+      const view = buildOrchestratorView(state.readiness, state.plan);
+      await syncConversationDecisions(env.DB, {
+        projectId: message.projectId,
+        threadId,
+        decisions: view.decisions.filter((decision) => decision.blocking).map((decision) => ({
+          id: decision.id,
+          kind: decision.kind,
+          prompt: decision.prompt,
+          ...(decision.options ? { options: decision.options } : {}),
+          context: {
+            questionId: decision.questionId ?? null,
+            analysisId: decision.analysisId ?? null
+          }
+        })),
+        now: new Date().toISOString()
+      });
+
+      if (!view.automaticAction) {
+        const waiting = view.status === "waiting_for_researcher";
+        await appendProjectMessage(env.DB, {
+          id: makeId("msg"), threadId, projectId: message.projectId,
+          role: "methodome", messageKind: waiting ? "checkpoint" : view.status === "complete" ? "result" : "message",
+          content: waiting && view.decisions[0] ? view.decisions[0].prompt : view.summary,
+          metadata: {
+            workflowStatus: view.status,
+            decisions: view.decisions,
+            methodologyKnowledgeVersion
+          },
+          attachmentFileIds: [], createdAt: new Date().toISOString(),
+          deduplicationKey: `${message.runId}:stop:${view.status}:${view.decisions[0]?.id ?? "none"}`
+        });
+        await updateOrchestrationRun(env.DB, message.runId, {
+          status: waiting ? "waiting" : "complete",
+          iterationCount: iterations,
+          stopReason: view.status
+        });
+        return;
+      }
+
+      const mutation = await executeAutomaticOrchestratorAction(
+        c, message.projectId, state, view.automaticAction
+      );
+      await appendProjectMessage(env.DB, {
+        id: makeId("msg"), threadId, projectId: message.projectId,
+        role: "activity", messageKind: "activity",
+        content: `${view.nextAction.label} completed.`,
+        metadata: { mutation, methodologyKnowledgeVersion }, attachmentFileIds: [],
+        createdAt: new Date().toISOString(),
+        deduplicationKey: `${message.runId}:iteration:${iterations}:${view.automaticAction}`
+      });
+
+      if (view.automaticAction === "run_analyses") {
+        await updateOrchestrationRun(env.DB, message.runId, {
+          status: "waiting", iterationCount: iterations + 1,
+          stopReason: "waiting_for_async_analysis"
+        });
+        return;
+      }
+    }
+
+    await updateOrchestrationRun(env.DB, message.runId, {
+      status: "waiting", iterationCount: iterations,
+      stopReason: "safe_iteration_limit"
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Methodome could not continue safely.";
+    await appendProjectMessage(env.DB, {
+      id: makeId("msg"), threadId, projectId: message.projectId,
+      role: "methodome", messageKind: "error", content: errorMessage,
+      metadata: { runId: message.runId }, attachmentFileIds: [],
+      createdAt: new Date().toISOString(), deduplicationKey: `${message.runId}:error`
+    });
+    await updateOrchestrationRun(env.DB, message.runId, {
+      status: "failed", iterationCount: iterations, stopReason: "unrecoverable_error", errorMessage
+    });
+    throw error;
+  }
+}
+
+const conversationMessageSchema = z.object({
+  content: z.string().trim().min(1).max(8000),
+  attachmentFileIds: z.array(z.string().min(1)).max(20).default([])
+});
+
+function inferResearchFileKind(file: { filename: string; mediaType?: string }) {
+  const name = file.filename.toLowerCase();
+  const mediaType = file.mediaType?.toLowerCase() ?? "";
+  if (/protocol|proposal|research.plan|study.plan/.test(name)) return "protocol" as const;
+  if (/transcript|interview|focus.group|fgd|field.note/.test(name)) return "transcript" as const;
+  if (/codebook|data.dictionary|variable.dictionary/.test(name)) return "codebook" as const;
+  if (/questionnaire|instrument|survey.form|case.report.form|\bcrf\b/.test(name)) return "instrument" as const;
+  if (/\.(csv|tsv|xlsx?|sav|dta|sas7bdat)$/.test(name) || mediaType.includes("spreadsheet") || mediaType.includes("csv")) return "dataset" as const;
+  return "other" as const;
+}
+
+app.get("/projects/:projectId/conversation", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+  const state = await computeProjectReadiness(c, projectId);
+  return c.json({
+    messages: await listProjectMessages(c.env.DB, projectId),
+    orchestrator: buildOrchestratorView(state.readiness, state.plan),
+    methodologyKnowledgeVersion
+  });
+});
+
+app.post("/projects/:projectId/conversation/messages", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+  const parsed = conversationMessageSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ error: { code: "INVALID_CONVERSATION_MESSAGE", message: "Write a message or attach research files.", details: parsed.error.flatten() } }, 400);
+  }
+
+  const files = await listProjectFiles(c.env.DB, projectId);
+  const projectFileIds = new Set(files.map((file) => file.id));
+  if (parsed.data.attachmentFileIds.some((fileId) => !projectFileIds.has(fileId))) {
+    return c.json({ error: { code: "INVALID_CONVERSATION_ATTACHMENT", message: "One or more attachments do not belong to this project." } }, 400);
+  }
+  for (const file of files.filter((item) => parsed.data.attachmentFileIds.includes(item.id))) {
+    const inferred = inferResearchFileKind(file);
+    if (file.fileKind === "other" && inferred !== "other") {
+      await updateProjectFileKind(c.env.DB, projectId, file.id, inferred);
+    }
+  }
+
+  const now = new Date().toISOString();
+  const threadId = await ensureProjectThread(c.env.DB, projectId, makeId("thread"), now);
+  const messageId = makeId("msg");
+  await appendProjectMessage(c.env.DB, {
+    id: messageId, threadId, projectId, role: "researcher", messageKind: "message",
+    content: parsed.data.content, metadata: {}, attachmentFileIds: parsed.data.attachmentFileIds,
+    createdBy: getUserId(c), createdAt: now
+  });
+  const runId = makeId("run");
+  const queued = await createOrchestrationRun(c.env.DB, {
+    id: runId, projectId, triggerMessageId: messageId, createdBy: getUserId(c), now
+  });
+  if (queued) {
+    await c.env.ANALYSIS_QUEUE.send({
+      type: "orchestration", runId, projectId, userId: getUserId(c),
+      ...(c.get("userEmail") ? { userEmail: c.get("userEmail") } : {})
+    });
+  }
+  return c.json({ messageId, runId: queued ? runId : null, queued }, 202);
+});
+
 app.get("/projects/:projectId/orchestrator", async (c) => {
   const projectId = c.req.param("projectId");
   const access = await requireProject(c, projectId);
@@ -2412,11 +2631,18 @@ app.post("/projects/:projectId/assistant", async (c) => {
   };
 
   try {
-    const reply = await answerProjectAssistant({
+    const assistant = await answerProjectAssistant({
       env: c.env,
       message: parsed.data.message,
       history: parsed.data.history,
-      context
+      context,
+      methodology: retrieveMethodologyGuidance({
+        query: parsed.data.message,
+        topics: state.selections.flatMap((selection) =>
+          selection.candidates.map((candidate) => candidate.methodId)
+        ),
+        limit: 10
+      })
     });
     await addAudit(c, {
       projectId,
@@ -2431,7 +2657,12 @@ app.post("/projects/:projectId/assistant", async (c) => {
       }
     });
     return c.json({
-      reply,
+      reply: assistant.reply,
+      intent: assistant.intent,
+      methodology: {
+        version: methodologyKnowledgeVersion,
+        ruleIds: assistant.methodologyRuleIds
+      },
       grounded: true,
       modelUsed: true
     });
@@ -5007,7 +5238,32 @@ app.onError((error, c) => {
   );
 });
 
+async function consumeMethodomeQueue(
+  batch: MessageBatch<unknown>,
+  env: Env
+): Promise<void> {
+  for (const message of batch.messages) {
+    try {
+      if (isAnalysisQueueMessage(message.body)) {
+        await processAnalysisMessage(message.body, env);
+      } else if (
+        message.body && typeof message.body === "object" &&
+        (message.body as Record<string, unknown>).type === "orchestration"
+      ) {
+        await runConversationOrchestrator(env, message.body as OrchestrationQueueMessage);
+      } else {
+        console.error("Invalid Methodome queue message", message.body);
+      }
+      message.ack();
+    } catch (error) {
+      console.error("Methodome queue processing failed", error);
+      if (message.attempts >= 3) message.ack();
+      else message.retry();
+    }
+  }
+}
+
 export default {
   fetch: app.fetch,
-  queue: consumeAnalysisQueue
+  queue: consumeMethodomeQueue
 } satisfies ExportedHandler<Env>;

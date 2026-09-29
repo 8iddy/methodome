@@ -3,6 +3,11 @@ import type {
   StudySpecification,
   VariableConcept
 } from "@methodome/study-spec";
+import {
+  methodologyKnowledgeStatus,
+  methodologyKnowledgeVersion,
+  retrieveMethodologyGuidance
+} from "@methodome/methodology-knowledge";
 
 export type MethodMaturity = "validated" | "supported" | "experimental";
 
@@ -28,6 +33,13 @@ export interface CandidateMethod {
   rationale: string;
   requiredChecks: string[];
   decisionRequired?: string;
+  methodology?: {
+    version: string;
+    status: string;
+    ruleIds: string[];
+    evidenceIds: string[];
+    sourceIds: string[];
+  };
 }
 
 export interface CandidateSelection {
@@ -35,6 +47,13 @@ export interface CandidateSelection {
   candidates: CandidateMethod[];
   warnings: string[];
   blockedReason?: string;
+  methodology?: {
+    version: string;
+    status: string;
+    ruleIds: string[];
+    evidenceIds: string[];
+    sourceIds: string[];
+  };
 }
 
 export const registryVersion = "0.2.0";
@@ -337,6 +356,37 @@ function contextualWarnings(
   return warnings;
 }
 
+const methodRuleIds: Record<string, string[]> = {
+  descriptive_statistics: ["descriptive-categorical-001", "descriptive-continuous-001"],
+  pearson_correlation: ["pearson-001"],
+  spearman_correlation: ["spearman-correlation-001"],
+  linear_regression: ["linear-regression-001", "multicollinearity-001"],
+  binary_logistic_regression: ["logistic-regression-001", "logistic-separation-001", "logistic-sparse-events-001"],
+  poisson_regression: ["poisson-regression-001", "count-overdispersion-001"],
+  negative_binomial_regression: ["count-overdispersion-001"],
+  independent_two_sample_t: ["independent-two-sample-t-001"],
+  paired_t: ["paired-t-001"],
+  one_way_anova: ["multi-group-gate-001", "one-way-anova-001"],
+  wilcoxon_signed_rank: ["wilcoxon-signed-rank-001"],
+  mann_whitney: ["mann-whitney-001"],
+  kruskal_wallis: ["kruskal-wallis-001"],
+  chi_square: ["chi-square-001"],
+  fisher_exact: ["fisher-exact-001"],
+  mixed_effects_logistic_regression: ["cluster-001", "repeated-001"],
+  gee_logistic_regression: ["cluster-001", "repeated-001"]
+};
+
+function provenance(ruleIds: string[]) {
+  const guidance = retrieveMethodologyGuidance({ ruleIds, limit: Math.max(ruleIds.length, 1) });
+  return {
+    version: methodologyKnowledgeVersion,
+    status: methodologyKnowledgeStatus,
+    ruleIds: guidance.rules.map((rule) => rule.ruleId),
+    evidenceIds: guidance.evidenceIds,
+    sourceIds: guidance.sourceIds
+  };
+}
+
 function candidate(id: string, rationale: string, decisionRequired?: string): CandidateMethod {
   const method = methodRegistry[id];
   if (!method) throw new Error(`Unknown method: ${id}`);
@@ -348,14 +398,15 @@ function candidate(id: string, rationale: string, decisionRequired?: string): Ca
     executable: method.executable,
     rationale,
     requiredChecks: method.diagnostics,
+    methodology: provenance(methodRuleIds[id] ?? []),
     ...(decisionRequired ? { decisionRequired } : {})
   };
 }
 
-export function selectCandidateMethods(
+function selectCandidateMethodsInternal(
   study: StudySpecification,
   questionId: string
-): CandidateSelection {
+): Omit<CandidateSelection, "methodology"> {
   const question = study.researchQuestions.find((item) => item.id === questionId);
 
   if (!question) {
@@ -740,5 +791,43 @@ export function selectCandidateMethods(
     candidates: [],
     warnings: baseWarnings,
     blockedReason: `No current deterministic rule exists for outcome type ${outcome.variableType}.`
+  };
+}
+
+function selectionRuleIds(
+  study: StudySpecification,
+  question: ResearchQuestion | undefined,
+  selection: Omit<CandidateSelection, "methodology">
+): string[] {
+  const ids = new Set(selection.candidates.flatMap((item) => item.methodology?.ruleIds ?? []));
+  if (question?.objectiveType === "causal") ids.add("causal-gate-001");
+  if (question?.objectiveType === "diagnostic") ids.add("diagnostic-accuracy-001");
+  if (question?.objectiveType === "prediction") ids.add("prediction-001");
+  if (study.repeatedMeasures) ids.add("repeated-001");
+  if (study.clustered) ids.add("cluster-001");
+  if (requiresSurveyAwareAnalysis(study)) {
+    ids.add("survey-weight-001");
+    ids.add("survey-variance-001");
+  }
+  if (samplingDesignText(study).match(/convenience|purposive|volunteer|self-select|non-probability|nonprobability/)) {
+    ids.add("nonprobability-sampling-001");
+  }
+  return [...ids];
+}
+
+export function selectCandidateMethods(
+  study: StudySpecification,
+  questionId: string
+): CandidateSelection {
+  const selection = selectCandidateMethodsInternal(study, questionId) as Omit<CandidateSelection, "methodology">;
+  return {
+    ...selection,
+    methodology: provenance(
+      selectionRuleIds(
+        study,
+        study.researchQuestions.find((item) => item.id === questionId),
+        selection
+      )
+    )
   };
 }

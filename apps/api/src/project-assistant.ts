@@ -1,12 +1,31 @@
 import { z } from "zod";
 import type { Env } from "./env";
+import {
+  formatMethodologyGuidance,
+  retrieveMethodologyGuidance,
+  type MethodologyGuidance
+} from "@methodome/methodology-knowledge";
 
 export const PROJECT_ASSISTANT_MODEL =
   "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 const assistantResponseSchema = z.object({
-  reply: z.string().trim().min(1).max(6000)
+  reply: z.string().trim().min(1).max(6000),
+  intent: z.object({
+    kind: z.enum([
+      "explain", "continue_research", "answer_checkpoint", "change_study",
+      "inspect_results", "upload_context", "unknown"
+    ]),
+    requestedAction: z.enum([
+      "none", "continue", "resolve_decision", "update_study", "show_results"
+    ]),
+    decisionId: z.string().nullable().default(null),
+    confidence: z.number().min(0).max(1)
+  }),
+  methodologyRuleIds: z.array(z.string()).default([])
 });
+
+export type ProjectAssistantResponse = z.infer<typeof assistantResponseSchema>;
 
 function modelPayload(result: unknown): unknown {
   if (typeof result === "string") return result;
@@ -59,7 +78,8 @@ export async function answerProjectAssistant(input: {
   message: string;
   history: Array<{ role: "user" | "assistant"; content: string }>;
   context: unknown;
-}): Promise<string> {
+  methodology?: MethodologyGuidance;
+}): Promise<ProjectAssistantResponse> {
   if (!input.env.AI) {
     throw new Error("Workers AI is required for project conversation.");
   }
@@ -79,7 +99,9 @@ export async function answerProjectAssistant(input: {
           "If the researcher asks to change or add a research aim, variable, design assumption, or analysis that is not already represented in PROJECT STATE, treat it as a requested change. Explain what would need to be reviewed or updated; do not claim the project was changed.",
           "Do not expose internal pipeline or implementation jargon unless the researcher asks for technical detail.",
           "Write concise prose by default. Prefer one to three short paragraphs. Avoid bullet lists unless the researcher explicitly asks for a list.",
-          "Return JSON only as {reply:string}."
+          "Classify the message into the supplied intent envelope. This classification only proposes intent; the server independently validates every action against current canonical state.",
+          "Cite only methodology rule IDs supplied in METHODOLOGY GUIDANCE. Do not invent IDs.",
+          "Return JSON only as {reply:string,intent:{kind,requestedAction,decisionId,confidence},methodologyRuleIds:string[]} ."
         ].join("\n")
       },
       ...input.history.slice(-8).map((item) => ({
@@ -91,6 +113,11 @@ export async function answerProjectAssistant(input: {
         content: [
           "PROJECT STATE",
           JSON.stringify(input.context),
+          "",
+          "METHODOLOGY GUIDANCE",
+          formatMethodologyGuidance(
+            input.methodology ?? retrieveMethodologyGuidance({ query: input.message, limit: 8 })
+          ),
           "",
           "RESEARCHER MESSAGE",
           input.message
@@ -105,5 +132,5 @@ export async function answerProjectAssistant(input: {
   const parsed = assistantResponseSchema.parse(
     parseModelJson(modelPayload(response))
   );
-  return parsed.reply;
+  return parsed;
 }

@@ -1183,6 +1183,17 @@ export async function listProjectFiles(
   }));
 }
 
+export async function updateProjectFileKind(
+  db: D1Database,
+  projectId: string,
+  fileId: string,
+  fileKind: "protocol" | "instrument" | "codebook" | "dataset" | "transcript" | "other"
+): Promise<void> {
+  await db.prepare(
+    "UPDATE files SET file_kind = ? WHERE project_id = ? AND id = ? AND file_kind = 'other'"
+  ).bind(fileKind, projectId, fileId).run();
+}
+
 
 export async function createQualitativeAnalysis(
   db: D1Database,
@@ -1557,4 +1568,143 @@ export async function updateQualitativeSegmentCodingState(
       .bind(codingState, analysisId, segmentId)
   );
   await db.batch(statements);
+}
+
+export type ConversationRole = "researcher" | "methodome" | "activity" | "system";
+export type ConversationMessageKind = "message" | "checkpoint" | "result" | "activity" | "error";
+
+export interface ProjectConversationMessage {
+  id: string;
+  projectId: string;
+  role: ConversationRole;
+  messageKind: ConversationMessageKind;
+  content: string;
+  metadata: Record<string, unknown>;
+  attachmentFileIds: string[];
+  createdBy?: string;
+  createdAt: string;
+}
+
+export async function ensureProjectThread(
+  db: D1Database,
+  projectId: string,
+  threadId: string,
+  now: string
+): Promise<string> {
+  await db.prepare(
+    `INSERT INTO project_threads (id, project_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(project_id) DO UPDATE SET updated_at = excluded.updated_at`
+  ).bind(threadId, projectId, now, now).run();
+  const row = await db.prepare(
+    "SELECT id FROM project_threads WHERE project_id = ? LIMIT 1"
+  ).bind(projectId).first<{ id: string }>();
+  if (!row) throw new Error("Project conversation could not be created.");
+  return row.id;
+}
+
+export async function appendProjectMessage(
+  db: D1Database,
+  input: ProjectConversationMessage & { threadId: string; deduplicationKey?: string }
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO project_messages
+     (id, thread_id, project_id, role, message_kind, content, metadata_json,
+      attachment_file_ids_json, deduplication_key, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(project_id, deduplication_key) DO NOTHING`
+  ).bind(
+    input.id, input.threadId, input.projectId, input.role, input.messageKind,
+    input.content, JSON.stringify(input.metadata), JSON.stringify(input.attachmentFileIds),
+    input.deduplicationKey ?? null, input.createdBy ?? null, input.createdAt
+  ).run();
+}
+
+export async function listProjectMessages(
+  db: D1Database,
+  projectId: string,
+  limit = 100
+): Promise<ProjectConversationMessage[]> {
+  const result = await db.prepare(
+    `SELECT id, project_id, role, message_kind, content, metadata_json,
+            attachment_file_ids_json, created_by, created_at
+     FROM project_messages WHERE project_id = ?
+     ORDER BY created_at ASC, id ASC LIMIT ?`
+  ).bind(projectId, limit).all<Record<string, unknown>>();
+  return result.results.map((row) => ({
+    id: String(row.id),
+    projectId: String(row.project_id),
+    role: String(row.role) as ConversationRole,
+    messageKind: String(row.message_kind) as ConversationMessageKind,
+    content: String(row.content),
+    metadata: parseJson<Record<string, unknown>>(String(row.metadata_json), {}),
+    attachmentFileIds: parseJson<string[]>(String(row.attachment_file_ids_json), []),
+    ...(row.created_by ? { createdBy: String(row.created_by) } : {}),
+    createdAt: String(row.created_at)
+  }));
+}
+
+export async function syncConversationDecisions(
+  db: D1Database,
+  input: {
+    projectId: string;
+    threadId: string;
+    decisions: Array<{ id: string; kind: string; prompt: string; options?: unknown[]; context?: Record<string, unknown> }>;
+    now: string;
+  }
+): Promise<void> {
+  const keys = input.decisions.map((decision) => decision.id);
+  await db.prepare(
+    `UPDATE project_conversation_decisions SET status = 'superseded', updated_at = ?
+     WHERE project_id = ? AND status = 'open'`
+  ).bind(input.now, input.projectId).run();
+  for (const decision of input.decisions) {
+    await db.prepare(
+      `INSERT INTO project_conversation_decisions
+       (id, project_id, thread_id, decision_key, kind, prompt, options_json,
+        domain_context_json, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)
+       ON CONFLICT(project_id, decision_key) DO UPDATE SET
+         kind = excluded.kind, prompt = excluded.prompt, options_json = excluded.options_json,
+         domain_context_json = excluded.domain_context_json, status = 'open', updated_at = excluded.updated_at`
+    ).bind(
+      makeConversationDecisionId(input.projectId, decision.id), input.projectId, input.threadId,
+      decision.id, decision.kind, decision.prompt, JSON.stringify(decision.options ?? []),
+      JSON.stringify(decision.context ?? {}), input.now, input.now
+    ).run();
+  }
+  void keys;
+}
+
+function makeConversationDecisionId(projectId: string, decisionKey: string): string {
+  let hash = 2166136261;
+  for (const character of `${projectId}:${decisionKey}`) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `decision_${(hash >>> 0).toString(16)}`;
+}
+
+export async function createOrchestrationRun(
+  db: D1Database,
+  input: { id: string; projectId: string; triggerMessageId?: string; createdBy: string; now: string }
+): Promise<boolean> {
+  const result = await db.prepare(
+    `INSERT INTO project_orchestration_runs
+     (id, project_id, trigger_message_id, status, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, 'queued', ?, ?, ?)
+     ON CONFLICT DO NOTHING`
+  ).bind(input.id, input.projectId, input.triggerMessageId ?? null, input.createdBy, input.now, input.now).run();
+  return Number(result.meta.changes ?? 0) > 0;
+}
+
+export async function updateOrchestrationRun(
+  db: D1Database,
+  runId: string,
+  input: { status: "running" | "waiting" | "complete" | "failed"; iterationCount: number; stopReason?: string; errorMessage?: string }
+): Promise<void> {
+  await db.prepare(
+    `UPDATE project_orchestration_runs SET status = ?, iteration_count = ?, stop_reason = ?,
+     error_message = ?, updated_at = ? WHERE id = ?`
+  ).bind(input.status, input.iterationCount, input.stopReason ?? null, input.errorMessage ?? null, new Date().toISOString(), runId).run();
 }

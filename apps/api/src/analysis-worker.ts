@@ -157,10 +157,11 @@ export async function processAnalysisMessage(
   });
 }
 
-function isAnalysisQueueMessage(value: unknown): value is AnalysisQueueMessage {
+export function isAnalysisQueueMessage(value: unknown): value is AnalysisQueueMessage {
   if (!value || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
   return (
+    record.type !== "orchestration" &&
     typeof record.jobId === "string" &&
     typeof record.projectId === "string"
   );
