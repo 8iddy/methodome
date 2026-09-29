@@ -82,15 +82,17 @@
       "need": "Primary source-backed safeguard for detecting complete and quasi-complete separation and routing to an appropriate estimation strategy.",
       "reason": "Current logistic-regression sources support binary-outcome routing and general diagnostics but do not yet provide a sufficiently explicit Methodome rule for separation detection and response.",
       "status": "open",
-      "candidate_source": {
-        "title": "Separation in Logistic Regression: Causes, Consequences, and Control",
-        "authors": "Mansournia MA; Geroldinger A; Greenland S; Heinze G",
-        "journal": "American Journal of Epidemiology",
-        "year": 2018,
-        "doi": "10.1093/aje/kwx299",
-        "status": "identified_external_pending_drive_ingestion",
-        "note": "Directly addresses separation, rare outcomes/exposures, small-sample and sparse-data bias, infinite maximum-likelihood estimates, diagnostic warning signs, and penalized-likelihood approaches including Firth."
-      }
+      "candidate_sources": [
+        {
+          "title": "Separation in Logistic Regression: Causes, Consequences, and Control",
+          "authors": "Mansournia MA; Geroldinger A; Greenland S; Heinze G",
+          "journal": "American Journal of Epidemiology",
+          "year": 2018,
+          "doi": "10.1093/aje/kwx299",
+          "status": "identified_external_pending_drive_ingestion",
+          "note": "Directly addresses complete/quasi-complete separation, sparse-data bias, warning signs, and penalized-likelihood remedies including Firth."
+        }
+      ]
     },
     {
       "gap_id": "gap-logit-sparse-events-001",
@@ -98,15 +100,26 @@
       "need": "Primary source-backed safeguard for sparse-event and small-sample logistic regression, including when ordinary maximum-likelihood estimates may be biased or unstable and when penalized or small-sample alternatives should be considered.",
       "reason": "Current corpus material does not yet support an operational rare-event or sparse-event threshold or automatic fallback method.",
       "status": "open",
-      "candidate_source": {
-        "title": "Separation in Logistic Regression: Causes, Consequences, and Control",
-        "authors": "Mansournia MA; Geroldinger A; Greenland S; Heinze G",
-        "journal": "American Journal of Epidemiology",
-        "year": 2018,
-        "doi": "10.1093/aje/kwx299",
-        "status": "identified_external_pending_drive_ingestion",
-        "note": "Directly addresses separation, rare outcomes/exposures, small-sample and sparse-data bias, infinite maximum-likelihood estimates, diagnostic warning signs, and penalized-likelihood approaches including Firth."
-      }
+      "candidate_sources": [
+        {
+          "title": "Separation in Logistic Regression: Causes, Consequences, and Control",
+          "authors": "Mansournia MA; Geroldinger A; Greenland S; Heinze G",
+          "journal": "American Journal of Epidemiology",
+          "year": 2018,
+          "doi": "10.1093/aje/kwx299",
+          "status": "identified_external_pending_drive_ingestion",
+          "note": "Links rare outcomes/exposures and sparse data to separation and maximum-likelihood failure or bias."
+        },
+        {
+          "title": "No rationale for 1 variable per 10 events criterion for binary logistic regression analysis",
+          "authors": "van Smeden M; de Groot JAH; Moons KGM; Collins GS; Altman DG; Eijkemans MJC; Reitsma JB",
+          "journal": "BMC Medical Research Methodology",
+          "year": 2016,
+          "doi": "10.1186/s12874-016-0267-3",
+          "status": "identified_external_pending_drive_ingestion",
+          "note": "Shows that fixed 10-EPV rules are weakly supported, low-EPV problems depend on other factors, separation materially affects results, and Firth correction can improve coefficient accuracy and alleviate separation."
+        }
+      ]
     },
     {
       "gap_id": "gap-count-excess-zero-001",
