@@ -44,12 +44,14 @@ describe("methodology knowledge corpus", () => {
     expect(represented.size).toBe(registry.file_count);
   });
 
-  it("requires every methodology rule to point to registered source evidence", () => {
+  it("requires every methodology rule to be unique and point to registered source evidence", () => {
     const ruleFiles = readdirSync(join(root, "knowledge/rules")).filter((name) =>
       name.endsWith(".json")
     );
 
     expect(ruleFiles.length).toBeGreaterThan(0);
+
+    const seenRuleIds = new Set<string>();
 
     for (const file of ruleFiles) {
       const payload = readJson(`knowledge/rules/${file}`);
@@ -57,6 +59,9 @@ describe("methodology knowledge corpus", () => {
 
       for (const rule of payload.rules) {
         expect(rule.rule_id).toBeTruthy();
+        expect(seenRuleIds.has(rule.rule_id)).toBe(false);
+        seenRuleIds.add(rule.rule_id);
+
         expect(rule.topic).toBeTruthy();
         expect(rule.decision).toBeTruthy();
         expect(Array.isArray(rule.conditions)).toBe(true);
@@ -74,17 +79,22 @@ describe("methodology knowledge corpus", () => {
     }
   });
 
-  it("requires evidence records to cite registered corpus sources", () => {
+  it("requires evidence records to be unique and cite registered corpus sources", () => {
     const evidenceFiles = readdirSync(join(root, "knowledge/evidence")).filter(
       (name) => name.endsWith(".json")
     );
 
     expect(evidenceFiles.length).toBeGreaterThan(0);
 
+    const seenEvidenceIds = new Set<string>();
+
     for (const file of evidenceFiles) {
       const payload = readJson(`knowledge/evidence/${file}`);
       for (const record of payload.records) {
         expect(record.evidence_id).toBeTruthy();
+        expect(seenEvidenceIds.has(record.evidence_id)).toBe(false);
+        seenEvidenceIds.add(record.evidence_id);
+
         expect(record.topic).toBeTruthy();
         expect(record.statement).toBeTruthy();
         expect(sourceIds.has(record.source_id)).toBe(true);
