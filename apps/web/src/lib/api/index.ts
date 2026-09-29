@@ -62,6 +62,218 @@ async function request<T>(
   return (await response.json()) as T;
 }
 
+
+export type WorkflowStageStatus =
+  | "missing"
+  | "needs_review"
+  | "reviewed_with_gaps"
+  | "ready"
+  | "locked"
+  | "complete"
+  | "blocked";
+
+export type OrchestratorAutomaticAction =
+  | "extract_protocol"
+  | "create_draft_plan"
+  | "run_analyses"
+  | "prepare_qualitative_analysis"
+  | "propose_qualitative_codebook"
+  | "propose_qualitative_codings"
+  | "propose_qualitative_themes";
+
+export interface WorkflowAction {
+  code: string;
+  label: string;
+  detail: string;
+  targetSection: string;
+  requiresResearcher: boolean;
+}
+
+export interface OrchestratorDecision {
+  id: string;
+  kind:
+    | "provide_input"
+    | "confirm_study_design"
+    | "review_mapping"
+    | "resolve_mapping_gap"
+    | "select_method"
+    | "approve_plan"
+    | "review_qualitative_codebook"
+    | "review_qualitative_codings"
+    | "review_qualitative_themes"
+    | "review_results";
+  prompt: string;
+  questionId?: string;
+  analysisId?: string;
+  options?: Array<{ id: string; label: string; detail?: string }>;
+  blocking: boolean;
+}
+
+export interface OrchestratorTask {
+  id: string;
+  label: string;
+  status: "pending" | "ready" | "waiting" | "complete" | "blocked";
+  detail: string;
+}
+
+export interface QuestionReadiness {
+  questionId: string;
+  text: string;
+  objectiveType: string | null;
+  mode: "quantitative" | "qualitative" | "unknown";
+  status: string;
+  variables: Array<{
+    concept: string;
+    role: "outcome" | "predictor" | "covariate";
+    datasetVariable?: string;
+    mappingStatus?: "direct_match" | "probable_match" | "uncertain" | "no_match";
+    confirmed: boolean;
+    represented: boolean;
+  }>;
+  blockers: Array<{
+    code: string;
+    message: string;
+    questionId: string;
+    concept?: string;
+    role?: "outcome" | "predictor" | "covariate";
+  }>;
+  candidates: Array<Record<string, unknown>>;
+  warnings: string[];
+  qualitativeWorkstream?: {
+    id: string;
+    researchQuestionId: string;
+    status: string;
+  };
+}
+
+export interface ProjectReadiness {
+  stages: {
+    protocol: WorkflowStageStatus;
+    data: WorkflowStageStatus;
+    studyDesign: WorkflowStageStatus;
+    mappings: WorkflowStageStatus;
+    plan: WorkflowStageStatus;
+    analysis: WorkflowStageStatus;
+  };
+  mappingSummary: {
+    status: WorkflowStageStatus;
+    reviewedCount: number;
+    totalConcepts: number;
+    representedCount: number;
+    gapCount: number;
+    unreviewedCount: number;
+  };
+  questions: QuestionReadiness[];
+  nextAction: WorkflowAction;
+  guidance: {
+    visible: boolean;
+    reason: "next_action_elsewhere" | "already_on_action_surface";
+  };
+}
+
+export interface OrchestratorView {
+  status:
+    | "working"
+    | "waiting_for_researcher"
+    | "ready_to_execute"
+    | "complete"
+    | "blocked";
+  summary: string;
+  tasks: OrchestratorTask[];
+  decisions: OrchestratorDecision[];
+  automaticAction?: OrchestratorAutomaticAction;
+  nextAction: WorkflowAction;
+}
+
+export interface QualitativeCode {
+  id: string;
+  label: string;
+  definition: string;
+  inclusionCriteria: string[];
+  exclusionCriteria: string[];
+}
+
+export interface QualitativeCodebook {
+  codes: QualitativeCode[];
+}
+
+export interface QualitativeSegment {
+  id: string;
+  analysisId: string;
+  projectId: string;
+  fileId: string;
+  segmentIndex: number;
+  text: string;
+  startChar: number;
+  endChar: number;
+  codingState: "uncoded" | "proposed" | "reviewed";
+  createdAt: string;
+}
+
+export interface QualitativeCoding {
+  id: string;
+  analysisId: string;
+  segmentId: string;
+  codeId: string;
+  status: "proposed" | "confirmed" | "rejected";
+  source: "model" | "researcher";
+  rationale?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QualitativeAnalysisRecord {
+  id: string;
+  projectId: string;
+  researchQuestionId: string;
+  status: string;
+  sourceFileIds: string[];
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QualitativeCodebookVersion {
+  id: string;
+  analysisId: string;
+  version: number;
+  source: "model" | "researcher";
+  codebook: QualitativeCodebook;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface QualitativeTheme {
+  id: string;
+  label: string;
+  summary: string;
+  codeIds: string[];
+  evidenceSegmentIds: string[];
+}
+
+export interface QualitativeThemeVersion {
+  id: string;
+  analysisId: string;
+  version: number;
+  source: "model" | "researcher";
+  themes: QualitativeTheme[];
+  synthesis: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface QualitativeAnalysisDetail {
+  analysis: QualitativeAnalysisRecord;
+  segments: QualitativeSegment[];
+  codebookVersions: QualitativeCodebookVersion[];
+  latestCodebook: QualitativeCodebookVersion | null;
+  codings: QualitativeCoding[];
+  themeVersions: QualitativeThemeVersion[];
+  latestThemes: QualitativeThemeVersion | null;
+}
+
 export type ResearchType = "quantitative" | "qualitative" | "mixed_methods";
 
 export interface BackendProject {
@@ -738,6 +950,130 @@ export async function updateProjectPolicy(
       { method: "PUT", body: JSON.stringify(policy) }
     )
   ).policy;
+}
+
+
+export async function getProjectReadiness(projectId: string, section?: string) {
+  const query = section ? `?section=${encodeURIComponent(section)}` : "";
+  return request<{
+    readiness: ProjectReadiness;
+    registryVersion: string;
+    datasetVersionId?: string;
+  }>(`/projects/${projectId}/readiness${query}`);
+}
+
+export async function getProjectOrchestrator(projectId: string) {
+  return request<{
+    orchestrator: OrchestratorView;
+    readiness: ProjectReadiness;
+    registryVersion: string;
+    datasetVersionId?: string;
+  }>(`/projects/${projectId}/orchestrator`);
+}
+
+export async function advanceProjectOrchestrator(
+  projectId: string,
+  action?: OrchestratorAutomaticAction
+) {
+  return request<{
+    advanced: boolean;
+    orchestrator: OrchestratorView;
+    readiness: ProjectReadiness;
+    datasetVersionId?: string;
+    message?: string;
+    mutation?: Record<string, unknown>;
+  }>(`/projects/${projectId}/orchestrator/advance`, {
+    method: "POST",
+    body: JSON.stringify(action ? { action } : {})
+  });
+}
+
+export async function updateAnalysisPlanMethods(
+  projectId: string,
+  planId: string,
+  methodSelections: Array<{ analysisId: string; methodId: string }>
+) {
+  return request<{ plan: AnalysisPlan }>(
+    `/projects/${projectId}/analysis-plan/${planId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ methodSelections })
+    }
+  );
+}
+
+export async function getQualitativeAnalyses(projectId: string) {
+  return (
+    await request<{ analyses: QualitativeAnalysisRecord[] }>(
+      `/projects/${projectId}/qualitative-analyses`
+    )
+  ).analyses;
+}
+
+export async function getQualitativeAnalysis(
+  projectId: string,
+  analysisId: string
+) {
+  return (
+    await request<{ detail: QualitativeAnalysisDetail | null }>(
+      `/projects/${projectId}/qualitative-analyses/${analysisId}`
+    )
+  ).detail;
+}
+
+export async function confirmQualitativeCodebook(
+  projectId: string,
+  analysisId: string,
+  codebook: QualitativeCodebook
+) {
+  return request<{ detail: QualitativeAnalysisDetail }>(
+    `/projects/${projectId}/qualitative-analyses/${analysisId}/codebook`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ codebook })
+    }
+  );
+}
+
+export async function reviewQualitativeCodings(
+  projectId: string,
+  analysisId: string,
+  input: {
+    decisions: Array<{
+      segmentId: string;
+      codeId: string;
+      status: "confirmed" | "rejected";
+      rationale?: string;
+    }>;
+    manualAssignments: Array<{
+      segmentId: string;
+      codeId: string;
+      rationale?: string;
+    }>;
+    reviewedSegmentIds: string[];
+  }
+) {
+  return request<{ detail: QualitativeAnalysisDetail }>(
+    `/projects/${projectId}/qualitative-analyses/${analysisId}/codings`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input)
+    }
+  );
+}
+
+export async function confirmQualitativeThemes(
+  projectId: string,
+  analysisId: string,
+  themeSet: { themes: QualitativeTheme[]; synthesis: string }
+) {
+  return request<{ detail: QualitativeAnalysisDetail }>(
+    `/projects/${projectId}/qualitative-analyses/${analysisId}/themes`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ themeSet })
+    }
+  );
 }
 
 export { API_BASE };

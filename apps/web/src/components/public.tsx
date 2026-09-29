@@ -9,10 +9,33 @@ import { Badge, Button, Mark, PageHeader, ThemeToggle } from "@/components/ui";
 
 function StartProjectButton() { const router = useRouter(); return <Button onClick={() => void getSession().then((session) => router.push(session?.user ? "/app/projects/new" : "/sign-in?next=/app/projects/new")).catch(() => router.push("/sign-in?next=/app/projects/new"))}>Start a project</Button>; }
 function PublicHeader() { return <header className="public-header"><Mark /><nav><Link href="/methods">Methods</Link><Link href="/how-it-works">How it works</Link><Link href="/documentation">Documentation</Link></nav><div><ThemeToggle /><StartProjectButton /></div></header>; }
-export function Landing() { return <><PublicHeader /><main className="landing"><section className="hero"><div><p className="eyebrow">RESEARCH WORKSPACE</p><h1>Research analysis,<br />brought together.</h1><p className="hero-copy">Clean data, define your study, build an analysis plan, run statistical methods, review diagnostics and produce reproducible results from one research workspace.</p><div className="hero-actions"><StartProjectButton /><Button href="/methods" variant="secondary">Explore methods</Button></div></div><ResearchMockup /></section><WorkflowStrip /><section className="method-family-section"><div className="section-intro"><div><p className="eyebrow">METHODS LIBRARY</p><h2>Your methods in one place.</h2></div><Button href="/methods" variant="secondary">Explore all methods</Button></div><p className="muted">The registry includes executable methods and methods whose execution is still pending. See the catalogue for method-level status.</p><div className="family-grid">{currentFamilies.map((name, i) => <article key={name}><span>0{i + 1}</span><h3>{name}</h3><p>{familyCopy(name)}</p></article>)}</div></section><section className="two-column-copy"><article><p className="eyebrow">REPRODUCIBILITY</p><h2>Every result has a record.</h2><p>Trace a result to its dataset version, transformations, analysis plan, method, code, package versions and diagnostics.</p></article><article><p className="eyebrow">DATA CONTROL</p><h2>Researchers control processing.</h2><p>Set project data rules before any model assisted extraction or qualitative processing takes place.</p></article></section><section className="final-cta"><p className="eyebrow">READY TO BEGIN</p><h2>Create your first<br />Methodome project.</h2><StartProjectButton /></section></main><PublicFooter /></>; }
-function ResearchMockup() { return <div className="research-mockup"><div className="mock-top"><span>Analysis plan</span><Badge kind="success">Planned before analysis</Badge></div><p className="mono">RESEARCH QUESTION 2</p><h3>Is reporting completeness associated with medicine stockout?</h3><div className="mock-grid"><div><span>Outcome</span><code>stockout_status</code></div><div><span>Outcome type</span><strong>Binary</strong></div><div><span>Design</span><strong>Cross sectional</strong></div><div><span>Repeated / clustered</span><strong>No</strong></div></div><p className="mono">CANDIDATE METHOD</p><div className="method-option"><strong>Binary logistic regression</strong><small>Validated · executable</small></div><a href="/methods">View method requirements and diagnostics</a></div>; }
+export function Landing() { return <><PublicHeader /><main className="landing"><section className="hero"><div><p className="eyebrow">RESEARCH ANALYSIS SYSTEM</p><h1>Analysis that follows<br />the study.</h1><p className="hero-copy">Give Methodome the protocol, instruments and research data. It builds a study model, prepares the analytical work, asks for research decisions when needed and sends approved analyses to deterministic statistical software.</p><div className="hero-actions"><StartProjectButton /><Button href="/how-it-works" variant="secondary">How it works</Button></div></div><ResearchMockup /></section><WorkflowStrip /><section className="method-family-section"><div className="section-intro"><div><p className="eyebrow">METHOD REGISTRY</p><h2>Statistical capability with defined boundaries.</h2></div><Button href="/methods" variant="secondary">Open registry</Button></div><p className="muted">Execution status and method maturity are separate. Methodome can support a method without giving the system permission to select it on its own.</p><div className="family-grid">{currentFamilies.map((name, i) => <article key={name}><span>0{i + 1}</span><h3>{name}</h3><p>{familyCopy(name)}</p></article>)}</div></section><section className="two-column-copy"><article><p className="eyebrow">PROVENANCE</p><h2>Every result keeps its record.</h2><p>Trace a result to the source dataset, transformations, analysis plan, selected method, code, package versions, diagnostics and approvals.</p></article><article><p className="eyebrow">RESEARCHER AUTHORITY</p><h2>Methodome stops when judgement is required.</h2><p>Study design, mapping gaps, method choices, plan approval and qualitative interpretation remain reviewable research decisions.</p></article></section><section className="final-cta"><p className="eyebrow">METHODOME</p><h2>Start with the study.<br />Keep the analysis accountable.</h2><StartProjectButton /></section></main><PublicFooter /></>; }
+function ResearchMockup() {
+  return (
+    <div className="research-mockup">
+      <div className="mock-top">
+        <span>Study brief</span>
+        <Badge kind="warning">Research decision</Badge>
+      </div>
+      <p className="mono">METHODOME</p>
+      <h3>I found four research questions. Three can continue. One outcome is not represented in the selected dataset.</h3>
+      <div className="mock-grid">
+        <div><span>Quantitative</span><strong>3 questions</strong></div>
+        <div><span>Qualitative</span><strong>1 question</strong></div>
+        <div><span>Mapping gaps</span><strong>1 confirmed gap</strong></div>
+        <div><span>Next decision</span><strong>Question 2</strong></div>
+      </div>
+      <p className="mono">NEEDS YOU</p>
+      <div className="method-option">
+        <strong>Resolve the missing outcome for Question 2</strong>
+        <small>Methodome will continue the other ready work after your decision.</small>
+      </div>
+      <a href="/how-it-works">See the research workflow</a>
+    </div>
+  );
+}
 function WorkflowStrip() {
-  const labels = ["Protocol", "Data", "Define", "Map", "Plan", "Analyse", "Review", "Report"];
+  const labels = ["Read sources", "Model study", "Prepare data", "Resolve evidence", "Plan", "Compute", "Review", "Report"];
   return (
     <section className="workflow">
       <div className="section-intro compact-workflow-intro">

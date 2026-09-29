@@ -382,7 +382,7 @@ export function selectCandidateMethods(
       questionId,
       candidates: [],
       warnings: [
-        "Methodome recognised this as a qualitative research question. Qualitative coding and synthesis are not yet executable in the current release."
+        "Methodome recognised this as a qualitative research question. It is routed to the source-linked qualitative coding and synthesis workflow rather than the quantitative statistical method registry."
       ],
       blockedReason:
         "This question should not be forced into the quantitative statistical pipeline."

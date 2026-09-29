@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Button, PageHeader, ThemeToggle } from "@/components/ui";
 import { ProjectPage as PrototypeProjectPage } from "@/components/workspace";
+import { ResearchAnalysisSurface, ResearchSectionContext, ResearchWorkspaceHome } from "@/components/research-workspace";
 import {
   MethodomeApiError,
   appendDatasets,
@@ -442,36 +443,45 @@ export function LiveProjectPage({
     getProject(projectId).then(setProject).catch(() => setProject(null));
   }, [projectId]);
 
-  const title = project?.name ?? "Methodome project";
-  const sectionDescriptions: Record<string, string> = {
-    overview: "Project sources, research decisions, analysis readiness and next actions.",
-    protocol: "Upload the study protocol and review the study information Methodome extracts from it.",
-    instruments: "Add questionnaires or codebooks that can provide evidence for variable mapping.",
-    data: "Upload source datasets, compare form versions and create harmonised dataset versions.",
-    "data-preparation": "Inspect dataset structure and derived versions before analysis planning.",
-    "study-design": "Review research questions and confirm the study design that constrains valid analyses.",
-    variables: "Connect confirmed research concepts to observed dataset variables using explicit evidence.",
-    "analysis-plan": "Review candidate methods for each research question and lock the approved plan.",
-    analysis: "Run the analyses recorded in the locked plan through deterministic statistical computation.",
-    results: "Review estimates, diagnostics, warnings and software details from completed analyses.",
-    reports: "Prepare research outputs from completed structured results.",
-    "audit-trail": "Inspect the record of project actions and versioned research decisions.",
-    settings: "Set the project data class, ethics reference and model-processing policy."
+  if (section === "overview") {
+    return (
+      <main className="app-content workspace-page">
+        <ResearchWorkspaceHome projectId={projectId} project={project} />
+      </main>
+    );
+  }
+
+  const sectionDescriptions: Record<string, [string, string]> = {
+    protocol: ["Protocol", "Source material and extracted study information."],
+    instruments: ["Instruments", "Questionnaires and codebooks used as mapping evidence."],
+    data: ["Data", "Source datasets, versions and schema relationships."],
+    "data-preparation": ["Data preparation", "Dataset structure, quality issues and derived versions."],
+    "study-design": ["Study design", "Research questions and design facts that constrain analysis."],
+    variables: ["Variable mapping", "Evidence linking research concepts to observed dataset fields."],
+    "analysis-plan": ["Analysis plan", "Candidate methods, selected methods and plan lock."],
+    analysis: ["Analysis", "Quantitative execution and source-linked qualitative review."],
+    results: ["Results", "Estimates, diagnostics, warnings and execution records."],
+    reports: ["Reports", "Research outputs and reproducibility files."],
+    "audit-trail": ["Audit record", "Versioned project actions and research decisions."],
+    settings: ["Project settings", "Data policy, ethics reference and model-processing controls."]
   };
+  const [title, description] = sectionDescriptions[section] ?? [
+    section.replaceAll("-", " "),
+    "Inspect this project record."
+  ];
 
   return (
-    <main className="app-content">
-      <LiveProjectStage projectId={projectId} />
+    <main className="app-content review-page">
+      <div className="review-backline">
+        <a href={`/app/projects/${projectId}/overview`}>← Research workspace</a>
+        <span>{project?.name ?? "Methodome project"}</span>
+      </div>
       <PageHeader
-        eyebrow={section.replaceAll("-", " ").toUpperCase()}
+        eyebrow="REVIEW SURFACE"
         title={title}
-        description={
-          sectionDescriptions[section] ??
-          "Continue structured research work in this Methodome project."
-        }
+        description={description}
       />
-      <LiveWorkflowGuide projectId={projectId} />
-      {section === "overview" && <LiveOverview projectId={projectId} project={project} />}
+      <ResearchSectionContext projectId={projectId} section={section} />
       {section === "protocol" && <LiveProjectFiles projectId={projectId} mode="protocol" />}
       {section === "instruments" && <LiveProjectFiles projectId={projectId} mode="instruments" />}
       {section === "data" && <LiveData projectId={projectId} />}
@@ -479,13 +489,17 @@ export function LiveProjectPage({
       {section === "study-design" && <LiveStudyDesign projectId={projectId} />}
       {section === "variables" && <LiveVariables projectId={projectId} />}
       {section === "analysis-plan" && <LiveAnalysisPlan projectId={projectId} />}
-      {section === "analysis" && <LiveAnalysis projectId={projectId} />}
+      {section === "analysis" && (
+        <ResearchAnalysisSurface
+          projectId={projectId}
+          fallback={<LiveAnalysis projectId={projectId} />}
+        />
+      )}
       {section === "results" && <LiveResults projectId={projectId} />}
       {section === "reports" && <LiveReports projectId={projectId} />}
       {section === "audit-trail" && <LiveAudit projectId={projectId} />}
       {section === "settings" && <LiveProjectSettings projectId={projectId} />}
       {![
-        "overview",
         "protocol",
         "instruments",
         "data",
