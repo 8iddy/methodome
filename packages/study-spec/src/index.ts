@@ -16,7 +16,7 @@ export const variableConceptSchema = z.object({
   concept: z.string().min(1),
   datasetVariable: z.string().min(1).nullable().default(null),
   variableType: z.enum(variableTypes).nullable().default(null),
-  observedLevelCount: z.number().int().nonnegative().nullable().default(null),
+  observedLevelCount: z.number().int().nonnegative().nullable().optional(),
   mappingStatus: z
     .enum(["direct_match", "probable_match", "uncertain", "no_match"])
     .nullable()
