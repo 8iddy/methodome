@@ -2466,282 +2466,144 @@ function simpleHash(value: string): string {
 }
 
 function LiveAnalysisPlan({ projectId }: { projectId: string }) {
-  const [selections, setSelections] = useState<CandidateSelection[]>([]);
-  const [datasets, setDatasets] = useState<DatasetVersion[]>([]);
-  const [spec, setSpec] = useState<StudySpecification | null>(null);
-  const [mappings, setMappings] = useState<VariableMapping[]>([]);
   const [plan, setPlan] = useState<AnalysisPlan | null>(null);
-  const [selectedMethods, setSelectedMethods] = useState<Record<string, string>>({});
-  const [selectedDatasetId, setSelectedDatasetId] = useState("");
-  const [status, setStatus] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function refresh() {
-    const [candidateResponse, ds, existing, specification, savedMappings] =
-      await Promise.all([
-        getMethodCandidates(projectId),
-        getDatasets(projectId),
-        getAnalysisPlan(projectId),
-        getStudySpecification(projectId),
-        getVariableMappings(projectId)
-      ]);
-
-    setSelections(candidateResponse.selections);
-    setDatasets(ds);
-    setPlan(existing);
-    setSpec(specification);
-    setMappings(savedMappings);
-
-    const preferred =
-      existing?.datasetVersionId ??
-      ds.find((dataset) => dataset.sourceKind === "derived")?.id ??
-      ds[0]?.id ??
-      "";
-    setSelectedDatasetId(preferred);
-
-    setSelectedMethods((current) => {
-      const next = { ...current };
-      for (const selection of candidateResponse.selections) {
-        if (!next[selection.questionId]) {
-          const executable = selection.candidates.find((candidate) => candidate.executable);
-          if (executable) next[selection.questionId] = executable.methodId;
-        }
-      }
-      return next;
-    });
-  }
+  const [spec, setSpec] = useState<StudySpecification | null>(null);
+  const [datasets, setDatasets] = useState<DatasetVersion[]>([]);
+  const [status, setStatus] = useState("Loading Methodome's analysis plan…");
 
   useEffect(() => {
-    void refresh().catch((err) => setStatus(message(err)));
+    Promise.all([
+      getAnalysisPlan(projectId),
+      getStudySpecification(projectId),
+      getDatasets(projectId)
+    ])
+      .then(([currentPlan, specification, currentDatasets]) => {
+        setPlan(currentPlan);
+        setSpec(specification);
+        setDatasets(currentDatasets);
+        setStatus("");
+      })
+      .catch((err) => setStatus(message(err)));
   }, [projectId]);
 
-  function mappingFor(concept: string) {
-    const key = concept.trim().toLowerCase();
-    return mappings.find(
-      (mapping) =>
-        mapping.researchConcept.trim().toLowerCase() === key &&
-        Boolean(mapping.confirmedBy)
+  if (!plan) {
+    return (
+      <section className="panel analysis-plan-reader">
+        <p className="eyebrow">METHODOME BUILDS THIS</p>
+        <h2>The analysis plan is not ready yet</h2>
+        <p>
+          You do not need to construct a statistical plan by hand. Methodome will create it
+          after the study design and analytical variables are sufficiently resolved. If a
+          genuine methodological choice remains, the workspace will ask you one specific
+          question and explain why it matters.
+        </p>
+        {status ? (
+          <div className="mapping-thinking">
+            <ActivitySpinner label="Reading analysis state" />
+            <span>{status}</span>
+          </div>
+        ) : (
+          <Button href={`/app/projects/${projectId}/overview`}>
+            Return to workspace
+          </Button>
+        )}
+      </section>
     );
   }
 
-  function resolvedVariables(question: StudySpecification["researchQuestions"][number]) {
-    const outcome = question.outcomes
-      .map((item) => mappingFor(item.concept)?.datasetVariable)
-      .find(Boolean);
-    const predictors = question.predictors.flatMap((item) => {
-      const value = mappingFor(item.concept)?.datasetVariable;
-      return value ? [value] : [];
-    });
-    const covariates = question.covariates.flatMap((item) => {
-      const value = mappingFor(item.concept)?.datasetVariable;
-      return value ? [value] : [];
-    });
-    return { outcome, predictors, covariates };
-  }
-
-  async function createPlan() {
-    if (!spec) {
-      setStatus("Confirm the study specification before creating an analysis plan.");
-      return;
-    }
-    if (!selectedDatasetId) {
-      setStatus("Upload and select a dataset before creating an analysis plan.");
-      return;
-    }
-
-    const analyses = selections.flatMap((selection, index) => {
-      const question = spec.researchQuestions.find(
-        (item) => item.id === selection.questionId
-      );
-      const selectedMethodId = selectedMethods[selection.questionId];
-      const candidate = selection.candidates.find(
-        (item) => item.methodId === selectedMethodId
-      );
-      if (!question || !selectedMethodId || !candidate?.executable) return [];
-      const resolved = resolvedVariables(question);
-      if (!resolved.outcome) return [];
-
-      return [
-        {
-          id: `analysis-${index + 1}`,
-          researchQuestionId: question.id,
-          outcome: resolved.outcome,
-          predictors: resolved.predictors,
-          covariates: resolved.covariates,
-          candidateMethodIds: selection.candidates.map((item) => item.methodId),
-          selectedMethodId,
-          requiredDecisions: candidate.decisionRequired
-            ? [candidate.decisionRequired]
-            : [],
-          warnings: selection.warnings,
-          diagnostics: candidate.requiredChecks,
-          addedAfterLock: false
-        }
-      ];
-    });
-
-    if (analyses.length === 0) {
-      setStatus(
-        "No research question is ready for an executable analysis. Review mappings and method blockers below."
-      );
-      return;
-    }
-
-    setBusy(true);
-    setStatus("");
-    try {
-      const created = await createAnalysisPlan(projectId, {
-        versionId: `plan-${Date.now()}`,
-        datasetVersionId: selectedDatasetId,
-        status: "planned_before_analysis",
-        analyses
-      });
-      setPlan(created);
-      setStatus(
-        `Analysis plan created with ${created.analyses.length} planned analysis${created.analyses.length === 1 ? "" : "es"}.`
-      );
-    } catch (err) {
-      setStatus(message(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function lock() {
-    if (!plan) return;
-    setBusy(true);
-    try {
-      const locked = await lockAnalysisPlan(projectId, plan.id);
-      setPlan(locked);
-      setStatus("Analysis plan locked. Planned analyses are now distinguished from later exploratory work.");
-    } catch (err) {
-      setStatus(message(err));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const dataset = datasets.find((item) => item.id === plan.datasetVersionId);
+  const questions = new Map(
+    spec?.researchQuestions.map((question) => [question.id, question]) ?? []
+  );
 
   return (
-    <section className="panel">
+    <section className="panel analysis-plan-reader">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">ANALYSIS DATASET</p>
-          <h2>Build analysis plan</h2>
+          <p className="eyebrow">METHODOME'S ANALYSIS PLAN</p>
+          <h2>{plan.lockedAt ? "Approved analysis plan" : "Draft analysis plan"}</h2>
+          <p className="muted">
+            This is an inspection surface. Methodome constructs the plan from the protocol,
+            confirmed analytical variables and deterministic method rules.
+          </p>
         </div>
-        {plan && (
-          <Badge kind={plan.lockedAt ? "success" : "blue"}>
-            {plan.lockedAt ? "Locked" : "Draft"}
-          </Badge>
-        )}
+        <Badge kind={plan.lockedAt ? "success" : "warning"}>
+          {plan.lockedAt ? "Locked" : "Awaiting approval"}
+        </Badge>
       </div>
 
-      <label>
-        Dataset version
-        <select
-          value={selectedDatasetId}
-          disabled={Boolean(plan)}
-          onChange={(event) => setSelectedDatasetId(event.target.value)}
-        >
-          <option value="">Select dataset</option>
-          {datasets.map((dataset) => (
-            <option key={dataset.id} value={dataset.id}>
-              {dataset.label} · {dataset.sourceKind}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="muted">
-        Methodome prefers the newest derived dataset when one exists. You can change the selection before the plan is created.
-      </p>
+      <div className="plan-summary-line">
+        <span>
+          <small>Analysis dataset</small>
+          <strong>{dataset?.label ?? plan.datasetVersionId ?? "Not resolved"}</strong>
+        </span>
+        <span>
+          <small>Planned analyses</small>
+          <strong>{plan.analyses.length}</strong>
+        </span>
+      </div>
 
-      <div className="method-list">
-        {selections.map((selection, index) => {
-          const question = spec?.researchQuestions.find(
-            (item) => item.id === selection.questionId
-          );
-          const resolved = question ? resolvedVariables(question) : null;
-          const mappingBlocker =
-            question && !resolved?.outcome
-              ? "The outcome concept does not have a confirmed dataset mapping."
-              : null;
+      <div className="plan-narrative-list">
+        {plan.analyses.map((analysis, index) => {
+          const question = questions.get(analysis.researchQuestionId);
           return (
-            <article className="method-card" key={selection.questionId}>
-              <p className="eyebrow">RESEARCH QUESTION {index + 1}</p>
-              <h3>{question?.text ?? selection.questionId}</h3>
-              {resolved?.outcome && (
-                <p>
-                  <b>Outcome:</b> <code>{resolved.outcome}</code>
-                  {resolved.predictors.length > 0 && (
-                    <> · <b>Predictors:</b> <code>{resolved.predictors.join(", ")}</code></>
-                  )}
-                </p>
-              )}
-
-              {(mappingBlocker || selection.blockedReason) && (
-                <div className="warning-panel">
-                  <b>Needs review</b>
-                  <p>{mappingBlocker ?? selection.blockedReason}</p>
-                </div>
-              )}
-
-              {selection.warnings.map((warning) => (
-                <p className="muted" key={warning}>{warning}</p>
-              ))}
-
-              {selection.candidates.map((candidate) => (
-                <label className="candidate" key={candidate.methodId}>
-                  <input
-                    type="radio"
-                    name={`candidate-${selection.questionId}`}
-                    checked={selectedMethods[selection.questionId] === candidate.methodId}
-                    disabled={!candidate.executable || Boolean(plan)}
-                    onChange={() =>
-                      setSelectedMethods((current) => ({
-                        ...current,
-                        [selection.questionId]: candidate.methodId
-                      }))
-                    }
-                  />
-                  <span>
-                    <b>{candidate.displayName}</b>
-                    <small>{candidate.rationale}</small>
-                    {candidate.decisionRequired && <small>{candidate.decisionRequired}</small>}
-                  </span>
-                  <Badge kind={candidate.executable ? "success" : "warning"}>
-                    {candidate.executable ? candidate.maturity : "Execution pending"}
-                  </Badge>
-                </label>
-              ))}
+            <article className="plan-narrative" key={analysis.id}>
+              <div className="plan-narrative-number">
+                {String(index + 1).padStart(2, "0")}
+              </div>
+              <div>
+                <p className="eyebrow">RESEARCH QUESTION</p>
+                <h3>{question?.text ?? analysis.researchQuestionId}</h3>
+                {analysis.selectedMethodId ? (
+                  <p>
+                    Methodome proposes <strong>{analysis.selectedMethodId.replaceAll("_", " ")}</strong>
+                    {" "}using <code>{analysis.outcome}</code> as the outcome
+                    {analysis.predictors.length > 0
+                      ? <> and <code>{analysis.predictors.join(", ")}</code> as predictor{analysis.predictors.length === 1 ? "" : "s"}</>
+                      : null}.
+                  </p>
+                ) : (
+                  <div className="plain-decision-note">
+                    <b>One methodological decision remains.</b>
+                    <p>
+                      Methodome found more than one defensible analysis for this question.
+                      The workspace will present the alternatives in plain language before
+                      anything is executed.
+                    </p>
+                  </div>
+                )}
+                {analysis.warnings.length > 0 && (
+                  <details>
+                    <summary>Method notes and diagnostics</summary>
+                    {analysis.warnings.map((warning) => (
+                      <p className="muted" key={warning}>{warning}</p>
+                    ))}
+                  </details>
+                )}
+              </div>
             </article>
           );
         })}
       </div>
 
-      {!plan ? (
-        <Button onClick={() => void createPlan()}>
-          {busy ? "Creating…" : "Create analysis plan"}
+      <div className="action-row">
+        <Button href={`/app/projects/${projectId}/overview`}>
+          Return to workspace
         </Button>
-      ) : (
-        <div className="action-row">
-          <span>
-            {plan.analyses.length} planned analysis{plan.analyses.length === 1 ? "" : "es"}
-          </span>
-          {!plan.lockedAt && (
-            <Button onClick={() => void lock()}>
-              {busy ? "Locking…" : "Lock analysis plan"}
-            </Button>
-          )}
-          {plan.lockedAt && (
-            <Button href={`/app/projects/${projectId}/analysis`}>
-              Run analyses
-            </Button>
-          )}
-        </div>
-      )}
-      {plan?.lockHash && (
-        <p className="muted">
-          SHA-256 plan hash: <code>{plan.lockHash}</code>
-        </p>
+        {plan.lockedAt && (
+          <Button href={`/app/projects/${projectId}/analysis`} variant="secondary">
+            Inspect execution
+          </Button>
+        )}
+      </div>
+
+      {plan.lockHash && (
+        <details className="technical-plan-record">
+          <summary>Technical plan record</summary>
+          <p className="muted">
+            SHA-256 plan hash: <code>{plan.lockHash}</code>
+          </p>
+        </details>
       )}
       {status && <p className="confirmation" role="status">{status}</p>}
     </section>
