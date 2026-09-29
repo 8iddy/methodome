@@ -794,7 +794,10 @@ export type OrchestratorAutomaticAction =
   | "extract_protocol"
   | "create_draft_plan"
   | "run_analyses"
-  | "prepare_qualitative_analysis";
+  | "prepare_qualitative_analysis"
+  | "propose_qualitative_codebook"
+  | "propose_qualitative_codings"
+  | "propose_qualitative_themes";
 
 export interface OrchestratorDecision {
   id: string;
@@ -805,6 +808,9 @@ export interface OrchestratorDecision {
     | "resolve_mapping_gap"
     | "select_method"
     | "approve_plan"
+    | "review_qualitative_codebook"
+    | "review_qualitative_codings"
+    | "review_qualitative_themes"
     | "review_results";
   prompt: string;
   questionId?: string;
@@ -1008,6 +1014,62 @@ export function buildOrchestratorView(
     }
   }
 
+  const activeQualitativeQuestion = readiness.questions.find(
+    (question) =>
+      question.mode === "qualitative" &&
+      question.qualitativeWorkstream &&
+      [
+        "qualitative_codebook_review",
+        "qualitative_coding_review",
+        "qualitative_theme_review"
+      ].includes(question.status)
+  );
+
+  if (
+    readiness.nextAction.code === "review_qualitative_codebook" &&
+    activeQualitativeQuestion?.qualitativeWorkstream
+  ) {
+    decisions.push({
+      id: `decision:qualitative-codebook:${activeQualitativeQuestion.qualitativeWorkstream.id}`,
+      kind: "review_qualitative_codebook",
+      prompt:
+        "Review, edit if needed, and confirm the proposed qualitative codebook before coding begins.",
+      questionId: activeQualitativeQuestion.questionId,
+      analysisId: activeQualitativeQuestion.qualitativeWorkstream.id,
+      blocking: true
+    });
+  }
+
+  if (
+    readiness.nextAction.code === "review_qualitative_codings" &&
+    activeQualitativeQuestion?.qualitativeWorkstream
+  ) {
+    decisions.push({
+      id: `decision:qualitative-codings:${activeQualitativeQuestion.qualitativeWorkstream.id}`,
+      kind: "review_qualitative_codings",
+      prompt:
+        "Confirm or reject proposed coding and explicitly review segments with no proposed code.",
+      questionId: activeQualitativeQuestion.questionId,
+      analysisId: activeQualitativeQuestion.qualitativeWorkstream.id,
+      blocking: true
+    });
+  }
+
+  if (
+    readiness.nextAction.code === "review_qualitative_themes" &&
+    activeQualitativeQuestion?.qualitativeWorkstream
+  ) {
+    decisions.push({
+      id: `decision:qualitative-themes:${activeQualitativeQuestion.qualitativeWorkstream.id}`,
+      kind: "review_qualitative_themes",
+      prompt:
+        "Review the candidate themes, source evidence and synthesis before confirming qualitative results.",
+      questionId: activeQualitativeQuestion.questionId,
+      analysisId: activeQualitativeQuestion.qualitativeWorkstream.id,
+      blocking: true
+    });
+  }
+
   if (readiness.nextAction.code === "review_results") {
     decisions.push({
       id: "decision:review-results",
@@ -1030,7 +1092,11 @@ export function buildOrchestratorView(
     const automatic = new Map<WorkflowActionCode, OrchestratorAutomaticAction>([
       ["extract_protocol", "extract_protocol"],
       ["build_analysis_plan", "create_draft_plan"],
-      ["run_analyses", "run_analyses"]
+      ["run_analyses", "run_analyses"],
+      ["prepare_qualitative_analysis", "prepare_qualitative_analysis"],
+      ["propose_qualitative_codebook", "propose_qualitative_codebook"],
+      ["propose_qualitative_codings", "propose_qualitative_codings"],
+      ["propose_qualitative_themes", "propose_qualitative_themes"]
     ]);
     automaticAction = automatic.get(readiness.nextAction.code);
     status = automaticAction ? "ready_to_execute" : "blocked";
