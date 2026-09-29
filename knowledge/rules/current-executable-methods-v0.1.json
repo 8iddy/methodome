@@ -213,6 +213,41 @@
       "validation_status": "draft"
     },
     {
+      "rule_id": "logistic-gof-001",
+      "topic": "logistic_regression_diagnostics",
+      "decision": "Assess binary logistic-regression fit with diagnostics that match the predictor-pattern structure of the data.",
+      "conditions": [
+        "A binary logistic regression model has been fitted",
+        "The analysis remains within Methodome's current independence and design boundary"
+      ],
+      "action": "Inspect deviance or Pearson residuals and select goodness-of-fit checks according to replication of predictor patterns; do not interpret Pearson or deviance goodness-of-fit tests as valid when their replicated-data condition is absent.",
+      "assumptions": [
+        "The selected goodness-of-fit procedure is compatible with the observed predictor-pattern replication structure"
+      ],
+      "diagnostics": [
+        "Deviance residuals",
+        "Pearson residuals",
+        "Residuals versus observation order where ordering may matter",
+        "Pearson chi-square or deviance goodness-of-fit when replicated predictor patterns support them",
+        "Hosmer-Lemeshow goodness-of-fit for unreplicated or sparsely replicated predictor patterns as described by the source"
+      ],
+      "warnings": [
+        "Do not report a goodness-of-fit result from a procedure whose data-structure condition is not met.",
+        "A non-significant goodness-of-fit test is not proof that the model is correctly specified.",
+        "This rule does not yet resolve complete or quasi-complete separation, rare-event bias, or sparse-event estimation; those need separate source-backed safeguards."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-009-penn-state-stat-501-regression-methods",
+          "support": "Penn State distinguishes replicated-data Pearson/deviance goodness-of-fit tests from the Hosmer-Lemeshow test for unreplicated or sparsely replicated data and demonstrates deviance/Pearson residual diagnostics.",
+          "section": "Lesson 13: Goodness-of-Fit Tests and logistic diagnostics",
+          "page": "14, 18-19, 29 of 33"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
       "rule_id": "multicollinearity-001",
       "topic": "regression_diagnostics",
       "decision": "Check multicollinearity when a regression model contains multiple predictors.",
