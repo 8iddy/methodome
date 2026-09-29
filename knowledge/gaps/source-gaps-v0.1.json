@@ -28,20 +28,73 @@
       "topic": "spearman_correlation",
       "need": "Primary source-backed rule for Spearman correlation, including ordinal/monotonic use and diagnostics.",
       "reason": "The currently extracted STAT 200 correlation source focuses on Pearson correlation.",
-      "status": "open"
+      "status": "closed",
+      "resolution": {
+        "source_ids": [
+          "src-075-correlation-coefficients-appropriate-use-and-interpretation"
+        ],
+        "evidence_ids": [
+          "ev-spearman-001",
+          "ev-spearman-002",
+          "ev-spearman-003"
+        ],
+        "rule_ids": [
+          "spearman-correlation-001"
+        ],
+        "note": "Schober et al. directly support Spearman for ordinal data, nonnormal continuous data, relevant outliers, and nonlinear monotonic relationships, with graphical/form and independence checks. No normality-p-value switch rule is encoded."
+      }
     },
     {
       "gap_id": "gap-negative-binomial-001",
       "topic": "negative_binomial_regression",
       "need": "Primary source-backed decision rule for when negative-binomial regression should replace or supplement Poisson regression, including overdispersion diagnostics.",
-      "reason": "The current corpus yields direct support for routing Poisson counts to Poisson regression, but the scanned Agresti text has not yet yielded extractable count-model guidance and no other extracted source gives a sufficient negative-binomial decision rule.",
-      "status": "open"
+      "reason": "A specialist source now directly supports quasi-Poisson and negative-binomial regression as alternatives for overdispersed counts and explains their different mean-variance relationships. A fully automated negative-binomial selection rule still needs operational diagnostics for matching variance structure and other count-data features.",
+      "status": "partial",
+      "resolution_progress": {
+        "source_ids": [
+          "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data"
+        ],
+        "rule_ids": [
+          "count-overdispersion-001"
+        ],
+        "note": "Ver Hoef & Boveng (2007) supports overdispersion-aware model selection but does not justify the crude rule 'overdispersion => negative binomial'."
+      }
     },
     {
       "gap_id": "gap-poisson-dispersion-001",
       "topic": "poisson_regression",
       "need": "Source-backed operational guidance for dispersion assessment, excess zeros, and model adequacy before automated Poisson recommendation.",
-      "reason": "Current extracted guidance supports Poisson regression for Poisson counts but does not support a complete automated diagnostic threshold.",
+      "reason": "The specialist source supports detecting overdispersion as a reason to reconsider ordinary Poisson and comparing quasi-Poisson versus negative-binomial variance structures. Excess-zero handling and a complete automated adequacy workflow remain unresolved.",
+      "status": "partial",
+      "resolution_progress": {
+        "source_ids": [
+          "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data"
+        ],
+        "rule_ids": [
+          "count-overdispersion-001"
+        ],
+        "note": "Overdispersion now has direct source support; excess zeros and full operational thresholds remain open."
+      }
+    },
+    {
+      "gap_id": "gap-logit-separation-001",
+      "topic": "binary_logistic_regression",
+      "need": "Primary source-backed safeguard for detecting complete and quasi-complete separation and routing to an appropriate estimation strategy.",
+      "reason": "Current logistic-regression sources support binary-outcome routing and general diagnostics but do not yet provide a sufficiently explicit Methodome rule for separation detection and response.",
+      "status": "open"
+    },
+    {
+      "gap_id": "gap-logit-sparse-events-001",
+      "topic": "binary_logistic_regression",
+      "need": "Primary source-backed safeguard for sparse-event and small-sample logistic regression, including when ordinary maximum-likelihood estimates may be biased or unstable and when penalized or small-sample alternatives should be considered.",
+      "reason": "Current corpus material does not yet support an operational rare-event or sparse-event threshold or automatic fallback method.",
+      "status": "open"
+    },
+    {
+      "gap_id": "gap-count-excess-zero-001",
+      "topic": "count_regression",
+      "need": "Source-backed decision guidance for excess-zero count data, including when zero-inflated or hurdle models should enter the candidate set.",
+      "reason": "The overdispersion source does not by itself support an automated zero-inflation or hurdle-model decision rule.",
       "status": "open"
     }
   ]
