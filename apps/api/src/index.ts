@@ -2957,6 +2957,156 @@ app.post("/projects/:projectId/conversation/messages", async (c) => {
     });
   }
 
+  if (parsed.data.attachmentFileIds.length === 0 && c.env.AI) {
+    const currentState = await computeProjectReadiness(c, projectId);
+    const currentView = buildOrchestratorView(
+      currentState.readiness,
+      currentState.plan
+    );
+    const policy = await getProjectPolicy(c.env.DB, projectId);
+    let assistantAllowed = true;
+    if (policy) {
+      try {
+        assertModelRequestAllowed(policy, {
+          processorId: "workers-ai",
+          providerKind: "internal",
+          payloadKind: "metadata",
+          containsIdentifiers: policy.containsIdentifiableData
+        });
+      } catch {
+        assistantAllowed = false;
+      }
+    }
+
+    if (assistantAllowed) {
+      try {
+        const priorMessages = (await listProjectMessages(c.env.DB, projectId))
+          .filter(
+            (item) =>
+              item.id !== messageId &&
+              (item.role === "researcher" || item.role === "methodome")
+          )
+          .slice(-8)
+          .map((item) => ({
+            role: item.role === "researcher" ? ("user" as const) : ("assistant" as const),
+            content: item.content
+          }));
+        const methodology = retrieveMethodologyGuidance({
+          query: parsed.data.content,
+          topics: currentState.selections.flatMap((selection) =>
+            selection.candidates.map((candidate) => candidate.methodId)
+          ),
+          limit: 10
+        });
+        const assistant = await answerProjectAssistant({
+          env: c.env,
+          message: parsed.data.content,
+          history: priorMessages,
+          context: {
+            project: {
+              name: access.project.name,
+              description: access.project.description ?? null,
+              researchType: access.project.researchType
+            },
+            workflow: {
+              status: currentView.status,
+              summary: currentView.summary,
+              nextAction: currentView.nextAction,
+              decisions: currentView.decisions.map((decision) => ({
+                id: decision.id,
+                kind: decision.kind,
+                prompt: decision.prompt,
+                questionId: decision.questionId ?? null,
+                options: decision.options ?? []
+              }))
+            },
+            researchQuestions: currentState.readiness.questions.map(
+              (question) => ({
+                id: question.questionId,
+                text: question.text,
+                mode: question.mode,
+                objectiveType: question.objectiveType,
+                status: question.status,
+                blockers: question.blockers.map((blocker) => blocker.message),
+                warnings: question.warnings,
+                candidates: question.candidates
+                  .filter((candidate) => candidate.executable)
+                  .map((candidate) => ({
+                    methodId: candidate.methodId,
+                    displayName: candidate.displayName,
+                    rationale: candidate.rationale,
+                    decisionRequired: candidate.decisionRequired ?? null
+                  }))
+              })
+            ),
+            plan: currentState.plan
+              ? {
+                  locked: Boolean(currentState.plan.lockedAt),
+                  analyses: currentState.plan.analyses
+                }
+              : null
+          },
+          methodology
+        });
+
+        await appendProjectMessage(c.env.DB, {
+          id: makeId("msg"),
+          threadId,
+          projectId,
+          role: "methodome",
+          messageKind: "message",
+          content: assistant.reply,
+          metadata: {
+            intent: assistant.intent,
+            methodologyKnowledgeVersion,
+            methodologyRuleIds: assistant.methodologyRuleIds,
+            evidenceIds: methodology.evidenceIds,
+            sourceIds: methodology.sourceIds
+          },
+          attachmentFileIds: [],
+          createdAt: new Date().toISOString()
+        });
+
+        await addAudit(c, {
+          projectId,
+          action: "conversation_assistant_responded",
+          objectType: "project_conversation",
+          objectId: messageId,
+          modelId: PROJECT_ASSISTANT_MODEL,
+          after: {
+            intent: assistant.intent,
+            methodologyKnowledgeVersion,
+            methodologyRuleIds: assistant.methodologyRuleIds
+          }
+        });
+
+        const conversationalOnly =
+          assistant.intent.requestedAction === "none" ||
+          assistant.intent.requestedAction === "show_results" ||
+          assistant.intent.requestedAction === "resolve_decision" ||
+          assistant.intent.requestedAction === "update_study" ||
+          assistant.intent.kind === "explain" ||
+          assistant.intent.kind === "inspect_results" ||
+          assistant.intent.kind === "unknown";
+
+        if (conversationalOnly) {
+          return c.json(
+            {
+              messageId,
+              runId: null,
+              queued: false,
+              assistantReply: assistant.reply
+            },
+            202
+          );
+        }
+      } catch {
+        // If grounded conversation fails, preserve the researcher message and
+        // allow the deterministic orchestrator to decide whether work can continue.
+      }
+    }
+  }
+
   const runId = makeId("run");
   const queued = await createOrchestrationRun(c.env.DB, {
     id: runId, projectId, triggerMessageId: messageId, createdBy: getUserId(c), now
