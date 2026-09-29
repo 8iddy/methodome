@@ -104,4 +104,7 @@ echo "methodome.com responded successfully"
 echo "-- Run complete research workflow"
 METHODOME_API_URL=https://api.methodome.com/api node scripts/e2e-smoke.mjs
 
+echo "-- Run conversation-first research workflow"
+METHODOME_API_URL=https://api.methodome.com/api node scripts/e2e-conversation.mjs
+
 echo "== Methodome production deployment complete =="
