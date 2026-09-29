@@ -4,24 +4,6 @@
   "extracted_date": "2026-09-29",
   "records": [
     {
-      "evidence_id": "ev-fisher-001",
-      "topic": "fisher_exact",
-      "statement": "For two independent small samples with binary/discrete outcomes arranged in a 2x2 table, NIST identifies Fisher's exact probability test as an appropriate exact nonparametric procedure.",
-      "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
-      "section": "7.3.3 Comparing two proportions, exact test for small samples",
-      "page": null,
-      "support_type": "direct"
-    },
-    {
-      "evidence_id": "ev-fisher-002",
-      "topic": "fisher_exact",
-      "statement": "CDC notes that chi-square works well in larger outbreak-study samples and that Fisher exact may be more appropriate for smaller studies.",
-      "source_id": "src-074-principles-of-epidemiology-in-public-health-practice-3rd-ed",
-      "section": "Lesson Six, Investigating an Outbreak",
-      "page": "6-44",
-      "support_type": "supporting"
-    },
-    {
       "evidence_id": "ev-diagnostic-001",
       "topic": "diagnostic_accuracy",
       "statement": "Diagnostic test performance can be represented in a 2x2 table against a reference standard, with sensitivity, specificity, predictive values, likelihood ratios, and diagnostic odds ratio derived from true/false positive and negative counts.",
