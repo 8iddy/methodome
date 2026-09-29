@@ -1,6 +1,6 @@
 {
   "rule_set_id": "methodome-descriptive-two-group-v0.1",
-  "status": "draft",
+  "status": "supported",
   "rules": [
     {
       "rule_id": "descriptive-categorical-001",
@@ -30,7 +30,7 @@
           "page": "1-2 of 56"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "descriptive-continuous-001",
@@ -61,80 +61,7 @@
           "page": "43 of 56"
         }
       ],
-      "validation_status": "draft"
-    },
-    {
-      "rule_id": "independent-t-001",
-      "topic": "independent_two_sample_t",
-      "decision": "Use a two-sample t procedure only for a two-group mean comparison with independent observations and suitable distribution and variance conditions.",
-      "conditions": [
-        "Outcome is quantitative",
-        "Exactly two independent groups",
-        "Research question concerns a difference in population means"
-      ],
-      "action": "Consider a two-sample t procedure after checking independence and distributional conditions; distinguish pooled-variance from separate-variance analysis when variances are not reasonably equal.",
-      "assumptions": [
-        "Independent observations within and between groups",
-        "Population distributions sufficiently compatible with t-based inference for the sample sizes",
-        "Equal variances if using the pooled-variance form"
-      ],
-      "diagnostics": [
-        "Group sample sizes",
-        "Distribution shape and outliers by group",
-        "Variance comparison"
-      ],
-      "warnings": [
-        "Do not treat clustered, serially correlated, spatially correlated, repeated, or paired data as two independent samples.",
-        "Do not use the pooled-variance form merely because it is available when group variances and sample sizes are very unequal."
-      ],
-      "exceptions": [
-        "When parametric conditions are not defensible and the estimand supports a rank-based comparison, consider Wilcoxon rank-sum or Mann-Whitney."
-      ],
-      "source_evidence": [
-        {
-          "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
-          "support": "Ott and Longnecker describe independent two-sample t inference, its independence, normality and equal-variance conditions, and a separate-variance alternative when variances differ.",
-          "section": "Chapter 6.2",
-          "page": "293-305"
-        }
-      ],
-      "validation_status": "draft"
-    },
-    {
-      "rule_id": "paired-t-001",
-      "topic": "paired_t",
-      "decision": "Analyze meaningfully paired observations through within-pair differences rather than as two independent groups.",
-      "conditions": [
-        "Outcome is quantitative",
-        "Two observations are matched by participant or pair",
-        "Research question concerns the mean within-pair difference"
-      ],
-      "action": "Compute within-pair differences and consider a paired t procedure when the distribution of differences supports t-based inference.",
-      "assumptions": [
-        "Correct pairing",
-        "Independent pairs",
-        "Difference scores sufficiently compatible with t-based inference"
-      ],
-      "diagnostics": [
-        "Pair completeness",
-        "Distribution of difference scores",
-        "Outliers in difference scores"
-      ],
-      "warnings": [
-        "Do not break pairing and analyze the observations as independent samples."
-      ],
-      "exceptions": [
-        "When t-based conditions for differences are unsuitable and a rank-based paired analysis matches the question, consider Wilcoxon signed-rank."
-      ],
-      "source_evidence": [
-        {
-          "source_id": "src-067-penn-state-stat-200-elementary-statistics",
-          "support": "Penn State defines paired samples as dependent matched observations, commonly repeated measures, and bases paired-means inference on difference scores.",
-          "section": "8.3 Paired Means",
-          "page": "48-53 of 58"
-        }
-      ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "multi-group-gate-001",
@@ -164,7 +91,7 @@
           "page": "1 of 15"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     }
   ]
 }
