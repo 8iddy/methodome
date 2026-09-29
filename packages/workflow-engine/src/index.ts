@@ -472,12 +472,40 @@ function chooseNextAction(
   }
 
   if (!snapshot.plan) {
+    const readyQuantitative = questions.some(
+      (question) =>
+        question.mode === "quantitative" && question.status === "ready"
+    );
+    const readyQualitative = questions.some(
+      (question) => question.status === "qualitative_ready"
+    );
+
+    if (readyQuantitative) {
+      return action(
+        "build_analysis_plan",
+        "Build the analysis plan",
+        "Methodome has enough confirmed information to construct the executable quantitative plan.",
+        "analysis-plan",
+        false
+      );
+    }
+
+    if (readyQualitative) {
+      return action(
+        "prepare_qualitative_analysis",
+        "Prepare qualitative analysis",
+        "Qualitative source material is ready for coding and synthesis.",
+        "analysis",
+        false
+      );
+    }
+
     return action(
-      "build_analysis_plan",
-      "Build the analysis plan",
-      "Methodome has enough confirmed information to construct the executable quantitative plan and qualitative workstreams.",
-      "analysis-plan",
-      false
+      "review_project",
+      "Resolve analysis blockers",
+      "No research question is currently inside an executable analysis boundary. Review the question-level blockers before continuing.",
+      "overview",
+      true
     );
   }
 
