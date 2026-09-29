@@ -1617,11 +1617,11 @@ const plannedAnalysisSchema = z.object({
   outcome: z.string().min(1),
   predictors: z.array(z.string()),
   covariates: z.array(z.string()),
-  candidateMethodIds: z.array(z.string()).min(1),
+  candidateMethodIds: z.array(z.string()).default([]),
   selectedMethodId: z.string().min(1).optional(),
-  requiredDecisions: z.array(z.string()),
-  warnings: z.array(z.string()),
-  diagnostics: z.array(z.string()),
+  requiredDecisions: z.array(z.string()).default([]),
+  warnings: z.array(z.string()).default([]),
+  diagnostics: z.array(z.string()).default([]),
   addedAfterLock: z.boolean().default(false)
 });
 
