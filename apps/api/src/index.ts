@@ -2563,8 +2563,12 @@ app.post("/projects/:projectId/qualitative-analyses", async (c) => {
     projectId,
     "transcript"
   );
-  const sourceFileIds =
-    parsed.data.sourceFileIds ?? availableTranscripts.map((file) => file.id);
+  const sourceFileIds = Array.from(
+    new Set(
+      parsed.data.sourceFileIds ??
+        availableTranscripts.map((file) => file.id)
+    )
+  );
   if (sourceFileIds.length === 0) {
     return c.json(
       {
