@@ -1,0 +1,83 @@
+{
+  "rule_set_id": "methodome-logistic-safeguards-v0.1",
+  "status": "draft",
+  "rules": [
+    {
+      "rule_id": "logistic-separation-001",
+      "topic": "binary_logistic_regression",
+      "decision": "Do not accept ordinary maximum-likelihood logistic-regression estimates when complete or quasi-complete separation is detected.",
+      "conditions": [
+        "A binary logistic-regression model is proposed or fitted",
+        "Covariate patterns perfectly or nearly perfectly predict the outcome, or software/model diagnostics indicate separation"
+      ],
+      "action": "Flag the model as outside ordinary maximum-likelihood reliability. Do not report extreme or effectively infinite coefficients as ordinary finite estimates. Route to a separation-aware estimation strategy, such as a supported penalized-likelihood method, or require expert review if no validated alternative is executable.",
+      "assumptions": [],
+      "diagnostics": [
+        "Check for perfect prediction of outcome by covariate patterns",
+        "Inspect zero or near-zero cells for categorical predictors and outcome",
+        "Inspect convergence warnings, extreme coefficient magnitudes and extreme standard errors",
+        "Check rare outcome and rare exposure structure",
+        "Check highly correlated covariates and strong effects as separation risk factors"
+      ],
+      "warnings": [
+        "Software convergence alone does not prove that separation is absent.",
+        "Different software can handle separation differently and may return misleading finite-looking output.",
+        "Firth penalization is a candidate separation-aware method, but it must be executable and validated in Methodome before automatic use."
+      ],
+      "exceptions": [
+        "A structural or deterministic relationship that is part of the data-generating definition needs substantive review rather than automatic penalization."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-077-separation-in-logistic-regression-causes-consequences-and-control",
+          "support": "Mansournia et al. define complete and quasi-complete separation, link it to sparse data and rare outcomes/exposures, explain failure of ordinary maximum likelihood, and review penalized-likelihood approaches including Firth.",
+          "section": "Abstract, introduction, and control of separation",
+          "page": "864-870"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "logistic-sparse-events-001",
+      "topic": "binary_logistic_regression",
+      "decision": "Do not use a fixed events-per-variable threshold, including 10 EPV, as the sole gate for binary logistic-regression suitability.",
+      "conditions": [
+        "Binary logistic regression is proposed",
+        "The outcome is uncommon, the smaller outcome group is small, the model contains several coefficients, or the dataset is otherwise sparse"
+      ],
+      "action": "Assess sparse-data risk using the number of outcome events and non-events, total sample size, model dimensionality, separation, predictor distribution, convergence and coefficient stability. If material sparse-data risk is present, restrict automatic ordinary maximum-likelihood recommendation and consider a validated small-sample or penalized alternative.",
+      "assumptions": [],
+      "diagnostics": [
+        "Events and non-events",
+        "Number of estimated regression coefficients",
+        "Total sample size",
+        "Complete or quasi-complete separation",
+        "Rare predictors/exposures",
+        "Coefficient magnitude and standard errors",
+        "Convergence and stability"
+      ],
+      "warnings": [
+        "Do not encode 'EPV < 10 = invalid' or 'EPV >= 10 = safe'.",
+        "Low EPV is a risk signal, not a complete decision rule.",
+        "Sparse-data bias can occur even without an obvious convergence failure.",
+        "Firth correction is supported by these sources as a candidate remedy, but Methodome must not execute it automatically until its computation and decision boundary are implemented and validated."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-078-no-rationale-for-one-variable-per-ten-events-logistic-regression",
+          "support": "van Smeden et al. find weak support for universal EPV rules, show that low-EPV performance depends on other factors including total sample size and separation, and report improved coefficient accuracy with Firth correction.",
+          "section": "Abstract and simulation results",
+          "page": "1 onward"
+        },
+        {
+          "source_id": "src-077-separation-in-logistic-regression-causes-consequences-and-control",
+          "support": "Mansournia et al. connect small samples, sparse data, rare outcomes/exposures and strong effects with separation and maximum-likelihood bias or failure.",
+          "section": "Abstract and introduction",
+          "page": "864-865"
+        }
+      ],
+      "validation_status": "draft"
+    }
+  ]
+}
