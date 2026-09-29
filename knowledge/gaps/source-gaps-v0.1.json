@@ -128,6 +128,28 @@
       "need": "Source-backed decision guidance for excess-zero count data, including when zero-inflated or hurdle models should enter the candidate set.",
       "reason": "The overdispersion source does not by itself support an automated zero-inflation or hurdle-model decision rule.",
       "status": "open"
+    },
+    {
+      "gap_id": "gap-mice-general-guidance-001",
+      "topic": "multiple_imputation",
+      "need": "The intended White, Royston & Wood (2011) general MICE guidance source for imputation-model construction, variable-type handling, number of imputations, diagnostics and practical failure modes.",
+      "reason": "The Drive file named multiple-imputation-by-chained-equations-for-systematically-ygzclny7dt.pdf is not White, Royston & Wood (2011). It is Resche-Rigon & White (2018), a specialist multilevel MICE paper. Sterne et al. (2009) supports general MI safeguards, but the planned deeper general MICE source is still absent.",
+      "status": "open",
+      "candidate_sources": [
+        {
+          "title": "Multiple imputation using chained equations: Issues and guidance for practice",
+          "authors": "White IR; Royston P; Wood AM",
+          "journal": "Statistics in Medicine",
+          "year": 2011,
+          "doi": "10.1002/sim.4067",
+          "status": "identified_external_not_in_drive",
+          "note": "Acquire the actual paper before adding detailed general MICE implementation rules such as number-of-imputations and variable-specific chained-equation guidance."
+        }
+      ],
+      "related_sources": [
+        "src-084-sterne-multiple-imputation-potential-and-pitfalls",
+        "src-085-resche-rigon-white-multilevel-mice"
+      ]
     }
   ]
 }
