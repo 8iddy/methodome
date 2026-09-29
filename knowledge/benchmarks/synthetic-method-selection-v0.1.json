@@ -1,6 +1,6 @@
 {
   "benchmark_id": "methodome-synthetic-method-selection-v0.1",
-  "purpose": "Regression tests for methodology-rule behaviour. These are synthetic software cases and are NOT a substitute for the planned expert-labelled benchmark.",
+  "purpose": "Synthetic regression tests for methodology-rule behaviour. These cases test rule consistency and known failure modes; they are NOT a substitute for the planned expert-labelled protocol-to-analysis benchmark.",
   "cases": [
     {
       "case_id": "syn-001",
@@ -440,6 +440,364 @@
         "recognized_domain": "competing_risks",
         "avoid": [
           "ordinary_survival_analysis_that_treats_competing_event_as_noninformative_censoring"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-021",
+      "question": "Is symptom severity monotonically associated with an ordered disease stage score?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "cross_sectional",
+        "repeated": false,
+        "clustered": false
+      },
+      "variables": {
+        "outcome": {
+          "type": "ordinal"
+        },
+        "predictors": [
+          {
+            "type": "continuous"
+          }
+        ]
+      },
+      "data_features": {
+        "relationship": "monotonic_non_linear"
+      },
+      "expected": {
+        "recognized_domain": "spearman_correlation",
+        "avoid": [
+          "pearson_as_automatic_default"
+        ],
+        "required_checks": [
+          "monotonicity",
+          "independence",
+          "outliers"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-022",
+      "question": "Do outcome distributions differ between two independent groups?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "cross_sectional",
+        "paired": false
+      },
+      "variables": {
+        "outcome": {
+          "type": "continuous"
+        },
+        "group": {
+          "type": "binary"
+        }
+      },
+      "data_features": {
+        "group_shapes": "different",
+        "group_spreads": "different"
+      },
+      "expected": {
+        "recognized_domain": "mann_whitney",
+        "avoid_interpretation": [
+          "generic_test_of_equal_medians",
+          "automatic_non_normal_t_test"
+        ],
+        "required_checks": [
+          "distribution_shapes",
+          "spreads",
+          "ties",
+          "estimand"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-023",
+      "question": "Which predictors are associated with a rare binary outcome?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "cross_sectional",
+        "clustered": false
+      },
+      "variables": {
+        "outcome": {
+          "type": "binary"
+        },
+        "predictors": [
+          {
+            "type": "binary"
+          },
+          {
+            "type": "categorical"
+          }
+        ]
+      },
+      "data_features": {
+        "complete_separation": true
+      },
+      "expected": {
+        "recognized_domain": "binary_logistic_regression",
+        "block_ordinary_ml_estimates": true,
+        "reason_contains": "separation",
+        "avoid": [
+          "report_infinite_or_extreme_ml_coefficients_as_ordinary_estimates"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-024",
+      "question": "Which factors predict a binary outcome with 18 events among 260 records?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "cross_sectional",
+        "clustered": false
+      },
+      "variables": {
+        "outcome": {
+          "type": "binary"
+        },
+        "predictors": [
+          {
+            "type": "continuous"
+          },
+          {
+            "type": "continuous"
+          },
+          {
+            "type": "binary"
+          }
+        ]
+      },
+      "data_features": {
+        "events": 18,
+        "non_events": 242,
+        "coefficients": 3
+      },
+      "expected": {
+        "recognized_domain": "binary_logistic_regression",
+        "required_checks": [
+          "events_and_non_events",
+          "separation",
+          "coefficient_stability",
+          "convergence"
+        ],
+        "avoid": [
+          "fixed_10_epv_pass_fail_rule"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-025",
+      "question": "Estimate national hypertension prevalence from a stratified multistage household survey.",
+      "objective_type": "descriptive",
+      "design": {
+        "study_design": "cross_sectional",
+        "survey_weights": true,
+        "stratified": true,
+        "clustered": true,
+        "multistage": true
+      },
+      "variables": {
+        "outcome": {
+          "type": "binary"
+        },
+        "weight": {
+          "type": "survey_weight"
+        },
+        "stratum": {
+          "type": "design_variable"
+        },
+        "psu": {
+          "type": "design_variable"
+        }
+      },
+      "expected": {
+        "recognized_domain": "complex_survey_analysis",
+        "requires": [
+          "weight",
+          "strata",
+          "psu"
+        ],
+        "avoid": [
+          "ordinary_iid_proportion_standard_error",
+          "weights_only_variance_estimation"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-026",
+      "question": "Estimate hypertension prevalence among women using the same complex survey.",
+      "objective_type": "descriptive",
+      "design": {
+        "study_design": "cross_sectional",
+        "survey_weights": true,
+        "stratified": true,
+        "clustered": true
+      },
+      "variables": {
+        "outcome": {
+          "type": "binary"
+        },
+        "domain": {
+          "type": "binary"
+        },
+        "weight": {
+          "type": "survey_weight"
+        }
+      },
+      "expected": {
+        "recognized_domain": "survey_domain_analysis",
+        "preserve_full_design_context": true,
+        "avoid": [
+          "drop_all_non_domain_rows_before_taylor_variance_estimation"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-027",
+      "question": "How should 12% missing outcome and covariate data be handled?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "cohort"
+      },
+      "data_features": {
+        "percent_missing": 12
+      },
+      "expected": {
+        "recognized_domain": "missing_data",
+        "requires": [
+          "missingness_patterns",
+          "analysis_roles",
+          "observed_predictors_of_missingness",
+          "assumption_review"
+        ],
+        "avoid": [
+          "percent_missing_threshold_auto_multiple_imputation",
+          "automatic_complete_case"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-028",
+      "question": "Impute missing student outcomes for an analysis where students are nested within schools.",
+      "objective_type": "association",
+      "design": {
+        "study_design": "cross_sectional",
+        "clustered": true,
+        "cluster_concept": "school"
+      },
+      "data_features": {
+        "missing_data": true
+      },
+      "expected": {
+        "recognized_domain": "multilevel_multiple_imputation",
+        "requires_cluster_aware_imputation": true,
+        "avoid": [
+          "iid_single_level_imputation_then_multilevel_analysis"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-029",
+      "question": "Did a national policy change monthly admission rates after January 2024?",
+      "objective_type": "causal",
+      "design": {
+        "study_design": "interrupted_time_series",
+        "ordered_time": true,
+        "interruption_known": true
+      },
+      "variables": {
+        "outcome": {
+          "type": "rate"
+        },
+        "time": {
+          "type": "date_time"
+        }
+      },
+      "expected": {
+        "recognized_domain": "interrupted_time_series",
+        "required_checks": [
+          "pre_interruption_trend",
+          "autocorrelation",
+          "level_change",
+          "slope_change",
+          "concurrent_shocks"
+        ],
+        "avoid": [
+          "simple_pre_post_mean_comparison"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-030",
+      "question": "What proportion of all district facilities use the new stock system?",
+      "objective_type": "descriptive",
+      "design": {
+        "sampling": "convenience",
+        "study_design": "cross_sectional"
+      },
+      "variables": {
+        "outcome": {
+          "type": "binary"
+        }
+      },
+      "expected": {
+        "recognized_domain": "nonprobability_sampling",
+        "flag_population_generalization": true,
+        "avoid": [
+          "invented_sampling_weights",
+          "design_based_population_representativeness_claim"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-031",
+      "question": "Does a randomized treatment reduce mean symptom score at follow-up?",
+      "objective_type": "causal",
+      "design": {
+        "study_design": "randomized_trial",
+        "randomized": true,
+        "randomization_unit": "participant"
+      },
+      "variables": {
+        "outcome": {
+          "type": "continuous"
+        },
+        "treatment": {
+          "type": "binary"
+        }
+      },
+      "expected": {
+        "recognized_domain": "randomized_experiment",
+        "preserve_randomization": true,
+        "required_checks": [
+          "analysis_set",
+          "missing_outcomes",
+          "protocol_deviations"
+        ],
+        "avoid": [
+          "reclassify_as_observational_association"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-032",
+      "question": "Is a 10-item scale reliable and valid because Cronbach alpha is 0.91?",
+      "objective_type": "exploratory",
+      "measurement": {
+        "multi_item": true,
+        "measurement_model": "reflective"
+      },
+      "expected": {
+        "recognized_domain": "psychometrics",
+        "requires": [
+          "structural_validity_before_internal_consistency",
+          "dimensionality",
+          "reliability_vs_measurement_error"
+        ],
+        "avoid": [
+          "alpha_alone_proves_validity",
+          "alpha_alone_proves_unidimensionality"
         ]
       }
     }
