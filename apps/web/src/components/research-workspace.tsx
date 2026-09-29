@@ -301,7 +301,6 @@ export function ResearchWorkspaceHome({
         </div>
       </section>
 
-      </section>
       <section className="workspace-questions">
         <div className="section-rule">
           <span>RESEARCH QUESTIONS</span>
@@ -340,8 +339,6 @@ export function ResearchWorkspaceHome({
             </article>
           ))}
         </div>
-      </section>
-
       </section>
       </details>
 
