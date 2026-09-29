@@ -1,0 +1,34 @@
+{
+  "batch_id": "methodome-count-models-batch-1",
+  "status": "draft",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-count-overdisp-001",
+      "topic": "count_regression_overdispersion",
+      "statement": "Overdispersed count data can be modeled with either quasi-Poisson or negative-binomial regression; the two approaches can produce materially different covariate-effect estimates.",
+      "source_id": "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data",
+      "section": "Abstract and Introduction",
+      "page": "2766-2767",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-count-variance-001",
+      "topic": "count_regression_model_selection",
+      "statement": "The quasi-Poisson variance is a linear function of the mean, whereas the negative-binomial variance is a quadratic function of the mean; these different variance relationships change observation weights and can affect fitted covariate effects.",
+      "source_id": "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data",
+      "section": "Abstract",
+      "page": "2766",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-count-overdisp-002",
+      "topic": "poisson_regression",
+      "statement": "For Poisson data the variance equals the mean; count data with variance exceeding the mean are overdispersed and require reconsideration of ordinary Poisson assumptions.",
+      "source_id": "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data",
+      "section": "Introduction",
+      "page": "2766-2767",
+      "support_type": "direct"
+    }
+  ]
+}
