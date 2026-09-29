@@ -1,0 +1,181 @@
+{
+  "audit_id": "methodome-method-registry-evidence-audit-v0.1",
+  "updated_date": "2026-09-29",
+  "registry_version": "0.1.0",
+  "purpose": "Compare the software method registry with the methodology corpus without conflating computational correctness with methodological recommendation validity.",
+  "status_definitions": {
+    "source_backed_draft": "Relevant corpus evidence and an operational draft decision rule exist, but expert methodology benchmark validation is not complete.",
+    "source_backed_concept": "Sources support the method family or design distinction, but the exact automated selection rule is not yet fully encoded.",
+    "partial": "Some supporting evidence exists, but the method-specific selection/diagnostic rule is incomplete.",
+    "gap": "The corpus does not yet support a defensible automated selection rule.",
+    "out_of_runtime": "Method is methodologically represented but is intentionally non-executable in the current runtime."
+  },
+  "principles": [
+    "Computational validation asks whether an implementation returns correct numerical results for a specified method.",
+    "Methodological validation asks whether Methodome selected or rejected the method appropriately for the research question, design, measurement structure, estimand and data conditions.",
+    "A method may be computationally validated while its automatic recommendation rule remains unvalidated.",
+    "No method should be promoted to methodology-validated status until it passes the planned expert-labelled protocol-to-analysis benchmark."
+  ],
+  "methods": [
+    {
+      "method_id": "descriptive_statistics",
+      "registry_maturity": "validated",
+      "executable": true,
+      "computational_status": "existing_runtime_validated",
+      "methodology_status": "partial",
+      "evidence_sources": [
+        "src-061-penn-state-stat-200-elementary-statistics"
+      ],
+      "rule_ids": [
+        "var-type-001"
+      ],
+      "finding": "Variable-type dependence is source-backed, but a complete variable-type-specific descriptive summary rule set has not yet been encoded.",
+      "action": "Keep executable. Do not treat the registry maturity label as proof that automated descriptive choices are expert-benchmark validated."
+    },
+    {
+      "method_id": "pearson_correlation",
+      "registry_maturity": "validated",
+      "executable": true,
+      "computational_status": "existing_runtime_validated",
+      "methodology_status": "source_backed_draft",
+      "evidence_sources": [
+        "src-071-penn-state-stat-200-elementary-statistics"
+      ],
+      "rule_ids": [
+        "pearson-001"
+      ],
+      "finding": "Linear quantitative association, form and outlier checks are source-backed.",
+      "action": "Keep in the candidate set within the current independence boundary; expert benchmark validation remains pending."
+    },
+    {
+      "method_id": "spearman_correlation",
+      "registry_maturity": "validated",
+      "executable": true,
+      "computational_status": "existing_runtime_validated",
+      "methodology_status": "gap",
+      "evidence_sources": [],
+      "rule_ids": [],
+      "finding": "The corpus mentions Pearson/Spearman in measurement contexts but does not yet provide an adequate general decision rule for monotonic or ordinal association.",
+      "action": "Do not describe automatic Spearman recommendation as methodology-validated. Keep the source gap open until direct guidance is extracted or added."
+    },
+    {
+      "method_id": "linear_regression",
+      "registry_maturity": "validated",
+      "executable": true,
+      "computational_status": "existing_runtime_validated",
+      "methodology_status": "source_backed_draft",
+      "evidence_sources": [
+        "src-018-penn-state-stat-501-regression-methods",
+        "src-010-penn-state-stat-501-regression-methods"
+      ],
+      "rule_ids": [
+        "linear-regression-001",
+        "multicollinearity-001"
+      ],
+      "finding": "Outcome eligibility, LINE assumptions, residual diagnostics and multicollinearity checks are source-backed.",
+      "action": "Keep executable inside the current independence/design boundary; benchmark the selection and blocker logic before methodology validation."
+    },
+    {
+      "method_id": "binary_logistic_regression",
+      "registry_maturity": "validated",
+      "executable": true,
+      "computational_status": "existing_runtime_validated",
+      "methodology_status": "source_backed_draft",
+      "evidence_sources": [
+        "src-009-penn-state-stat-501-regression-methods"
+      ],
+      "rule_ids": [
+        "logistic-regression-001"
+      ],
+      "finding": "Binary-response eligibility is source-backed. Separation, sparse-event and influence guidance still needs stronger direct corpus extraction.",
+      "action": "Keep executable; expand diagnostic evidence before treating the recommendation logic as complete."
+    },
+    {
+      "method_id": "chi_square",
+      "registry_maturity": "validated",
+      "executable": true,
+      "computational_status": "existing_runtime_validated",
+      "methodology_status": "source_backed_draft",
+      "evidence_sources": [
+        "src-070-penn-state-stat-200-elementary-statistics"
+      ],
+      "rule_ids": [
+        "chi-square-001"
+      ],
+      "finding": "Categorical-data eligibility and expected-count checks are source-backed.",
+      "action": "Keep executable, with expected-cell diagnostics and Fisher routing for sparse suitable 2x2 tables."
+    },
+    {
+      "method_id": "fisher_exact",
+      "registry_maturity": "validated",
+      "executable": true,
+      "computational_status": "existing_runtime_validated",
+      "methodology_status": "source_backed_draft",
+      "evidence_sources": [
+        "src-002-nistsematech-e-handbook-of-statistical-methods",
+        "src-068-penn-state-stat-200-elementary-statistics"
+      ],
+      "rule_ids": [
+        "fisher-exact-001"
+      ],
+      "finding": "Small-sample independent 2x2 use is directly supported.",
+      "action": "Keep executable for suitable tables; do not use it to repair dependence from repeated, clustered or survey designs."
+    },
+    {
+      "method_id": "mixed_effects_logistic_regression",
+      "registry_maturity": "supported",
+      "executable": false,
+      "computational_status": "not_in_runtime",
+      "methodology_status": "source_backed_concept",
+      "evidence_sources": [
+        "src-029-longitudinal-and-repeated-measures-analysis-tutorial"
+      ],
+      "rule_ids": [
+        "repeated-001",
+        "repeated-002",
+        "cluster-001"
+      ],
+      "finding": "The need to account for correlation and the subject-specific interpretation of mixed models are source-backed; exact automatic eligibility rules need expansion.",
+      "action": "Keep non-executable and require an explicit decision about the scientific target before future activation."
+    },
+    {
+      "method_id": "gee_logistic_regression",
+      "registry_maturity": "supported",
+      "executable": false,
+      "computational_status": "not_in_runtime",
+      "methodology_status": "source_backed_concept",
+      "evidence_sources": [
+        "src-029-longitudinal-and-repeated-measures-analysis-tutorial"
+      ],
+      "rule_ids": [
+        "repeated-001",
+        "repeated-002",
+        "cluster-001"
+      ],
+      "finding": "GEE as a marginal/population-average approach is source-backed; exact automatic eligibility and small-cluster safeguards need expansion.",
+      "action": "Keep non-executable and require the population-average versus subject-specific target to be resolved before future activation."
+    },
+    {
+      "method_id": "poisson_regression",
+      "registry_maturity": "validated",
+      "executable": false,
+      "computational_status": "not_in_runtime",
+      "methodology_status": "gap",
+      "evidence_sources": [],
+      "rule_ids": [],
+      "finding": "The current 74-file corpus has not yet yielded a sufficiently explicit source-grounded Poisson regression selection and diagnostic rule.",
+      "action": "Do not use the registry maturity label as methodology validation. Extract or add authoritative count-regression guidance before activation."
+    },
+    {
+      "method_id": "negative_binomial_regression",
+      "registry_maturity": "validated",
+      "executable": false,
+      "computational_status": "not_in_runtime",
+      "methodology_status": "gap",
+      "evidence_sources": [],
+      "rule_ids": [],
+      "finding": "The current corpus has not yet yielded a sufficiently explicit negative-binomial selection rule, including overdispersion criteria.",
+      "action": "Do not activate automatic recommendation until count-regression evidence and benchmark cases are added."
+    }
+  ]
+}
