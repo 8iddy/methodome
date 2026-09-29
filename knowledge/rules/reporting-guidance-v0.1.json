@@ -1,6 +1,6 @@
 {
   "rule_set_id": "methodome-reporting-guidance-v0.1",
-  "status": "draft",
+  "status": "supported",
   "rules": [
     {
       "rule_id": "report-observational-001",
@@ -30,7 +30,7 @@
           "page": "1-2"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "report-randomized-trial-001",
@@ -61,7 +61,7 @@
           "page": null
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "report-diagnostic-accuracy-001",
@@ -92,7 +92,7 @@
           "page": null
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "report-prediction-model-001",
@@ -125,7 +125,7 @@
           "page": null
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     }
   ]
 }
