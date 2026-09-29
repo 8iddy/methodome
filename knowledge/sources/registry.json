@@ -1,7 +1,7 @@
 {
   "corpus_id": "methodome-methodology-corpus-v1",
   "drive_folder_id": "1HExso0MBgFlAonZz3CR6aqMi3Ws4ODc8",
-  "file_count": 76,
+  "file_count": 78,
   "generated_date": "2026-09-29",
   "authority_tiers": {
     "A": "Authoritative guideline, official institutional source, major methodological text, or major methods paper.",
@@ -1531,6 +1531,50 @@
         "negative_binomial_regression",
         "overdispersion",
         "model_selection"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-077-separation-in-logistic-regression-causes-consequences-and-control",
+      "drive_id": "1Gkt7L8BBvyNXjq8izvN7jgfwK176IhOW",
+      "file_name": "kwx299.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 266795,
+      "source_family": "Separation in Logistic Regression: Causes, Consequences, and Control",
+      "organization": "American Journal of Epidemiology",
+      "year": 2018,
+      "domains": [
+        "binary_logistic_regression",
+        "separation",
+        "sparse_data",
+        "small_samples",
+        "penalized_likelihood"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-078-no-rationale-for-one-variable-per-ten-events-logistic-regression",
+      "drive_id": "1u3CNnxzlXiPrqCiUbX_lLgEHjCCMyR3D",
+      "file_name": "12874_2016_Article_267.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1131607,
+      "source_family": "No rationale for 1 variable per 10 events criterion for binary logistic regression analysis",
+      "organization": "BMC Medical Research Methodology",
+      "year": 2016,
+      "domains": [
+        "binary_logistic_regression",
+        "events_per_variable",
+        "small_samples",
+        "separation",
+        "firth_correction"
       ],
       "authority_tier": "A",
       "role": "primary",
