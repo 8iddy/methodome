@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Methodome",
-  description: "Structured research analysis workspace"
+  description: "Protocol-driven research analysis with reviewable decisions and reproducible computation"
 };
 
 const themeBootScript = `
