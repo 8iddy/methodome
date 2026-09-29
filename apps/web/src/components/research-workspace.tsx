@@ -153,7 +153,7 @@ export function ResearchWorkspaceHome({
   if (!payload) {
     return (
       <section className="workspace-loading">
-        <span className="pulse-dot" />
+        <ActivitySpinner label="Reading the study record" />
         <p>Reading the study record…</p>
         {error && <p className="inline-error">{error}</p>}
       </section>
@@ -258,8 +258,12 @@ export function ResearchWorkspaceHome({
                   </div>
                 ) : decision.kind === "approve_plan" && plan ? (
                   <div className="decision-actions">
-                    <Button onClick={() => void approvePlan()}>
-                      {busy === "approve-plan" ? "Locking…" : "Approve and lock plan"}
+                    <Button
+                      onClick={() => void approvePlan()}
+                      loading={busy === "approve-plan"}
+                      loadingLabel="Approving plan…"
+                    >
+                      Approve and lock plan
                     </Button>
                     <Button href={`/app/projects/${projectId}/analysis-plan`} variant="quiet">
                       Inspect plan
