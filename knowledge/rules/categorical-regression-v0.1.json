@@ -1,6 +1,6 @@
 {
   "rule_set_id": "methodome-categorical-regression-v0.1",
-  "status": "draft",
+  "status": "supported",
   "rules": [
     {
       "rule_id": "nominal-logistic-route-001",
@@ -32,7 +32,7 @@
           "page": "11-12 of 33"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "ordinal-logistic-route-001",
@@ -64,7 +64,7 @@
           "page": "11-12 of 33"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     }
   ]
 }
