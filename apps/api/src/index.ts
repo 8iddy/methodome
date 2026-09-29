@@ -22,6 +22,16 @@ import type { Project } from "@methodome/domain";
 import { assertModelRequestAllowed, type ProjectProcessingPolicy } from "@methodome/policy-engine";
 import { compareDatasetSchemas } from "@methodome/schema-harmonisation";
 import {
+  codingProposalSchema,
+  qualitativeCodebookSchema,
+  qualitativeThemeSetSchema,
+  segmentQualitativeText,
+  validateThemeReferences,
+  type QualitativeCodebook,
+  type QualitativeCoding,
+  type QualitativeSegment
+} from "@methodome/qualitative-analysis";
+import {
   assessProjectReadiness,
   buildOrchestratorView,
   type WorkflowSection
@@ -40,6 +50,16 @@ import {
   researchFileToText,
   suggestMappingsWithAi
 } from "./protocol-extraction";
+import {
+  modelProvenance as qualitativeModelProvenance,
+  proposeQualitativeCodebook,
+  proposeQualitativeCodings,
+  proposeQualitativeThemes,
+  QUALITATIVE_CODEBOOK_PROMPT_VERSION,
+  QUALITATIVE_CODING_PROMPT_VERSION,
+  QUALITATIVE_MODEL,
+  QUALITATIVE_THEME_PROMPT_VERSION
+} from "./qualitative-analysis";
 import {
   appendAuditEvent,
   createAnalysisJob,
@@ -67,12 +87,24 @@ import {
   listAnalysisHistory,
   listAnalysisJobsForPlan,
   listAuditEvents,
+  listQualitativeAnalyses,
+  getQualitativeAnalysis,
+  listQualitativeSegments,
+  listQualitativeCodebookVersions,
+  listQualitativeCodings,
+  listQualitativeThemeVersions,
   listDatasetVersions,
   listProjectFiles,
   listVariableMappings,
   listProjects,
   saveAnalysisPlan,
   saveProtocolExtraction,
+  createQualitativeAnalysis,
+  saveQualitativeCodebookVersion,
+  upsertQualitativeCodings,
+  saveQualitativeThemeVersion,
+  updateQualitativeAnalysisStatus,
+  updateQualitativeSegmentCodingState,
   saveStudySpecification,
   saveVariableMappings,
   updateProjectPolicy,
