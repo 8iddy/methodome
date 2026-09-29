@@ -7,7 +7,7 @@ import statistics
 import sys
 from typing import Any
 
-ENGINE_VERSION = "python-worker-0.3.2"
+ENGINE_VERSION = "python-worker-0.3.3"
 PACKAGE_VERSION = sys.version.split()[0]
 _NORMAL_975 = 1.959963984540054
 _EPS = 1e-14
