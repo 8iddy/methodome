@@ -445,9 +445,17 @@ async function computeProjectReadiness(
   }
 
   const projectHistory = history.filter((item) => item.projectId === projectId);
+  const planJobs = plan
+    ? await listAnalysisJobsForPlan(c.env.DB, projectId, plan.id)
+    : [];
+  const completedPlanSignatures = new Set(
+    planJobs
+      .filter(({ state }) => state === "complete")
+      .map(({ job }) => analysisJobSignature(job))
+  );
   const completedAnalysisCount = Math.min(
     plan?.analyses.length ?? 0,
-    projectHistory.filter((item) => item.state === "complete").length
+    completedPlanSignatures.size
   );
 
   const readiness = assessProjectReadiness(
