@@ -13,7 +13,14 @@
           "src-002-nistsematech-e-handbook-of-statistical-methods",
           "src-068-penn-state-stat-200-elementary-statistics"
         ],
-        "note": "NIST explicitly supports Fisher exact for small independent-sample 2x2 discrete data; Penn State independently states Fisher exact may be used when large-sample two-proportion approximation assumptions are not met."
+        "evidence_ids": [
+          "ev-fisher-001",
+          "ev-fisher-002"
+        ],
+        "rule_ids": [
+          "fisher-exact-001"
+        ],
+        "note": "NIST provides the primary exact-test rule for small independent 2x2 discrete data; Penn State provides supporting guidance that Fisher's exact method is an alternative when the large-sample two-proportion approximation condition is not met. No universal total-sample cutoff is encoded."
       }
     },
     {
