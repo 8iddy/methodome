@@ -1009,7 +1009,10 @@ export function buildOrchestratorView(
     }
   ];
 
-  const decisions = mappingDecisions(readiness);
+  const decisions =
+    readiness.nextAction.code === "map_variables"
+      ? []
+      : mappingDecisions(readiness);
 
   if (plan && !plan.lockedAt) {
     for (const analysis of plan.analyses) {
