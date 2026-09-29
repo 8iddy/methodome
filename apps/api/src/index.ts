@@ -814,6 +814,338 @@ async function enqueueOrchestratedPlan(
   return queued;
 }
 
+
+async function orchestratorPrepareQualitativeAnalysis(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+) {
+  const target = state.readiness.questions.find(
+    (question) =>
+      question.status === "qualitative_ready" &&
+      !question.qualitativeWorkstream
+  );
+  if (!target) {
+    throw new Error("No qualitative question is ready to prepare.");
+  }
+  if (!c.env.FILES) {
+    throw new Error("Research file storage is required for qualitative analysis.");
+  }
+
+  const question = await requireQualitativeQuestion(
+    c,
+    projectId,
+    target.questionId
+  );
+  const transcriptFiles = await listProjectFiles(c.env.DB, projectId, "transcript");
+  if (transcriptFiles.length === 0) {
+    throw new Error("Upload at least one transcript before qualitative analysis.");
+  }
+
+  const analysisId = makeId("qual");
+  const now = new Date().toISOString();
+  const segments: QualitativeSegment[] = [];
+  const sourceFileIds: string[] = [];
+
+  for (const summary of transcriptFiles) {
+    const file = await getFileRecord(c.env.DB, summary.id, getUserId(c));
+    if (!file || file.projectId !== projectId || file.fileKind !== "transcript") {
+      continue;
+    }
+    if (file.checksumSha256 === "pending") {
+      throw new Error(`Finish uploading transcript ${file.filename} before analysis.`);
+    }
+    const object = await c.env.FILES.get(file.objectKey);
+    if (!object) {
+      throw new Error(`Stored transcript ${file.filename} could not be read.`);
+    }
+    const text = await researchFileToText({
+      env: c.env,
+      filename: file.filename,
+      ...(file.mediaType ? { mediaType: file.mediaType } : {}),
+      bytes: await object.arrayBuffer()
+    });
+    sourceFileIds.push(file.id);
+    for (const draft of segmentQualitativeText(text)) {
+      segments.push({
+        id: makeId("qseg"),
+        analysisId,
+        projectId,
+        fileId: file.id,
+        segmentIndex: draft.segmentIndex,
+        text: draft.text,
+        startChar: draft.startChar,
+        endChar: draft.endChar,
+        codingState: "uncoded",
+        createdAt: now
+      });
+    }
+  }
+
+  if (segments.length === 0) {
+    throw new Error("No analyzable transcript text was extracted.");
+  }
+
+  await createQualitativeAnalysis(c.env.DB, {
+    analysis: {
+      id: analysisId,
+      projectId,
+      researchQuestionId: question.id,
+      status: "prepared",
+      sourceFileIds,
+      createdBy: getUserId(c),
+      createdAt: now,
+      updatedAt: now
+    },
+    segments
+  });
+
+  await addAudit(c, {
+    projectId,
+    action: "orchestrator_qualitative_analysis_prepared",
+    objectType: "qualitative_analysis",
+    objectId: analysisId,
+    after: {
+      researchQuestionId: question.id,
+      sourceFileIds,
+      segmentCount: segments.length
+    }
+  });
+
+  return { analysisId, segmentCount: segments.length };
+}
+
+async function orchestratorProposeQualitativeCodebook(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+) {
+  const target = state.readiness.questions.find(
+    (question) =>
+      question.status === "qualitative_ready" &&
+      question.qualitativeWorkstream?.status === "prepared"
+  );
+  const analysisId = target?.qualitativeWorkstream?.id;
+  if (!target || !analysisId) {
+    throw new Error("No prepared qualitative workstream needs a codebook.");
+  }
+
+  const detail = await qualitativeAnalysisDetail(c, projectId, analysisId);
+  if (!detail) throw new Error("Qualitative analysis was not found.");
+  if (detail.codings.length > 0) {
+    throw new Error("Coding has already started for this qualitative workstream.");
+  }
+
+  const question = await requireQualitativeQuestion(c, projectId, target.questionId);
+  await assertQualitativeModelAllowed(c, projectId);
+  const codebook = await proposeQualitativeCodebook({
+    env: c.env,
+    researchQuestion: question.text,
+    segments: detail.segments
+  });
+
+  const version = (latestByVersion(detail.codebookVersions)?.version ?? 0) + 1;
+  await saveQualitativeCodebookVersion(c.env.DB, {
+    id: makeId("qcodebook"),
+    analysisId,
+    version,
+    source: "model",
+    codebook,
+    model: qualitativeModelProvenance(QUALITATIVE_CODEBOOK_PROMPT_VERSION),
+    createdBy: getUserId(c),
+    createdAt: new Date().toISOString()
+  });
+  await updateQualitativeAnalysisStatus(
+    c.env.DB,
+    projectId,
+    analysisId,
+    "codebook_review"
+  );
+  await addAudit(c, {
+    projectId,
+    action: "orchestrator_qualitative_codebook_proposed",
+    objectType: "qualitative_analysis",
+    objectId: analysisId,
+    modelId: QUALITATIVE_MODEL,
+    after: {
+      version,
+      promptVersion: QUALITATIVE_CODEBOOK_PROMPT_VERSION,
+      codeCount: codebook.codes.length
+    }
+  });
+
+  return { analysisId, version, codeCount: codebook.codes.length };
+}
+
+async function orchestratorProposeQualitativeCodings(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+) {
+  const target = state.readiness.questions.find(
+    (question) =>
+      question.status === "qualitative_coding" &&
+      question.qualitativeWorkstream
+  );
+  const analysisId = target?.qualitativeWorkstream?.id;
+  if (!target || !analysisId) {
+    throw new Error("No qualitative workstream is ready for coding.");
+  }
+
+  const detail = await qualitativeAnalysisDetail(c, projectId, analysisId);
+  if (!detail) throw new Error("Qualitative analysis was not found.");
+  const codebook = latestByVersion(detail.codebookVersions);
+  if (!codebook || codebook.source !== "researcher") {
+    throw new Error("Confirm the qualitative codebook before coding.");
+  }
+
+  const batch = detail.segments
+    .filter((segment) => segment.codingState === "uncoded")
+    .slice(0, 20);
+
+  if (batch.length === 0) {
+    await updateQualitativeAnalysisStatus(
+      c.env.DB,
+      projectId,
+      analysisId,
+      "coding_review"
+    );
+    return { analysisId, proposedSegments: 0, remainingUncoded: 0 };
+  }
+
+  const question = await requireQualitativeQuestion(c, projectId, target.questionId);
+  await assertQualitativeModelAllowed(c, projectId);
+  const proposal = await proposeQualitativeCodings({
+    env: c.env,
+    researchQuestion: question.text,
+    codebook: codebook.codebook,
+    segments: batch
+  });
+
+  const now = new Date().toISOString();
+  const codings: QualitativeCoding[] = proposal.assignments.flatMap(
+    (assignment) =>
+      assignment.codeIds.map((codeId) => ({
+        id: makeId("qcoding"),
+        analysisId,
+        segmentId: assignment.segmentId,
+        codeId,
+        status: "proposed" as const,
+        source: "model" as const,
+        ...(assignment.rationale ? { rationale: assignment.rationale } : {}),
+        createdBy: getUserId(c),
+        createdAt: now,
+        updatedAt: now
+      }))
+  );
+
+  await upsertQualitativeCodings(c.env.DB, codings);
+  await updateQualitativeSegmentCodingState(
+    c.env.DB,
+    analysisId,
+    batch.map((segment) => segment.id),
+    "proposed"
+  );
+
+  const remainingUncoded = detail.segments.filter(
+    (segment) =>
+      segment.codingState === "uncoded" &&
+      !batch.some((item) => item.id === segment.id)
+  ).length;
+  await updateQualitativeAnalysisStatus(
+    c.env.DB,
+    projectId,
+    analysisId,
+    remainingUncoded === 0 ? "coding_review" : "coding_in_progress"
+  );
+  await addAudit(c, {
+    projectId,
+    action: "orchestrator_qualitative_codings_proposed",
+    objectType: "qualitative_analysis",
+    objectId: analysisId,
+    modelId: QUALITATIVE_MODEL,
+    after: {
+      promptVersion: QUALITATIVE_CODING_PROMPT_VERSION,
+      segmentIds: batch.map((segment) => segment.id),
+      proposedCodingCount: codings.length,
+      remainingUncoded
+    }
+  });
+
+  return {
+    analysisId,
+    proposedSegments: batch.length,
+    proposedCodingCount: codings.length,
+    remainingUncoded
+  };
+}
+
+async function orchestratorProposeQualitativeThemes(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+) {
+  const target = state.readiness.questions.find(
+    (question) =>
+      question.status === "qualitative_theme_ready" &&
+      question.qualitativeWorkstream
+  );
+  const analysisId = target?.qualitativeWorkstream?.id;
+  if (!target || !analysisId) {
+    throw new Error("No qualitative workstream is ready for theme development.");
+  }
+
+  const detail = await qualitativeAnalysisDetail(c, projectId, analysisId);
+  if (!detail) throw new Error("Qualitative analysis was not found.");
+  const codebook = latestByVersion(detail.codebookVersions);
+  if (!codebook || codebook.source !== "researcher") {
+    throw new Error("A researcher-confirmed codebook is required.");
+  }
+
+  const question = await requireQualitativeQuestion(c, projectId, target.questionId);
+  await assertQualitativeModelAllowed(c, projectId);
+  const themeSet = await proposeQualitativeThemes({
+    env: c.env,
+    researchQuestion: question.text,
+    codebook: codebook.codebook,
+    segments: detail.segments,
+    codings: detail.codings
+  });
+
+  const version = (latestByVersion(detail.themeVersions)?.version ?? 0) + 1;
+  await saveQualitativeThemeVersion(c.env.DB, {
+    id: makeId("qthemes"),
+    analysisId,
+    version,
+    source: "model",
+    themes: themeSet.themes,
+    synthesis: themeSet.synthesis,
+    model: qualitativeModelProvenance(QUALITATIVE_THEME_PROMPT_VERSION),
+    createdBy: getUserId(c),
+    createdAt: new Date().toISOString()
+  });
+  await updateQualitativeAnalysisStatus(
+    c.env.DB,
+    projectId,
+    analysisId,
+    "theme_review"
+  );
+  await addAudit(c, {
+    projectId,
+    action: "orchestrator_qualitative_themes_proposed",
+    objectType: "qualitative_analysis",
+    objectId: analysisId,
+    modelId: QUALITATIVE_MODEL,
+    after: {
+      version,
+      promptVersion: QUALITATIVE_THEME_PROMPT_VERSION,
+      themeCount: themeSet.themes.length
+    }
+  });
+
+  return { analysisId, version, themeCount: themeSet.themes.length };
+}
+
 const createProjectSchema = z.object({
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).optional(),
