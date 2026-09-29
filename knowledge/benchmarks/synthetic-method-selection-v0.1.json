@@ -1,0 +1,235 @@
+{
+  "benchmark_id": "methodome-synthetic-method-selection-v0.1",
+  "purpose": "Regression tests for methodology-rule behaviour. These are synthetic software cases and are NOT a substitute for the planned expert-labelled benchmark.",
+  "cases": [
+    {
+      "case_id": "syn-001",
+      "question": "Is reporting completeness associated with facility stockout status?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "cross_sectional",
+        "repeated": false,
+        "clustered": false,
+        "survey_weights": false
+      },
+      "variables": {
+        "outcome": {
+          "type": "binary"
+        },
+        "predictors": [
+          {
+            "type": "continuous"
+          }
+        ]
+      },
+      "expected": {
+        "candidate_methods": [
+          "binary_logistic_regression"
+        ],
+        "blocked": false
+      }
+    },
+    {
+      "case_id": "syn-002",
+      "question": "Are cadre and stockout status associated?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "cross_sectional",
+        "repeated": false,
+        "clustered": false,
+        "survey_weights": false
+      },
+      "variables": {
+        "outcome": {
+          "type": "categorical"
+        },
+        "predictors": [
+          {
+            "type": "categorical"
+          }
+        ]
+      },
+      "data_features": {
+        "expected_cell_counts": [
+          2.1,
+          3.4,
+          4,
+          2.5
+        ]
+      },
+      "expected": {
+        "prefer_exact": true,
+        "avoid": [
+          "chi_square_approximation_without_warning"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-003",
+      "question": "Is supervision score linearly associated with reporting completeness?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "cross_sectional",
+        "repeated": false,
+        "clustered": false,
+        "survey_weights": false
+      },
+      "variables": {
+        "outcome": {
+          "type": "continuous"
+        },
+        "predictors": [
+          {
+            "type": "continuous"
+          }
+        ]
+      },
+      "expected": {
+        "candidate_methods": [
+          "pearson_correlation",
+          "linear_regression"
+        ],
+        "required_diagnostics": [
+          "linearity",
+          "outliers"
+        ]
+      }
+    },
+    {
+      "case_id": "syn-004",
+      "question": "Does the intervention change adherence over four monthly visits?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "longitudinal",
+        "repeated": true,
+        "clustered": false,
+        "survey_weights": false
+      },
+      "variables": {
+        "outcome": {
+          "type": "continuous"
+        },
+        "predictors": [
+          {
+            "type": "categorical"
+          }
+        ]
+      },
+      "expected": {
+        "block_current_simple_methods": true,
+        "reason_contains": "repeated"
+      }
+    },
+    {
+      "case_id": "syn-005",
+      "question": "Is facility ownership associated with stockout when facilities are sampled within districts?",
+      "objective_type": "association",
+      "design": {
+        "study_design": "cross_sectional",
+        "repeated": false,
+        "clustered": true,
+        "cluster_concept": "district",
+        "survey_weights": false
+      },
+      "variables": {
+        "outcome": {
+          "type": "binary"
+        },
+        "predictors": [
+          {
+            "type": "categorical"
+          }
+        ]
+      },
+      "expected": {
+        "block_current_simple_methods": true,
+        "reason_contains": "cluster"
+      }
+    },
+    {
+      "case_id": "syn-006",
+      "question": "What is the five-year probability of remaining event-free?",
+      "objective_type": "prognostic",
+      "design": {
+        "study_design": "cohort",
+        "repeated": false,
+        "clustered": false,
+        "survey_weights": false
+      },
+      "variables": {
+        "outcome": {
+          "type": "time_to_event"
+        }
+      },
+      "expected": {
+        "recognized_domain": "survival_analysis",
+        "block_if_not_executable": true
+      }
+    },
+    {
+      "case_id": "syn-007",
+      "question": "How accurately does the screening test detect current disease?",
+      "objective_type": "diagnostic",
+      "variables": {
+        "index_test": {
+          "type": "continuous"
+        },
+        "reference_standard": {
+          "type": "binary"
+        }
+      },
+      "expected": {
+        "recognized_domain": "diagnostic_accuracy",
+        "required_metrics": [
+          "sensitivity",
+          "specificity"
+        ],
+        "block_if_not_executable": true
+      }
+    },
+    {
+      "case_id": "syn-008",
+      "question": "What is the effect of treatment on 30-day mortality?",
+      "objective_type": "causal",
+      "design": {
+        "study_design": "cohort"
+      },
+      "variables": {
+        "outcome": {
+          "type": "binary"
+        },
+        "exposure": {
+          "type": "binary"
+        }
+      },
+      "expected": {
+        "do_not_reduce_to_plain_association": true,
+        "requires_estimand": true
+      }
+    },
+    {
+      "case_id": "syn-009",
+      "question": "What barriers and facilitator experiences shape eLMIS use?",
+      "objective_type": "qualitative",
+      "expected": {
+        "block_quantitative_pipeline": true
+      }
+    },
+    {
+      "case_id": "syn-010",
+      "question": "How reliable is this 12-item scale?",
+      "objective_type": "exploratory",
+      "measurement": {
+        "multi_item": true,
+        "measurement_model": "formative"
+      },
+      "expected": {
+        "do_not_auto_apply": [
+          "cronbach_alpha",
+          "factor_analysis"
+        ],
+        "recognized_domain": "psychometrics"
+      }
+    }
+  ]
+}
