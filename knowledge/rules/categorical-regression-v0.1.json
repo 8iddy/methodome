@@ -1,0 +1,70 @@
+{
+  "rule_set_id": "methodome-categorical-regression-v0.1",
+  "status": "draft",
+  "rules": [
+    {
+      "rule_id": "nominal-logistic-route-001",
+      "topic": "multinomial_logistic_regression",
+      "decision": "Route a response with three or more unordered categories to a nominal or multinomial logistic-regression candidate rather than binary logistic regression.",
+      "conditions": [
+        "Response is categorical",
+        "Response has three or more observed or defined categories",
+        "Categories have no defensible natural order"
+      ],
+      "action": "Classify the response as nominal multinomial and route to a nominal or multinomial logistic-regression candidate for later method-specific review.",
+      "assumptions": [],
+      "diagnostics": [
+        "Number of response categories",
+        "Category labels and coding",
+        "Evidence of a defensible ordering"
+      ],
+      "warnings": [
+        "Do not collapse categories to binary merely to fit the current runtime without a research-based reason.",
+        "Do not impose an artificial numeric order on nominal categories.",
+        "Methodome does not yet have source-backed model-specific selection and diagnostic rules sufficient for autonomous recommendation of this model family."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-009-penn-state-stat-501-regression-methods",
+          "support": "Penn State defines nominal logistic regression for categorical responses with three or more unordered levels.",
+          "section": "Lesson 13.2.1",
+          "page": "11-12 of 33"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
+      "rule_id": "ordinal-logistic-route-001",
+      "topic": "ordinal_logistic_regression",
+      "decision": "Route a response with three or more naturally ordered categories to an ordinal logistic-regression candidate rather than treating category codes as a continuous outcome.",
+      "conditions": [
+        "Response is categorical",
+        "Response has three or more observed or defined categories",
+        "Categories have a defensible natural ordering"
+      ],
+      "action": "Preserve the category ordering and route to an ordinal logistic-regression candidate for later model-specific review.",
+      "assumptions": [],
+      "diagnostics": [
+        "Number of response categories",
+        "Category order",
+        "Codebook or instrument evidence supporting the order"
+      ],
+      "warnings": [
+        "Numeric category codes do not imply equal spacing between levels.",
+        "Do not treat an ordinal response as continuous solely because its categories are coded with numbers.",
+        "Model-specific ordinal-logistic assumptions are not yet sufficiently source-backed in the current corpus for autonomous recommendation."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-009-penn-state-stat-501-regression-methods",
+          "support": "Penn State defines ordinal logistic regression for responses with three or more naturally ordered categories and notes that ranked levels need not have equal intervals.",
+          "section": "Lesson 13.2.2",
+          "page": "11-12 of 33"
+        }
+      ],
+      "validation_status": "draft"
+    }
+  ]
+}
