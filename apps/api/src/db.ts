@@ -1263,6 +1263,8 @@ export async function listQualitativeAnalyses(
       []
     ),
     createdBy: String(row.created_by),
+    ...(row.reviewed_by ? { reviewedBy: String(row.reviewed_by) } : {}),
+    ...(row.reviewed_at ? { reviewedAt: String(row.reviewed_at) } : {}),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at)
   }));
@@ -1417,13 +1419,14 @@ export async function upsertQualitativeCodings(
       .prepare(
         `INSERT INTO qualitative_codings
          (id, analysis_id, segment_id, code_id, status, source, rationale,
-          created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          created_by, reviewed_by, reviewed_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(analysis_id, segment_id, code_id) DO UPDATE SET
            status = excluded.status,
            source = excluded.source,
            rationale = excluded.rationale,
-           created_by = excluded.created_by,
+           reviewed_by = excluded.reviewed_by,
+           reviewed_at = excluded.reviewed_at,
            updated_at = excluded.updated_at`
       )
       .bind(
@@ -1435,6 +1438,8 @@ export async function upsertQualitativeCodings(
         coding.source,
         coding.rationale ?? null,
         coding.createdBy,
+        coding.reviewedBy ?? null,
+        coding.reviewedAt ?? null,
         coding.createdAt,
         coding.updatedAt
       )
@@ -1449,7 +1454,7 @@ export async function listQualitativeCodings(
   const result = await db
     .prepare(
       `SELECT id, analysis_id, segment_id, code_id, status, source,
-              rationale, created_by, created_at, updated_at
+              rationale, created_by, reviewed_by, reviewed_at, created_at, updated_at
        FROM qualitative_codings
        WHERE analysis_id = ?
        ORDER BY segment_id ASC, code_id ASC`
