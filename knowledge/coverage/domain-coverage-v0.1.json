@@ -72,7 +72,7 @@
     {
       "domain": "binary_logistic_regression",
       "status": "ruled",
-      "notes": "Binary-response eligibility represented; separation/sparse-data rule needs stronger direct source extraction."
+      "notes": "Binary-response eligibility plus structure-aware goodness-of-fit and residual diagnostics are represented; complete separation, sparse-event bias, and influence safeguards still need direct source extraction."
     },
     {
       "domain": "multinomial_ordinal_logistic",
@@ -82,7 +82,7 @@
     {
       "domain": "poisson_negative_binomial",
       "status": "registered",
-      "notes": "Categorical/count modelling source family present but not yet extracted into rules."
+      "notes": "Basic Poisson count-outcome routing evidence is now extracted. Full Poisson diagnostics and negative-binomial selection, including overdispersion criteria, remain pending."
     },
     {
       "domain": "repeated_measures_longitudinal",
