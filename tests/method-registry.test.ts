@@ -82,7 +82,7 @@ describe("deterministic method registry", () => {
     expect(selection.candidates[0]?.executable).toBe(true);
   });
 
-  it("returns Poisson and negative binomial for count outcomes", () => {
+  it("returns count-model families without using overdispersion as an automatic negative-binomial switch", () => {
     const study = clusteredBinaryStudy();
     study.clustered = false;
     study.clusterVariable = null;
@@ -94,5 +94,106 @@ describe("deterministic method registry", () => {
       "poisson_regression",
       "negative_binomial_regression"
     ]);
+    expect(selection.warnings.join(" ")).toContain(
+      "Overdispersion alone does not select negative binomial"
+    );
+    expect(
+      selection.candidates.find(
+        (item) => item.methodId === "negative_binomial_regression"
+      )?.decisionRequired
+    ).toContain("Do not choose negative binomial solely");
+  });
+
+  it("blocks ordinary descriptive routing when the sample needs survey-aware analysis", () => {
+    const study = clusteredBinaryStudy();
+    study.clustered = false;
+    study.clusterVariable = null;
+    study.surveyWeights = true;
+    study.weightVariable = "survey_weight";
+    study.researchQuestions[0]!.objectiveType = "descriptive";
+
+    const selection = selectCandidateMethods(study, "rq1");
+
+    expect(selection.candidates).toHaveLength(0);
+    expect(selection.blockedReason).toContain("complex-survey");
+  });
+
+  it("blocks iid continuous methods for repeated observations", () => {
+    const study = clusteredBinaryStudy();
+    study.clustered = false;
+    study.clusterVariable = null;
+    study.repeatedMeasures = true;
+    study.studyDesign = "longitudinal";
+    study.researchQuestions[0]!.outcomes[0]!.variableType = "continuous";
+
+    const selection = selectCandidateMethods(study, "rq1");
+
+    expect(selection.candidates).toHaveLength(0);
+    expect(selection.blockedReason).toContain("must not be analysed with an iid method");
+  });
+
+  it("does not offer Fisher exact for a binary outcome with a non-binary nominal predictor", () => {
+    const study = clusteredBinaryStudy();
+    study.clustered = false;
+    study.clusterVariable = null;
+    study.researchQuestions[0]!.predictors = [
+      {
+        concept: "facility type",
+        datasetVariable: "facility_type",
+        variableType: "categorical_nominal",
+        mappingStatus: "direct_match"
+      }
+    ];
+
+    const selection = selectCandidateMethods(study, "rq1");
+    const methodIds = selection.candidates.map((item) => item.methodId);
+
+    expect(methodIds).toContain("chi_square");
+    expect(methodIds).not.toContain("fisher_exact");
+  });
+
+  it("keeps diagnostic questions out of ordinary association and regression routing", () => {
+    const study = clusteredBinaryStudy();
+    study.clustered = false;
+    study.clusterVariable = null;
+    study.researchQuestions[0]!.objectiveType = "diagnostic";
+
+    const selection = selectCandidateMethods(study, "rq1");
+
+    expect(selection.candidates).toHaveLength(0);
+    expect(selection.blockedReason).toContain("diagnostic-accuracy");
+  });
+
+  it("routes a simple ordinal monotonic association to Spearman", () => {
+    const study = clusteredBinaryStudy();
+    study.clustered = false;
+    study.clusterVariable = null;
+    study.researchQuestions[0]!.outcomes[0]!.variableType = "categorical_ordinal";
+    study.researchQuestions[0]!.predictors = [
+      {
+        concept: "severity score",
+        datasetVariable: "severity_score",
+        variableType: "continuous",
+        mappingStatus: "direct_match"
+      }
+    ];
+
+    const selection = selectCandidateMethods(study, "rq1");
+
+    expect(selection.candidates.map((item) => item.methodId)).toEqual([
+      "spearman_correlation"
+    ]);
+  });
+
+  it("warns against population representativeness for convenience samples", () => {
+    const study = clusteredBinaryStudy();
+    study.clustered = false;
+    study.clusterVariable = null;
+    study.samplingDesign = "convenience sampling";
+
+    const selection = selectCandidateMethods(study, "rq1");
+
+    expect(selection.warnings.join(" ")).toContain("non-probability");
+    expect(selection.warnings.join(" ")).toContain("population representativeness");
   });
 });
