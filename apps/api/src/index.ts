@@ -2121,7 +2121,11 @@ const orchestratorAdvanceSchema = z.object({
   action: z.enum([
     "extract_protocol",
     "create_draft_plan",
-    "run_analyses"
+    "run_analyses",
+    "prepare_qualitative_analysis",
+    "propose_qualitative_codebook",
+    "propose_qualitative_codings",
+    "propose_qualitative_themes"
   ]).optional()
 });
 
@@ -2197,7 +2201,17 @@ app.post("/projects/:projectId/orchestrator/advance", async (c) => {
   let mutation:
     | { action: "extract_protocol"; researchQuestionCount: number }
     | { action: "create_draft_plan"; planId: string; analysisCount: number }
-    | { action: "run_analyses"; queuedJobIds: string[] };
+    | { action: "run_analyses"; queuedJobIds: string[] }
+    | { action: "prepare_qualitative_analysis"; analysisId: string; segmentCount: number }
+    | { action: "propose_qualitative_codebook"; analysisId: string; version: number; codeCount: number }
+    | {
+        action: "propose_qualitative_codings";
+        analysisId: string;
+        proposedSegments: number;
+        proposedCodingCount?: number;
+        remainingUncoded: number;
+      }
+    | { action: "propose_qualitative_themes"; analysisId: string; version: number; themeCount: number };
 
   try {
     if (view.automaticAction === "extract_protocol") {
@@ -2213,13 +2227,33 @@ app.post("/projects/:projectId/orchestrator/advance", async (c) => {
         planId: plan.id,
         analysisCount: plan.analyses.length
       };
-    } else {
+    } else if (view.automaticAction === "run_analyses") {
       if (!before.plan) {
         throw new Error("The locked analysis plan could not be loaded.");
       }
       mutation = {
         action: "run_analyses",
         queuedJobIds: await enqueueOrchestratedPlan(c, projectId, before.plan)
+      };
+    } else if (view.automaticAction === "prepare_qualitative_analysis") {
+      mutation = {
+        action: "prepare_qualitative_analysis",
+        ...(await orchestratorPrepareQualitativeAnalysis(c, projectId, before))
+      };
+    } else if (view.automaticAction === "propose_qualitative_codebook") {
+      mutation = {
+        action: "propose_qualitative_codebook",
+        ...(await orchestratorProposeQualitativeCodebook(c, projectId, before))
+      };
+    } else if (view.automaticAction === "propose_qualitative_codings") {
+      mutation = {
+        action: "propose_qualitative_codings",
+        ...(await orchestratorProposeQualitativeCodings(c, projectId, before))
+      };
+    } else {
+      mutation = {
+        action: "propose_qualitative_themes",
+        ...(await orchestratorProposeQualitativeThemes(c, projectId, before))
       };
     }
   } catch (error) {
