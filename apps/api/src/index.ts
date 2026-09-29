@@ -448,7 +448,8 @@ async function computeProjectReadiness(
     mappings,
     plan,
     history,
-    extraction
+    extraction,
+    qualitativeAnalyses
   ] = await Promise.all([
     listProjectFiles(c.env.DB, projectId),
     listDatasetVersions(c.env.DB, projectId),
@@ -456,7 +457,8 @@ async function computeProjectReadiness(
     listVariableMappings(c.env.DB, projectId),
     getLatestAnalysisPlan(c.env.DB, projectId),
     listAnalysisHistory(c.env.DB, getUserId(c)),
-    getLatestProtocolExtraction(c.env.DB, projectId)
+    getLatestProtocolExtraction(c.env.DB, projectId),
+    listQualitativeAnalyses(c.env.DB, projectId)
   ]);
 
   let selections: ReturnType<typeof selectCandidateMethods>[] = [];
@@ -512,7 +514,12 @@ async function computeProjectReadiness(
       })),
       selections,
       plan,
-      completedAnalysisCount
+      completedAnalysisCount,
+      qualitativeWorkstreams: qualitativeAnalyses.map((analysis) => ({
+        id: analysis.id,
+        researchQuestionId: analysis.researchQuestionId,
+        status: analysis.status
+      }))
     },
     currentSection
   );
@@ -527,6 +534,7 @@ async function computeProjectReadiness(
     plan,
     history: projectHistory,
     extraction,
+    qualitativeAnalyses,
     selections,
     ...(resolvedDatasetVersionId
       ? { resolvedDatasetVersionId }
