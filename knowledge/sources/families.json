@@ -1,6 +1,6 @@
 {
   "corpus_id": "methodome-methodology-corpus-v1",
-  "family_count": 35,
+  "family_count": 39,
   "note": "Files from one textbook/course/guideline family are grouped so evidence weight is not inflated by chapter-level PDF splitting.",
   "families": [
     {
@@ -574,7 +574,7 @@
       "title": "NIST/SEMATECH e-Handbook of Statistical Methods",
       "organization": "NIST",
       "year": null,
-      "file_count": 8,
+      "file_count": 9,
       "file_source_ids": [
         "src-001-nistsematech-e-handbook-of-statistical-methods",
         "src-002-nistsematech-e-handbook-of-statistical-methods",
@@ -583,7 +583,8 @@
         "src-005-nistsematech-e-handbook-of-statistical-methods",
         "src-006-nistsematech-e-handbook-of-statistical-methods",
         "src-007-nistsematech-e-handbook-of-statistical-methods",
-        "src-008-nistsematech-e-handbook-of-statistical-methods"
+        "src-008-nistsematech-e-handbook-of-statistical-methods",
+        "src-079-nist-two-sample-t-test-for-equal-means"
       ],
       "domains": [
         "reliability",
@@ -709,6 +710,86 @@
       "authority_tier": "A",
       "role": "primary",
       "priority": "high"
+    },
+    {
+      "family_id": "family-wilcoxon-mann-whitney-fails-test-medians",
+      "title": "The Wilcoxon–Mann–Whitney Procedure Fails as a Test of Medians",
+      "organization": "The American Statistician",
+      "year": 2018,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-080-divine-wilcoxon-mann-whitney-fails-test-medians"
+      ],
+      "domains": [
+        "mann_whitney",
+        "wilcoxon_rank_sum",
+        "nonparametric_methods",
+        "probability_of_superiority"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-cdc-nchs-nhanes-tutorials",
+      "title": "CDC/NCHS NHANES Tutorials",
+      "organization": "CDC / National Center for Health Statistics",
+      "year": null,
+      "file_count": 3,
+      "file_source_ids": [
+        "src-081-nhanes-sample-design-module",
+        "src-082-nhanes-weighting-module",
+        "src-083-nhanes-variance-estimation-module"
+      ],
+      "domains": [
+        "complex_survey",
+        "multistage_sampling",
+        "survey_weights",
+        "variance_estimation",
+        "domain_analysis"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-sterne-multiple-imputation-potential-and-pitfalls",
+      "title": "Multiple imputation for missing data in epidemiological and clinical research: potential and pitfalls",
+      "organization": "BMJ",
+      "year": 2009,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-084-sterne-multiple-imputation-potential-and-pitfalls"
+      ],
+      "domains": [
+        "missing_data",
+        "multiple_imputation",
+        "mcar_mar_mnar",
+        "sensitivity_analysis"
+      ],
+      "authority_tier": "A",
+      "role": "primary",
+      "priority": "high"
+    },
+    {
+      "family_id": "family-resche-rigon-white-multilevel-mice",
+      "title": "Multiple imputation by chained equations for systematically and sporadically missing multilevel data",
+      "organization": "Statistical Methods in Medical Research",
+      "year": 2018,
+      "file_count": 1,
+      "file_source_ids": [
+        "src-085-resche-rigon-white-multilevel-mice"
+      ],
+      "domains": [
+        "missing_data",
+        "multiple_imputation",
+        "mice",
+        "multilevel_data",
+        "clustered_data"
+      ],
+      "authority_tier": "A",
+      "role": "supporting",
+      "priority": "medium"
     }
   ]
 }
