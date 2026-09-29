@@ -22,6 +22,16 @@ import type { Project } from "@methodome/domain";
 import { assertModelRequestAllowed, type ProjectProcessingPolicy } from "@methodome/policy-engine";
 import { compareDatasetSchemas } from "@methodome/schema-harmonisation";
 import {
+  codingProposalSchema,
+  qualitativeCodebookSchema,
+  qualitativeThemeSetSchema,
+  segmentQualitativeText,
+  validateThemeReferences,
+  type QualitativeCodebook,
+  type QualitativeCoding,
+  type QualitativeSegment
+} from "@methodome/qualitative-analysis";
+import {
   assessProjectReadiness,
   buildOrchestratorView,
   type WorkflowSection
@@ -40,6 +50,16 @@ import {
   researchFileToText,
   suggestMappingsWithAi
 } from "./protocol-extraction";
+import {
+  modelProvenance as qualitativeModelProvenance,
+  proposeQualitativeCodebook,
+  proposeQualitativeCodings,
+  proposeQualitativeThemes,
+  QUALITATIVE_CODEBOOK_PROMPT_VERSION,
+  QUALITATIVE_CODING_PROMPT_VERSION,
+  QUALITATIVE_MODEL,
+  QUALITATIVE_THEME_PROMPT_VERSION
+} from "./qualitative-analysis";
 import {
   appendAuditEvent,
   createAnalysisJob,
@@ -67,12 +87,24 @@ import {
   listAnalysisHistory,
   listAnalysisJobsForPlan,
   listAuditEvents,
+  listQualitativeAnalyses,
+  getQualitativeAnalysis,
+  listQualitativeSegments,
+  listQualitativeCodebookVersions,
+  listQualitativeCodings,
+  listQualitativeThemeVersions,
   listDatasetVersions,
   listProjectFiles,
   listVariableMappings,
   listProjects,
   saveAnalysisPlan,
   saveProtocolExtraction,
+  createQualitativeAnalysis,
+  saveQualitativeCodebookVersion,
+  upsertQualitativeCodings,
+  saveQualitativeThemeVersion,
+  updateQualitativeAnalysisStatus,
+  updateQualitativeSegmentCodingState,
   saveStudySpecification,
   saveVariableMappings,
   updateProjectPolicy,
@@ -416,7 +448,8 @@ async function computeProjectReadiness(
     mappings,
     plan,
     history,
-    extraction
+    extraction,
+    qualitativeAnalyses
   ] = await Promise.all([
     listProjectFiles(c.env.DB, projectId),
     listDatasetVersions(c.env.DB, projectId),
@@ -424,7 +457,8 @@ async function computeProjectReadiness(
     listVariableMappings(c.env.DB, projectId),
     getLatestAnalysisPlan(c.env.DB, projectId),
     listAnalysisHistory(c.env.DB, getUserId(c)),
-    getLatestProtocolExtraction(c.env.DB, projectId)
+    getLatestProtocolExtraction(c.env.DB, projectId),
+    listQualitativeAnalyses(c.env.DB, projectId)
   ]);
 
   let selections: ReturnType<typeof selectCandidateMethods>[] = [];
@@ -480,7 +514,12 @@ async function computeProjectReadiness(
       })),
       selections,
       plan,
-      completedAnalysisCount
+      completedAnalysisCount,
+      qualitativeWorkstreams: qualitativeAnalyses.map((analysis) => ({
+        id: analysis.id,
+        researchQuestionId: analysis.researchQuestionId,
+        status: analysis.status
+      }))
     },
     currentSection
   );
@@ -495,6 +534,7 @@ async function computeProjectReadiness(
     plan,
     history: projectHistory,
     extraction,
+    qualitativeAnalyses,
     selections,
     ...(resolvedDatasetVersionId
       ? { resolvedDatasetVersionId }
@@ -772,6 +812,356 @@ async function enqueueOrchestratedPlan(
   }
 
   return queued;
+}
+
+
+function qualitativeSourceNeedsModelConversion(
+  filename: string,
+  mediaType?: string
+): boolean {
+  const lower = filename.toLowerCase();
+  return !(
+    lower.endsWith(".txt") ||
+    lower.endsWith(".md") ||
+    lower.endsWith(".markdown") ||
+    mediaType?.startsWith("text/")
+  );
+}
+
+async function orchestratorPrepareQualitativeAnalysis(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+) {
+  const target = state.readiness.questions.find(
+    (question) =>
+      question.status === "qualitative_ready" &&
+      !question.qualitativeWorkstream
+  );
+  if (!target) {
+    throw new Error("No qualitative question is ready to prepare.");
+  }
+  if (!c.env.FILES) {
+    throw new Error("Research file storage is required for qualitative analysis.");
+  }
+
+  const question = await requireQualitativeQuestion(
+    c,
+    projectId,
+    target.questionId
+  );
+  const transcriptFiles = await listProjectFiles(c.env.DB, projectId, "transcript");
+  if (transcriptFiles.length === 0) {
+    throw new Error("Upload at least one transcript before qualitative analysis.");
+  }
+
+  const analysisId = makeId("qual");
+  const now = new Date().toISOString();
+  const segments: QualitativeSegment[] = [];
+  const sourceFileIds: string[] = [];
+
+  for (const summary of transcriptFiles) {
+    const file = await getFileRecord(c.env.DB, summary.id, getUserId(c));
+    if (!file || file.projectId !== projectId || file.fileKind !== "transcript") {
+      continue;
+    }
+    if (file.checksumSha256 === "pending") {
+      throw new Error(`Finish uploading transcript ${file.filename} before analysis.`);
+    }
+    const object = await c.env.FILES.get(file.objectKey);
+    if (!object) {
+      throw new Error(`Stored transcript ${file.filename} could not be read.`);
+    }
+    if (
+      qualitativeSourceNeedsModelConversion(file.filename, file.mediaType)
+    ) {
+      await assertQualitativeModelAllowed(c, projectId);
+    }
+    const text = await researchFileToText({
+      env: c.env,
+      filename: file.filename,
+      ...(file.mediaType ? { mediaType: file.mediaType } : {}),
+      bytes: await object.arrayBuffer()
+    });
+    sourceFileIds.push(file.id);
+    for (const draft of segmentQualitativeText(text)) {
+      segments.push({
+        id: makeId("qseg"),
+        analysisId,
+        projectId,
+        fileId: file.id,
+        segmentIndex: draft.segmentIndex,
+        text: draft.text,
+        startChar: draft.startChar,
+        endChar: draft.endChar,
+        codingState: "uncoded",
+        createdAt: now
+      });
+    }
+  }
+
+  if (segments.length === 0) {
+    throw new Error("No analyzable transcript text was extracted.");
+  }
+
+  await createQualitativeAnalysis(c.env.DB, {
+    analysis: {
+      id: analysisId,
+      projectId,
+      researchQuestionId: question.id,
+      status: "prepared",
+      sourceFileIds,
+      createdBy: getUserId(c),
+      createdAt: now,
+      updatedAt: now
+    },
+    segments
+  });
+
+  await addAudit(c, {
+    projectId,
+    action: "orchestrator_qualitative_analysis_prepared",
+    objectType: "qualitative_analysis",
+    objectId: analysisId,
+    after: {
+      researchQuestionId: question.id,
+      sourceFileIds,
+      segmentCount: segments.length
+    }
+  });
+
+  return { analysisId, segmentCount: segments.length };
+}
+
+async function orchestratorProposeQualitativeCodebook(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+) {
+  const target = state.readiness.questions.find(
+    (question) =>
+      question.status === "qualitative_ready" &&
+      question.qualitativeWorkstream?.status === "prepared"
+  );
+  const analysisId = target?.qualitativeWorkstream?.id;
+  if (!target || !analysisId) {
+    throw new Error("No prepared qualitative workstream needs a codebook.");
+  }
+
+  const detail = await qualitativeAnalysisDetail(c, projectId, analysisId);
+  if (!detail) throw new Error("Qualitative analysis was not found.");
+  if (detail.codings.length > 0) {
+    throw new Error("Coding has already started for this qualitative workstream.");
+  }
+
+  const question = await requireQualitativeQuestion(c, projectId, target.questionId);
+  await assertQualitativeModelAllowed(c, projectId);
+  const codebook = await proposeQualitativeCodebook({
+    env: c.env,
+    researchQuestion: question.text,
+    segments: detail.segments
+  });
+
+  const version = (latestByVersion(detail.codebookVersions)?.version ?? 0) + 1;
+  await saveQualitativeCodebookVersion(c.env.DB, {
+    id: makeId("qcodebook"),
+    analysisId,
+    version,
+    source: "model",
+    codebook,
+    model: qualitativeModelProvenance(QUALITATIVE_CODEBOOK_PROMPT_VERSION),
+    createdBy: getUserId(c),
+    createdAt: new Date().toISOString()
+  });
+  await updateQualitativeAnalysisStatus(
+    c.env.DB,
+    projectId,
+    analysisId,
+    "codebook_review"
+  );
+  await addAudit(c, {
+    projectId,
+    action: "orchestrator_qualitative_codebook_proposed",
+    objectType: "qualitative_analysis",
+    objectId: analysisId,
+    modelId: QUALITATIVE_MODEL,
+    after: {
+      version,
+      promptVersion: QUALITATIVE_CODEBOOK_PROMPT_VERSION,
+      codeCount: codebook.codes.length
+    }
+  });
+
+  return { analysisId, version, codeCount: codebook.codes.length };
+}
+
+async function orchestratorProposeQualitativeCodings(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+) {
+  const target = state.readiness.questions.find(
+    (question) =>
+      question.status === "qualitative_coding" &&
+      question.qualitativeWorkstream
+  );
+  const analysisId = target?.qualitativeWorkstream?.id;
+  if (!target || !analysisId) {
+    throw new Error("No qualitative workstream is ready for coding.");
+  }
+
+  const detail = await qualitativeAnalysisDetail(c, projectId, analysisId);
+  if (!detail) throw new Error("Qualitative analysis was not found.");
+  const codebook = latestByVersion(detail.codebookVersions);
+  if (!codebook || codebook.source !== "researcher") {
+    throw new Error("Confirm the qualitative codebook before coding.");
+  }
+
+  const batch = detail.segments
+    .filter((segment) => segment.codingState === "uncoded")
+    .slice(0, 20);
+
+  if (batch.length === 0) {
+    await updateQualitativeAnalysisStatus(
+      c.env.DB,
+      projectId,
+      analysisId,
+      "coding_review"
+    );
+    return { analysisId, proposedSegments: 0, remainingUncoded: 0 };
+  }
+
+  const question = await requireQualitativeQuestion(c, projectId, target.questionId);
+  await assertQualitativeModelAllowed(c, projectId);
+  const proposal = await proposeQualitativeCodings({
+    env: c.env,
+    researchQuestion: question.text,
+    codebook: codebook.codebook,
+    segments: batch
+  });
+
+  const now = new Date().toISOString();
+  const codings: QualitativeCoding[] = proposal.assignments.flatMap(
+    (assignment) =>
+      assignment.codeIds.map((codeId) => ({
+        id: makeId("qcoding"),
+        analysisId,
+        segmentId: assignment.segmentId,
+        codeId,
+        status: "proposed" as const,
+        source: "model" as const,
+        ...(assignment.rationale ? { rationale: assignment.rationale } : {}),
+        createdBy: getUserId(c),
+        createdAt: now,
+        updatedAt: now
+      }))
+  );
+
+  await upsertQualitativeCodings(c.env.DB, codings);
+  await updateQualitativeSegmentCodingState(
+    c.env.DB,
+    analysisId,
+    batch.map((segment) => segment.id),
+    "proposed"
+  );
+
+  const remainingUncoded = detail.segments.filter(
+    (segment) =>
+      segment.codingState === "uncoded" &&
+      !batch.some((item) => item.id === segment.id)
+  ).length;
+  await updateQualitativeAnalysisStatus(
+    c.env.DB,
+    projectId,
+    analysisId,
+    remainingUncoded === 0 ? "coding_review" : "coding_in_progress"
+  );
+  await addAudit(c, {
+    projectId,
+    action: "orchestrator_qualitative_codings_proposed",
+    objectType: "qualitative_analysis",
+    objectId: analysisId,
+    modelId: QUALITATIVE_MODEL,
+    after: {
+      promptVersion: QUALITATIVE_CODING_PROMPT_VERSION,
+      segmentIds: batch.map((segment) => segment.id),
+      proposedCodingCount: codings.length,
+      remainingUncoded
+    }
+  });
+
+  return {
+    analysisId,
+    proposedSegments: batch.length,
+    proposedCodingCount: codings.length,
+    remainingUncoded
+  };
+}
+
+async function orchestratorProposeQualitativeThemes(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+) {
+  const target = state.readiness.questions.find(
+    (question) =>
+      question.status === "qualitative_theme_ready" &&
+      question.qualitativeWorkstream
+  );
+  const analysisId = target?.qualitativeWorkstream?.id;
+  if (!target || !analysisId) {
+    throw new Error("No qualitative workstream is ready for theme development.");
+  }
+
+  const detail = await qualitativeAnalysisDetail(c, projectId, analysisId);
+  if (!detail) throw new Error("Qualitative analysis was not found.");
+  const codebook = latestByVersion(detail.codebookVersions);
+  if (!codebook || codebook.source !== "researcher") {
+    throw new Error("A researcher-confirmed codebook is required.");
+  }
+
+  const question = await requireQualitativeQuestion(c, projectId, target.questionId);
+  await assertQualitativeModelAllowed(c, projectId);
+  const themeSet = await proposeQualitativeThemes({
+    env: c.env,
+    researchQuestion: question.text,
+    codebook: codebook.codebook,
+    segments: detail.segments,
+    codings: detail.codings
+  });
+
+  const version = (latestByVersion(detail.themeVersions)?.version ?? 0) + 1;
+  await saveQualitativeThemeVersion(c.env.DB, {
+    id: makeId("qthemes"),
+    analysisId,
+    version,
+    source: "model",
+    themes: themeSet.themes,
+    synthesis: themeSet.synthesis,
+    model: qualitativeModelProvenance(QUALITATIVE_THEME_PROMPT_VERSION),
+    createdBy: getUserId(c),
+    createdAt: new Date().toISOString()
+  });
+  await updateQualitativeAnalysisStatus(
+    c.env.DB,
+    projectId,
+    analysisId,
+    "theme_review"
+  );
+  await addAudit(c, {
+    projectId,
+    action: "orchestrator_qualitative_themes_proposed",
+    objectType: "qualitative_analysis",
+    objectId: analysisId,
+    modelId: QUALITATIVE_MODEL,
+    after: {
+      version,
+      promptVersion: QUALITATIVE_THEME_PROMPT_VERSION,
+      themeCount: themeSet.themes.length
+    }
+  });
+
+  return { analysisId, version, themeCount: themeSet.themes.length };
 }
 
 const createProjectSchema = z.object({
@@ -1749,7 +2139,11 @@ const orchestratorAdvanceSchema = z.object({
   action: z.enum([
     "extract_protocol",
     "create_draft_plan",
-    "run_analyses"
+    "run_analyses",
+    "prepare_qualitative_analysis",
+    "propose_qualitative_codebook",
+    "propose_qualitative_codings",
+    "propose_qualitative_themes"
   ]).optional()
 });
 
@@ -1825,7 +2219,17 @@ app.post("/projects/:projectId/orchestrator/advance", async (c) => {
   let mutation:
     | { action: "extract_protocol"; researchQuestionCount: number }
     | { action: "create_draft_plan"; planId: string; analysisCount: number }
-    | { action: "run_analyses"; queuedJobIds: string[] };
+    | { action: "run_analyses"; queuedJobIds: string[] }
+    | { action: "prepare_qualitative_analysis"; analysisId: string; segmentCount: number }
+    | { action: "propose_qualitative_codebook"; analysisId: string; version: number; codeCount: number }
+    | {
+        action: "propose_qualitative_codings";
+        analysisId: string;
+        proposedSegments: number;
+        proposedCodingCount?: number;
+        remainingUncoded: number;
+      }
+    | { action: "propose_qualitative_themes"; analysisId: string; version: number; themeCount: number };
 
   try {
     if (view.automaticAction === "extract_protocol") {
@@ -1841,13 +2245,33 @@ app.post("/projects/:projectId/orchestrator/advance", async (c) => {
         planId: plan.id,
         analysisCount: plan.analyses.length
       };
-    } else {
+    } else if (view.automaticAction === "run_analyses") {
       if (!before.plan) {
         throw new Error("The locked analysis plan could not be loaded.");
       }
       mutation = {
         action: "run_analyses",
         queuedJobIds: await enqueueOrchestratedPlan(c, projectId, before.plan)
+      };
+    } else if (view.automaticAction === "prepare_qualitative_analysis") {
+      mutation = {
+        action: "prepare_qualitative_analysis",
+        ...(await orchestratorPrepareQualitativeAnalysis(c, projectId, before))
+      };
+    } else if (view.automaticAction === "propose_qualitative_codebook") {
+      mutation = {
+        action: "propose_qualitative_codebook",
+        ...(await orchestratorProposeQualitativeCodebook(c, projectId, before))
+      };
+    } else if (view.automaticAction === "propose_qualitative_codings") {
+      mutation = {
+        action: "propose_qualitative_codings",
+        ...(await orchestratorProposeQualitativeCodings(c, projectId, before))
+      };
+    } else {
+      mutation = {
+        action: "propose_qualitative_themes",
+        ...(await orchestratorProposeQualitativeThemes(c, projectId, before))
       };
     }
   } catch (error) {
@@ -1964,6 +2388,1331 @@ app.put("/projects/:projectId/policy", async (c) => {
 
   return c.json({ policy });
 });
+
+
+const createQualitativeAnalysisSchema = z.object({
+  researchQuestionId: z.string().min(1),
+  sourceFileIds: z.array(z.string().min(1)).min(1).optional()
+});
+
+const qualitativeCodingBatchSchema = z.object({
+  segmentIds: z.array(z.string().min(1)).min(1).max(20).optional()
+});
+
+const qualitativeCodingReviewSchema = z.object({
+  decisions: z.array(
+    z.object({
+      segmentId: z.string().min(1),
+      codeId: z.string().min(1),
+      status: z.enum(["confirmed", "rejected"]),
+      rationale: z.string().trim().max(2000).optional()
+    })
+  ).default([]),
+  manualAssignments: z.array(
+    z.object({
+      segmentId: z.string().min(1),
+      codeId: z.string().min(1),
+      rationale: z.string().trim().max(2000).optional()
+    })
+  ).default([]),
+  reviewedSegmentIds: z.array(z.string().min(1)).default([])
+});
+
+function latestByVersion<T extends { version: number }>(items: T[]): T | null {
+  return items.length > 0
+    ? [...items].sort((left, right) => right.version - left.version)[0] ?? null
+    : null;
+}
+
+async function requireQualitativeQuestion(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  researchQuestionId: string
+) {
+  const specification = await getStudySpecification(c.env.DB, projectId);
+  const question = specification?.researchQuestions.find(
+    (item) => item.id === researchQuestionId
+  );
+  if (!question) {
+    throw new Error("The qualitative analysis references an unknown research question.");
+  }
+  if (question.objectiveType !== "qualitative") {
+    throw new Error(
+      "Only research questions confirmed as qualitative can enter the qualitative analysis branch."
+    );
+  }
+  return question;
+}
+
+async function assertQualitativeModelAllowed(
+  c: import("hono").Context<AppBindings>,
+  projectId: string
+) {
+  if (!c.env.AI) {
+    throw new Error("Workers AI is required for AI-assisted qualitative analysis.");
+  }
+  const policy = await getProjectPolicy(c.env.DB, projectId);
+  if (policy) {
+    assertModelRequestAllowed(policy, {
+      processorId: "workers-ai",
+      providerKind: "internal",
+      payloadKind: "qualitative_text",
+      containsIdentifiers: policy.containsIdentifiableData
+    });
+  }
+}
+
+async function qualitativeAnalysisDetail(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  analysisId: string
+) {
+  const analysis = await getQualitativeAnalysis(c.env.DB, projectId, analysisId);
+  if (!analysis) return null;
+
+  const [segments, codebookVersions, codings, themeVersions] = await Promise.all([
+    listQualitativeSegments(c.env.DB, analysisId),
+    listQualitativeCodebookVersions(c.env.DB, analysisId),
+    listQualitativeCodings(c.env.DB, analysisId),
+    listQualitativeThemeVersions(c.env.DB, analysisId)
+  ]);
+
+  return {
+    analysis,
+    segments,
+    codebookVersions,
+    latestCodebook: latestByVersion(codebookVersions),
+    codings,
+    themeVersions,
+    latestThemes: latestByVersion(themeVersions)
+  };
+}
+
+app.get("/projects/:projectId/qualitative-analyses", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  return c.json({
+    analyses: await listQualitativeAnalyses(c.env.DB, projectId)
+  });
+});
+
+app.post("/projects/:projectId/qualitative-analyses", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const parsed = createQualitativeAnalysisSchema.safeParse(
+    await c.req.json().catch(() => null)
+  );
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_QUALITATIVE_ANALYSIS",
+          message: "Qualitative analysis setup is invalid.",
+          details: parsed.error.flatten()
+        }
+      },
+      400
+    );
+  }
+
+  let question;
+  try {
+    question = await requireQualitativeQuestion(
+      c,
+      projectId,
+      parsed.data.researchQuestionId
+    );
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: "QUALITATIVE_QUESTION_REQUIRED",
+          message: error instanceof Error ? error.message : String(error)
+        }
+      },
+      409
+    );
+  }
+
+  const existing = (await listQualitativeAnalyses(c.env.DB, projectId)).find(
+    (item) => item.researchQuestionId === question.id
+  );
+  if (existing) {
+    const detail = await qualitativeAnalysisDetail(c, projectId, existing.id);
+    return c.json({ detail });
+  }
+
+  if (!c.env.FILES) {
+    return c.json(
+      {
+        error: {
+          code: "OBJECT_STORAGE_NOT_CONFIGURED",
+          message: "Research file storage is required for qualitative analysis."
+        }
+      },
+      503
+    );
+  }
+
+  const availableTranscripts = await listProjectFiles(
+    c.env.DB,
+    projectId,
+    "transcript"
+  );
+  const sourceFileIds = Array.from(
+    new Set(
+      parsed.data.sourceFileIds ??
+        availableTranscripts.map((file) => file.id)
+    )
+  );
+  if (sourceFileIds.length === 0) {
+    return c.json(
+      {
+        error: {
+          code: "QUALITATIVE_SOURCE_REQUIRED",
+          message:
+            "Upload at least one transcript before preparing qualitative analysis."
+        }
+      },
+      409
+    );
+  }
+
+  const analysisId = makeId("qual");
+  const now = new Date().toISOString();
+  const segments: QualitativeSegment[] = [];
+
+  for (const fileId of sourceFileIds) {
+    const file = await getFileRecord(c.env.DB, fileId, getUserId(c));
+    if (
+      !file ||
+      file.projectId !== projectId ||
+      file.fileKind !== "transcript"
+    ) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_SOURCE_NOT_FOUND",
+            message:
+              "Every qualitative source must be a transcript file from this project.",
+            details: { fileId }
+          }
+        },
+        404
+      );
+    }
+    if (file.checksumSha256 === "pending") {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_SOURCE_UPLOAD_INCOMPLETE",
+            message: "Finish uploading all qualitative sources before analysis.",
+            details: { fileId }
+          }
+        },
+        409
+      );
+    }
+
+    const object = await c.env.FILES.get(file.objectKey);
+    if (!object) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_SOURCE_OBJECT_NOT_FOUND",
+            message: "A stored qualitative source could not be read.",
+            details: { fileId }
+          }
+        },
+        404
+      );
+    }
+
+    if (
+      qualitativeSourceNeedsModelConversion(file.filename, file.mediaType)
+    ) {
+      try {
+        await assertQualitativeModelAllowed(c, projectId);
+      } catch (error) {
+        return c.json(
+          {
+            error: {
+              code: "QUALITATIVE_MODEL_BLOCKED",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Project processing policy blocks transcript conversion.",
+              details: { fileId }
+            }
+          },
+          409
+        );
+      }
+    }
+
+    let text: string;
+    try {
+      text = await researchFileToText({
+        env: c.env,
+        filename: file.filename,
+        ...(file.mediaType ? { mediaType: file.mediaType } : {}),
+        bytes: await object.arrayBuffer()
+      });
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_TEXT_EXTRACTION_FAILED",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Methodome could not extract qualitative source text.",
+            details: { fileId }
+          }
+        },
+        422
+      );
+    }
+
+    const drafts = segmentQualitativeText(text);
+    for (const draft of drafts) {
+      segments.push({
+        id: makeId("qseg"),
+        analysisId,
+        projectId,
+        fileId,
+        segmentIndex: draft.segmentIndex,
+        text: draft.text,
+        startChar: draft.startChar,
+        endChar: draft.endChar,
+        codingState: "uncoded",
+        createdAt: now
+      });
+    }
+  }
+
+  if (segments.length === 0) {
+    return c.json(
+      {
+        error: {
+          code: "QUALITATIVE_SOURCE_EMPTY",
+          message: "No analyzable text was extracted from the selected transcripts."
+        }
+      },
+      422
+    );
+  }
+
+  const analysis = {
+    id: analysisId,
+    projectId,
+    researchQuestionId: question.id,
+    status: "prepared" as const,
+    sourceFileIds,
+    createdBy: getUserId(c),
+    createdAt: now,
+    updatedAt: now
+  };
+  await createQualitativeAnalysis(c.env.DB, { analysis, segments });
+  await addAudit(c, {
+    projectId,
+    action: "qualitative_analysis_prepared",
+    objectType: "qualitative_analysis",
+    objectId: analysisId,
+    after: {
+      researchQuestionId: question.id,
+      sourceFileIds,
+      segmentCount: segments.length
+    }
+  });
+
+  return c.json(
+    {
+      detail: await qualitativeAnalysisDetail(c, projectId, analysisId)
+    },
+    201
+  );
+});
+
+app.get(
+  "/projects/:projectId/qualitative-analyses/:analysisId",
+  async (c) => {
+    const projectId = c.req.param("projectId");
+    const access = await requireProject(c, projectId);
+    if ("response" in access) return access.response;
+
+    const detail = await qualitativeAnalysisDetail(
+      c,
+      projectId,
+      c.req.param("analysisId")
+    );
+    if (!detail) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_ANALYSIS_NOT_FOUND",
+            message: "Qualitative analysis was not found."
+          }
+        },
+        404
+      );
+    }
+    return c.json({ detail });
+  }
+);
+
+app.post(
+  "/projects/:projectId/qualitative-analyses/:analysisId/codebook/propose",
+  async (c) => {
+    const projectId = c.req.param("projectId");
+    const access = await requireProject(c, projectId);
+    if ("response" in access) return access.response;
+
+    const analysisId = c.req.param("analysisId");
+    const detail = await qualitativeAnalysisDetail(c, projectId, analysisId);
+    if (!detail) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_ANALYSIS_NOT_FOUND",
+            message: "Qualitative analysis was not found."
+          }
+        },
+        404
+      );
+    }
+    if (!["prepared", "codebook_review"].includes(detail.analysis.status)) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODEBOOK_STAGE_CLOSED",
+            message:
+              "Codebook proposals are only available before a codebook has been confirmed for coding."
+          }
+        },
+        409
+      );
+    }
+    if (detail.codings.length > 0) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODEBOOK_ALREADY_IN_USE",
+            message:
+              "The codebook is frozen after coding starts so the coding record remains reproducible."
+          }
+        },
+        409
+      );
+    }
+
+    let question;
+    try {
+      question = await requireQualitativeQuestion(
+        c,
+        projectId,
+        detail.analysis.researchQuestionId
+      );
+      await assertQualitativeModelAllowed(c, projectId);
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_MODEL_BLOCKED",
+            message: error instanceof Error ? error.message : String(error)
+          }
+        },
+        409
+      );
+    }
+
+    let codebook: QualitativeCodebook;
+    try {
+      codebook = await proposeQualitativeCodebook({
+        env: c.env,
+        researchQuestion: question.text,
+        segments: detail.segments
+      });
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODEBOOK_PROPOSAL_FAILED",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Methodome could not propose a qualitative codebook."
+          }
+        },
+        422
+      );
+    }
+
+    const version =
+      (latestByVersion(detail.codebookVersions)?.version ?? 0) + 1;
+    const createdAt = new Date().toISOString();
+    await saveQualitativeCodebookVersion(c.env.DB, {
+      id: makeId("qcodebook"),
+      analysisId,
+      version,
+      source: "model",
+      codebook,
+      model: qualitativeModelProvenance(
+        QUALITATIVE_CODEBOOK_PROMPT_VERSION
+      ),
+      createdBy: getUserId(c),
+      createdAt
+    });
+    await updateQualitativeAnalysisStatus(
+      c.env.DB,
+      projectId,
+      analysisId,
+      "codebook_review"
+    );
+    await addAudit(c, {
+      projectId,
+      action: "qualitative_codebook_proposed",
+      objectType: "qualitative_analysis",
+      objectId: analysisId,
+      modelId: QUALITATIVE_MODEL,
+      after: {
+        version,
+        promptVersion: QUALITATIVE_CODEBOOK_PROMPT_VERSION,
+        codeCount: codebook.codes.length
+      }
+    });
+
+    return c.json({
+      detail: await qualitativeAnalysisDetail(c, projectId, analysisId)
+    });
+  }
+);
+
+app.put(
+  "/projects/:projectId/qualitative-analyses/:analysisId/codebook",
+  async (c) => {
+    const projectId = c.req.param("projectId");
+    const access = await requireProject(c, projectId);
+    if ("response" in access) return access.response;
+
+    const analysisId = c.req.param("analysisId");
+    const detail = await qualitativeAnalysisDetail(c, projectId, analysisId);
+    if (!detail) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_ANALYSIS_NOT_FOUND",
+            message: "Qualitative analysis was not found."
+          }
+        },
+        404
+      );
+    }
+    if (detail.codings.length > 0) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODEBOOK_ALREADY_IN_USE",
+            message:
+              "The codebook is frozen after coding starts so the coding record remains reproducible."
+          }
+        },
+        409
+      );
+    }
+
+    const body = await c.req.json().catch(() => null);
+    const parsed = qualitativeCodebookSchema.safeParse(
+      body && typeof body === "object" && "codebook" in body
+        ? (body as { codebook: unknown }).codebook
+        : body
+    );
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_QUALITATIVE_CODEBOOK",
+            message: "The reviewed qualitative codebook is invalid.",
+            details: parsed.error.flatten()
+          }
+        },
+        400
+      );
+    }
+
+    const ids = parsed.data.codes.map((code) => code.id);
+    if (new Set(ids).size !== ids.length) {
+      return c.json(
+        {
+          error: {
+            code: "DUPLICATE_QUALITATIVE_CODE_ID",
+            message: "Every qualitative code must have a unique id."
+          }
+        },
+        400
+      );
+    }
+
+    const version =
+      (latestByVersion(detail.codebookVersions)?.version ?? 0) + 1;
+    await saveQualitativeCodebookVersion(c.env.DB, {
+      id: makeId("qcodebook"),
+      analysisId,
+      version,
+      source: "researcher",
+      codebook: parsed.data,
+      createdBy: getUserId(c),
+      createdAt: new Date().toISOString()
+    });
+    await updateQualitativeAnalysisStatus(
+      c.env.DB,
+      projectId,
+      analysisId,
+      "codebook_confirmed"
+    );
+    await addAudit(c, {
+      projectId,
+      action: "qualitative_codebook_confirmed",
+      objectType: "qualitative_analysis",
+      objectId: analysisId,
+      after: {
+        version,
+        codeCount: parsed.data.codes.length
+      }
+    });
+
+    return c.json({
+      detail: await qualitativeAnalysisDetail(c, projectId, analysisId)
+    });
+  }
+);
+
+app.post(
+  "/projects/:projectId/qualitative-analyses/:analysisId/codings/propose",
+  async (c) => {
+    const projectId = c.req.param("projectId");
+    const access = await requireProject(c, projectId);
+    if ("response" in access) return access.response;
+
+    const parsed = qualitativeCodingBatchSchema.safeParse(
+      await c.req.json().catch(() => ({}))
+    );
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_QUALITATIVE_CODING_BATCH",
+            message: "Qualitative coding batch is invalid.",
+            details: parsed.error.flatten()
+          }
+        },
+        400
+      );
+    }
+
+    const analysisId = c.req.param("analysisId");
+    const detail = await qualitativeAnalysisDetail(c, projectId, analysisId);
+    if (!detail) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_ANALYSIS_NOT_FOUND",
+            message: "Qualitative analysis was not found."
+          }
+        },
+        404
+      );
+    }
+
+    if (
+      !["codebook_confirmed", "coding_in_progress"].includes(
+        detail.analysis.status
+      )
+    ) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODING_STAGE_NOT_READY",
+            message:
+              "Coding proposals are only available after codebook confirmation and before coding review begins."
+          }
+        },
+        409
+      );
+    }
+
+    const latestCodebook = latestByVersion(detail.codebookVersions);
+    if (!latestCodebook || latestCodebook.source !== "researcher") {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODEBOOK_REVIEW_REQUIRED",
+            message:
+              "Confirm the qualitative codebook before AI-assisted coding begins."
+          }
+        },
+        409
+      );
+    }
+
+    let question;
+    try {
+      question = await requireQualitativeQuestion(
+        c,
+        projectId,
+        detail.analysis.researchQuestionId
+      );
+      await assertQualitativeModelAllowed(c, projectId);
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_MODEL_BLOCKED",
+            message: error instanceof Error ? error.message : String(error)
+          }
+        },
+        409
+      );
+    }
+
+    const segmentById = new Map(
+      detail.segments.map((segment) => [segment.id, segment])
+    );
+    const requested = parsed.data.segmentIds
+      ? parsed.data.segmentIds.map((id) => segmentById.get(id))
+      : detail.segments
+          .filter((segment) => segment.codingState === "uncoded")
+          .slice(0, 20);
+    if (requested.some((segment) => !segment)) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_SEGMENT_NOT_FOUND",
+            message:
+              "A requested coding segment does not belong to this qualitative analysis."
+          }
+        },
+        404
+      );
+    }
+    const batch = requested.filter(
+      (segment): segment is QualitativeSegment => Boolean(segment)
+    );
+    if (batch.some((segment) => segment.codingState !== "uncoded")) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_SEGMENT_ALREADY_CODED",
+            message:
+              "Coding proposals can only be generated for currently uncoded segments."
+          }
+        },
+        409
+      );
+    }
+
+    if (batch.length === 0) {
+      await updateQualitativeAnalysisStatus(
+        c.env.DB,
+        projectId,
+        analysisId,
+        "coding_review"
+      );
+      return c.json({
+        proposed: 0,
+        remainingUncoded: 0,
+        detail: await qualitativeAnalysisDetail(c, projectId, analysisId)
+      });
+    }
+
+    let proposal;
+    try {
+      proposal = await proposeQualitativeCodings({
+        env: c.env,
+        researchQuestion: question.text,
+        codebook: latestCodebook.codebook,
+        segments: batch
+      });
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODING_PROPOSAL_FAILED",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Methodome could not propose qualitative coding."
+          }
+        },
+        422
+      );
+    }
+
+    const now = new Date().toISOString();
+    const codings: QualitativeCoding[] = proposal.assignments.flatMap(
+      (assignment) =>
+        assignment.codeIds.map((codeId) => ({
+          id: makeId("qcoding"),
+          analysisId,
+          segmentId: assignment.segmentId,
+          codeId,
+          status: "proposed" as const,
+          source: "model" as const,
+          ...(assignment.rationale
+            ? { rationale: assignment.rationale }
+            : {}),
+          createdBy: getUserId(c),
+          createdAt: now,
+          updatedAt: now
+        }))
+    );
+    await upsertQualitativeCodings(c.env.DB, codings);
+    await updateQualitativeSegmentCodingState(
+      c.env.DB,
+      analysisId,
+      batch.map((segment) => segment.id),
+      "proposed"
+    );
+
+    const remainingUncoded = detail.segments.filter(
+      (segment) =>
+        segment.codingState === "uncoded" &&
+        !batch.some((item) => item.id === segment.id)
+    ).length;
+    await updateQualitativeAnalysisStatus(
+      c.env.DB,
+      projectId,
+      analysisId,
+      remainingUncoded === 0 ? "coding_review" : "coding_in_progress"
+    );
+    await addAudit(c, {
+      projectId,
+      action: "qualitative_codings_proposed",
+      objectType: "qualitative_analysis",
+      objectId: analysisId,
+      modelId: QUALITATIVE_MODEL,
+      after: {
+        promptVersion: QUALITATIVE_CODING_PROMPT_VERSION,
+        segmentIds: batch.map((segment) => segment.id),
+        proposedCodingCount: codings.length,
+        remainingUncoded
+      }
+    });
+
+    return c.json({
+      proposed: batch.length,
+      remainingUncoded,
+      assignments: proposal.assignments,
+      detail: await qualitativeAnalysisDetail(c, projectId, analysisId)
+    });
+  }
+);
+
+app.put(
+  "/projects/:projectId/qualitative-analyses/:analysisId/codings",
+  async (c) => {
+    const projectId = c.req.param("projectId");
+    const access = await requireProject(c, projectId);
+    if ("response" in access) return access.response;
+
+    const parsed = qualitativeCodingReviewSchema.safeParse(
+      await c.req.json().catch(() => null)
+    );
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_QUALITATIVE_CODING_REVIEW",
+            message: "Qualitative coding review is invalid.",
+            details: parsed.error.flatten()
+          }
+        },
+        400
+      );
+    }
+
+    const analysisId = c.req.param("analysisId");
+    const detail = await qualitativeAnalysisDetail(c, projectId, analysisId);
+    if (!detail) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_ANALYSIS_NOT_FOUND",
+            message: "Qualitative analysis was not found."
+          }
+        },
+        404
+      );
+    }
+
+    if (detail.analysis.status !== "coding_review") {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODING_REVIEW_NOT_READY",
+            message:
+              "Complete coding proposals for all source segments before researcher coding review."
+          }
+        },
+        409
+      );
+    }
+
+    const latestCodebook = latestByVersion(detail.codebookVersions);
+    if (!latestCodebook || latestCodebook.source !== "researcher") {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODEBOOK_REVIEW_REQUIRED",
+            message: "Confirm the codebook before reviewing coding."
+          }
+        },
+        409
+      );
+    }
+    const allowedCodes = new Set(
+      latestCodebook.codebook.codes.map((code) => code.id)
+    );
+    const allowedSegments = new Set(
+      detail.segments.map((segment) => segment.id)
+    );
+    const existingByPair = new Map(
+      detail.codings.map((coding) => [
+        `${coding.segmentId}\u0000${coding.codeId}`,
+        coding
+      ])
+    );
+
+    const now = new Date().toISOString();
+    const reviewerId = getUserId(c);
+    const updates: QualitativeCoding[] = [];
+
+    for (const decision of parsed.data.decisions) {
+      if (
+        !allowedSegments.has(decision.segmentId) ||
+        !allowedCodes.has(decision.codeId)
+      ) {
+        return c.json(
+          {
+            error: {
+              code: "QUALITATIVE_CODING_REFERENCE_INVALID",
+              message:
+                "A coding decision references a segment or code outside the current analysis."
+            }
+          },
+          409
+        );
+      }
+      const existing = existingByPair.get(
+        `${decision.segmentId}\u0000${decision.codeId}`
+      );
+      if (!existing) {
+        return c.json(
+          {
+            error: {
+              code: "QUALITATIVE_CODING_PROPOSAL_NOT_FOUND",
+              message:
+                "A reviewed model coding must exist before it can be confirmed or rejected."
+            }
+          },
+          409
+        );
+      }
+      updates.push({
+        ...existing,
+        status: decision.status,
+        source: existing.source,
+        ...(decision.rationale
+          ? { rationale: decision.rationale }
+          : existing.rationale
+            ? { rationale: existing.rationale }
+            : {}),
+        reviewedBy: reviewerId,
+        reviewedAt: now,
+        updatedAt: now
+      });
+    }
+
+    for (const assignment of parsed.data.manualAssignments) {
+      if (
+        !allowedSegments.has(assignment.segmentId) ||
+        !allowedCodes.has(assignment.codeId)
+      ) {
+        return c.json(
+          {
+            error: {
+              code: "QUALITATIVE_CODING_REFERENCE_INVALID",
+              message:
+                "A manual coding references a segment or code outside the current analysis."
+            }
+          },
+          409
+        );
+      }
+      const existing = existingByPair.get(
+        `${assignment.segmentId}\u0000${assignment.codeId}`
+      );
+      updates.push({
+        id: existing?.id ?? makeId("qcoding"),
+        analysisId,
+        segmentId: assignment.segmentId,
+        codeId: assignment.codeId,
+        status: "confirmed",
+        source: existing?.source ?? "researcher",
+        ...(assignment.rationale
+          ? { rationale: assignment.rationale }
+          : existing?.rationale
+            ? { rationale: existing.rationale }
+            : {}),
+        createdBy: existing?.createdBy ?? reviewerId,
+        reviewedBy: reviewerId,
+        reviewedAt: now,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now
+      });
+    }
+
+    const reviewIds = Array.from(new Set(parsed.data.reviewedSegmentIds));
+    for (const segmentId of reviewIds) {
+      if (!allowedSegments.has(segmentId)) {
+        return c.json(
+          {
+            error: {
+              code: "QUALITATIVE_SEGMENT_NOT_FOUND",
+              message:
+                "A reviewed segment does not belong to this qualitative analysis."
+            }
+          },
+          404
+        );
+      }
+    }
+
+    const prospectiveByPair = new Map(existingByPair);
+    for (const coding of updates) {
+      prospectiveByPair.set(
+        `${coding.segmentId}\u0000${coding.codeId}`,
+        coding
+      );
+    }
+    const unresolvedProposals = new Set(
+      Array.from(prospectiveByPair.values())
+        .filter((coding) => coding.status === "proposed")
+        .map((coding) => coding.segmentId)
+    );
+    if (reviewIds.some((segmentId) => unresolvedProposals.has(segmentId))) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_SEGMENT_REVIEW_INCOMPLETE",
+            message:
+              "Confirm or reject every proposed code before marking a segment reviewed."
+          }
+        },
+        409
+      );
+    }
+
+    await upsertQualitativeCodings(c.env.DB, updates);
+
+    await updateQualitativeSegmentCodingState(
+      c.env.DB,
+      analysisId,
+      reviewIds,
+      "reviewed"
+    );
+    const refreshedSegments = await listQualitativeSegments(
+      c.env.DB,
+      analysisId
+    );
+    const allReviewed = refreshedSegments.every(
+      (segment) => segment.codingState === "reviewed"
+    );
+    await updateQualitativeAnalysisStatus(
+      c.env.DB,
+      projectId,
+      analysisId,
+      allReviewed ? "coding_confirmed" : "coding_review"
+    );
+    await addAudit(c, {
+      projectId,
+      action: "qualitative_codings_reviewed",
+      objectType: "qualitative_analysis",
+      objectId: analysisId,
+      after: {
+        updatedCodingCount: updates.length,
+        reviewedSegmentIds: reviewIds,
+        allSegmentsReviewed: allReviewed
+      }
+    });
+
+    return c.json({
+      detail: await qualitativeAnalysisDetail(c, projectId, analysisId)
+    });
+  }
+);
+
+app.post(
+  "/projects/:projectId/qualitative-analyses/:analysisId/themes/propose",
+  async (c) => {
+    const projectId = c.req.param("projectId");
+    const access = await requireProject(c, projectId);
+    if ("response" in access) return access.response;
+
+    const analysisId = c.req.param("analysisId");
+    const detail = await qualitativeAnalysisDetail(c, projectId, analysisId);
+    if (!detail) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_ANALYSIS_NOT_FOUND",
+            message: "Qualitative analysis was not found."
+          }
+        },
+        404
+      );
+    }
+    if (detail.analysis.status !== "coding_confirmed") {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODING_REVIEW_REQUIRED",
+            message:
+              "Complete researcher review of coding before developing themes."
+          }
+        },
+        409
+      );
+    }
+
+    const latestCodebook = latestByVersion(detail.codebookVersions);
+    if (!latestCodebook || latestCodebook.source !== "researcher") {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODEBOOK_REVIEW_REQUIRED",
+            message: "A researcher-confirmed codebook is required."
+          }
+        },
+        409
+      );
+    }
+
+    let question;
+    try {
+      question = await requireQualitativeQuestion(
+        c,
+        projectId,
+        detail.analysis.researchQuestionId
+      );
+      await assertQualitativeModelAllowed(c, projectId);
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_MODEL_BLOCKED",
+            message: error instanceof Error ? error.message : String(error)
+          }
+        },
+        409
+      );
+    }
+
+    let themeSet;
+    try {
+      themeSet = await proposeQualitativeThemes({
+        env: c.env,
+        researchQuestion: question.text,
+        codebook: latestCodebook.codebook,
+        segments: detail.segments,
+        codings: detail.codings
+      });
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_THEME_PROPOSAL_FAILED",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Methodome could not propose qualitative themes."
+          }
+        },
+        422
+      );
+    }
+
+    const version =
+      (latestByVersion(detail.themeVersions)?.version ?? 0) + 1;
+    await saveQualitativeThemeVersion(c.env.DB, {
+      id: makeId("qthemes"),
+      analysisId,
+      version,
+      source: "model",
+      themes: themeSet.themes,
+      synthesis: themeSet.synthesis,
+      model: qualitativeModelProvenance(
+        QUALITATIVE_THEME_PROMPT_VERSION
+      ),
+      createdBy: getUserId(c),
+      createdAt: new Date().toISOString()
+    });
+    await updateQualitativeAnalysisStatus(
+      c.env.DB,
+      projectId,
+      analysisId,
+      "theme_review"
+    );
+    await addAudit(c, {
+      projectId,
+      action: "qualitative_themes_proposed",
+      objectType: "qualitative_analysis",
+      objectId: analysisId,
+      modelId: QUALITATIVE_MODEL,
+      after: {
+        version,
+        promptVersion: QUALITATIVE_THEME_PROMPT_VERSION,
+        themeCount: themeSet.themes.length
+      }
+    });
+
+    return c.json({
+      detail: await qualitativeAnalysisDetail(c, projectId, analysisId)
+    });
+  }
+);
+
+app.put(
+  "/projects/:projectId/qualitative-analyses/:analysisId/themes",
+  async (c) => {
+    const projectId = c.req.param("projectId");
+    const access = await requireProject(c, projectId);
+    if ("response" in access) return access.response;
+
+    const analysisId = c.req.param("analysisId");
+    const detail = await qualitativeAnalysisDetail(c, projectId, analysisId);
+    if (!detail) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_ANALYSIS_NOT_FOUND",
+            message: "Qualitative analysis was not found."
+          }
+        },
+        404
+      );
+    }
+    if (detail.analysis.status !== "theme_review") {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_THEME_REVIEW_NOT_READY",
+            message:
+              "Generate candidate themes after confirmed coding before final theme review."
+          }
+        },
+        409
+      );
+    }
+
+    const body = await c.req.json().catch(() => null);
+    const parsed = qualitativeThemeSetSchema.safeParse(
+      body && typeof body === "object" && "themeSet" in body
+        ? (body as { themeSet: unknown }).themeSet
+        : body
+    );
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_QUALITATIVE_THEMES",
+            message: "Reviewed qualitative themes are invalid.",
+            details: parsed.error.flatten()
+          }
+        },
+        400
+      );
+    }
+
+    const latestCodebook = latestByVersion(detail.codebookVersions);
+    if (!latestCodebook || latestCodebook.source !== "researcher") {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODEBOOK_REVIEW_REQUIRED",
+            message: "A researcher-confirmed codebook is required."
+          }
+        },
+        409
+      );
+    }
+
+    let reviewed;
+    try {
+      reviewed = validateThemeReferences(
+        parsed.data,
+        latestCodebook.codebook,
+        detail.codings,
+        detail.segments.map((segment) => segment.id)
+      );
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_THEME_EVIDENCE_INVALID",
+            message:
+              error instanceof Error
+                ? error.message
+                : "A theme is not supported by confirmed source-linked coding."
+          }
+        },
+        409
+      );
+    }
+
+    const version =
+      (latestByVersion(detail.themeVersions)?.version ?? 0) + 1;
+    await saveQualitativeThemeVersion(c.env.DB, {
+      id: makeId("qthemes"),
+      analysisId,
+      version,
+      source: "researcher",
+      themes: reviewed.themes,
+      synthesis: reviewed.synthesis,
+      createdBy: getUserId(c),
+      createdAt: new Date().toISOString()
+    });
+    await updateQualitativeAnalysisStatus(
+      c.env.DB,
+      projectId,
+      analysisId,
+      "complete"
+    );
+    await addAudit(c, {
+      projectId,
+      action: "qualitative_themes_confirmed",
+      objectType: "qualitative_analysis",
+      objectId: analysisId,
+      after: {
+        version,
+        themeCount: reviewed.themes.length,
+        evidenceSegmentIds: Array.from(
+          new Set(
+            reviewed.themes.flatMap((theme) => theme.evidenceSegmentIds)
+          )
+        )
+      }
+    });
+
+    return c.json({
+      detail: await qualitativeAnalysisDetail(c, projectId, analysisId)
+    });
+  }
+);
 
 const uploadIntentSchema = z.object({
   filename: z.string().trim().min(1).max(500),

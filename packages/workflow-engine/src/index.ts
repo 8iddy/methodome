@@ -1,6 +1,7 @@
 import type { AnalysisPlan } from "@methodome/analysis-contracts";
 import type { CandidateSelection } from "@methodome/method-registry";
 import type { ResearchQuestion, StudySpecification, VariableConcept } from "@methodome/study-spec";
+import type { QualitativeAnalysisStatus } from "@methodome/qualitative-analysis";
 
 export type WorkflowSection =
   | "overview"
@@ -32,7 +33,13 @@ export type QuestionReadinessStatus =
   | "needs_intent"
   | "method_blocked"
   | "qualitative_ready"
-  | "qualitative_source_required";
+  | "qualitative_source_required"
+  | "qualitative_codebook_review"
+  | "qualitative_coding"
+  | "qualitative_coding_review"
+  | "qualitative_theme_ready"
+  | "qualitative_theme_review"
+  | "qualitative_complete";
 
 export type WorkflowActionCode =
   | "add_protocol"
@@ -46,6 +53,12 @@ export type WorkflowActionCode =
   | "run_analyses"
   | "review_results"
   | "prepare_qualitative_analysis"
+  | "propose_qualitative_codebook"
+  | "review_qualitative_codebook"
+  | "propose_qualitative_codings"
+  | "review_qualitative_codings"
+  | "propose_qualitative_themes"
+  | "review_qualitative_themes"
   | "review_project";
 
 export interface VariableMappingSnapshot {
@@ -88,6 +101,7 @@ export interface QuestionReadiness {
   blockers: WorkflowBlocker[];
   candidates: CandidateSelection["candidates"];
   warnings: string[];
+  qualitativeWorkstream?: QualitativeWorkstreamSnapshot;
 }
 
 export interface MappingStageSummary {
@@ -97,6 +111,12 @@ export interface MappingStageSummary {
   representedCount: number;
   gapCount: number;
   unreviewedCount: number;
+}
+
+export interface QualitativeWorkstreamSnapshot {
+  id: string;
+  researchQuestionId: string;
+  status: QualitativeAnalysisStatus;
 }
 
 export interface ProjectWorkflowSnapshot {
@@ -110,6 +130,7 @@ export interface ProjectWorkflowSnapshot {
   selections: CandidateSelection[];
   plan: AnalysisPlan | null;
   completedAnalysisCount: number;
+  qualitativeWorkstreams: QualitativeWorkstreamSnapshot[];
 }
 
 export interface WorkflowAction {
@@ -219,7 +240,8 @@ function questionReadiness(
   question: ResearchQuestion,
   mappings: Map<string, VariableMappingSnapshot>,
   selection: CandidateSelection | undefined,
-  transcriptCount: number
+  transcriptCount: number,
+  qualitativeWorkstream: QualitativeWorkstreamSnapshot | undefined
 ): QuestionReadiness {
   if (!question.objectiveType) {
     return {
@@ -259,16 +281,47 @@ function questionReadiness(
             }
           ];
 
+    let status: QuestionReadinessStatus =
+      transcriptCount > 0 ? "qualitative_ready" : "qualitative_source_required";
+
+    if (qualitativeWorkstream) {
+      switch (qualitativeWorkstream.status) {
+        case "prepared":
+          status = "qualitative_ready";
+          break;
+        case "codebook_review":
+          status = "qualitative_codebook_review";
+          break;
+        case "codebook_confirmed":
+        case "coding_in_progress":
+          status = "qualitative_coding";
+          break;
+        case "coding_review":
+          status = "qualitative_coding_review";
+          break;
+        case "coding_confirmed":
+          status = "qualitative_theme_ready";
+          break;
+        case "theme_review":
+          status = "qualitative_theme_review";
+          break;
+        case "complete":
+          status = "qualitative_complete";
+          break;
+      }
+    }
+
     return {
       questionId: question.id,
       text: question.text,
       objectiveType: question.objectiveType,
       mode: "qualitative",
-      status: transcriptCount > 0 ? "qualitative_ready" : "qualitative_source_required",
+      status,
       variables: [],
       blockers: sourceBlocker,
       candidates: selection?.candidates ?? [],
-      warnings: selection?.warnings ?? []
+      warnings: selection?.warnings ?? [],
+      ...(qualitativeWorkstream ? { qualitativeWorkstream } : {})
     };
   }
 
@@ -392,6 +445,91 @@ function action(
   return { code, label, detail, targetSection, requiresResearcher };
 }
 
+function qualitativeNextAction(
+  questions: QuestionReadiness[]
+): WorkflowAction | null {
+  const question =
+    questions.find(
+      (item) =>
+        item.mode === "qualitative" &&
+        item.status !== "qualitative_complete" &&
+        item.status !== "qualitative_source_required"
+    ) ?? null;
+
+  if (!question) return null;
+
+  if (question.status === "qualitative_ready") {
+    if (!question.qualitativeWorkstream) {
+      return action(
+        "prepare_qualitative_analysis",
+        "Prepare qualitative analysis",
+        "Create a source-linked qualitative workstream from the uploaded transcripts.",
+        "analysis",
+        false
+      );
+    }
+    return action(
+      "propose_qualitative_codebook",
+      "Propose an initial codebook",
+      "Methodome can draft a source-grounded codebook for researcher review.",
+      "analysis",
+      false
+    );
+  }
+
+  if (question.status === "qualitative_codebook_review") {
+    return action(
+      "review_qualitative_codebook",
+      "Review the qualitative codebook",
+      "A researcher must confirm or edit the proposed codebook before coding begins.",
+      "analysis",
+      true
+    );
+  }
+
+  if (question.status === "qualitative_coding") {
+    return action(
+      "propose_qualitative_codings",
+      "Continue source coding",
+      "Methodome can apply the confirmed codebook to the next uncoded source segments.",
+      "analysis",
+      false
+    );
+  }
+
+  if (question.status === "qualitative_coding_review") {
+    return action(
+      "review_qualitative_codings",
+      "Review qualitative coding",
+      "A researcher must confirm or reject proposed codes and review uncoded segments.",
+      "analysis",
+      true
+    );
+  }
+
+  if (question.status === "qualitative_theme_ready") {
+    return action(
+      "propose_qualitative_themes",
+      "Develop candidate themes",
+      "Confirmed coding is ready for source-linked theme development and synthesis.",
+      "analysis",
+      false
+    );
+  }
+
+  if (question.status === "qualitative_theme_review") {
+    return action(
+      "review_qualitative_themes",
+      "Review themes and synthesis",
+      "A researcher must confirm or revise candidate themes before qualitative analysis is complete.",
+      "analysis",
+      true
+    );
+  }
+
+  return null;
+}
+
 function chooseNextAction(
   snapshot: ProjectWorkflowSnapshot,
   mapping: MappingStageSummary,
@@ -476,9 +614,6 @@ function chooseNextAction(
       (question) =>
         question.mode === "quantitative" && question.status === "ready"
     );
-    const readyQualitative = questions.some(
-      (question) => question.status === "qualitative_ready"
-    );
 
     if (readyQuantitative) {
       return action(
@@ -490,13 +625,24 @@ function chooseNextAction(
       );
     }
 
-    if (readyQualitative) {
+    const qualitativeAction = qualitativeNextAction(questions);
+    if (qualitativeAction) return qualitativeAction;
+
+    const hasQualitative = questions.some(
+      (question) => question.mode === "qualitative"
+    );
+    const qualitativeComplete =
+      hasQualitative &&
+      questions
+        .filter((question) => question.mode === "qualitative")
+        .every((question) => question.status === "qualitative_complete");
+    if (qualitativeComplete) {
       return action(
-        "prepare_qualitative_analysis",
-        "Prepare qualitative analysis",
-        "Qualitative source material is ready for coding and synthesis.",
-        "analysis",
-        false
+        "review_results",
+        "Review results",
+        "The qualitative analysis is complete and ready for interpretation and reporting.",
+        "results",
+        true
       );
     }
 
@@ -529,23 +675,19 @@ function chooseNextAction(
     );
   }
 
-  if (
-    questions.some(
-      (question) =>
-        question.status === "qualitative_ready" ||
-        question.status === "qualitative_source_required"
-    )
-  ) {
-    return action(
-      "prepare_qualitative_analysis",
-      "Continue qualitative analysis",
-      "The quantitative plan is accounted for; continue the qualitative coding and synthesis workstream.",
-      "analysis",
-      false
-    );
-  }
+  const qualitativeAction = qualitativeNextAction(questions);
+  if (qualitativeAction) return qualitativeAction;
 
-  if (snapshot.completedAnalysisCount > 0) {
+  const hasQualitative = questions.some(
+    (question) => question.mode === "qualitative"
+  );
+  const qualitativeComplete =
+    !hasQualitative ||
+    questions
+      .filter((question) => question.mode === "qualitative")
+      .every((question) => question.status === "qualitative_complete");
+
+  if (snapshot.completedAnalysisCount > 0 && qualitativeComplete) {
     return action(
       "review_results",
       "Review results",
@@ -581,7 +723,10 @@ export function assessProjectReadiness(
           snapshot.mappings.map((item) => [normalize(item.researchConcept), item])
         ),
         selectionByQuestion.get(question.id),
-        snapshot.transcriptCount
+        snapshot.transcriptCount,
+        snapshot.qualitativeWorkstreams.find(
+          (workstream) => workstream.researchQuestionId === question.id
+        )
       )
     ) ?? [];
 
@@ -594,14 +739,35 @@ export function assessProjectReadiness(
       studyDesign: snapshot.specification ? "ready" : "missing",
       mappings: mapping.status,
       plan: snapshot.plan ? (snapshot.plan.lockedAt ? "locked" : "ready") : "missing",
-      analysis:
-        snapshot.plan &&
-        snapshot.plan.analyses.length > 0 &&
-        snapshot.completedAnalysisCount >= snapshot.plan.analyses.length
-          ? "complete"
-          : snapshot.plan?.lockedAt
-            ? "ready"
-            : "missing"
+      analysis: (() => {
+        const quantitativeQuestions = questions.filter(
+          (question) => question.mode === "quantitative"
+        );
+        const qualitativeQuestions = questions.filter(
+          (question) => question.mode === "qualitative"
+        );
+        const quantitativeComplete =
+          quantitativeQuestions.length === 0 ||
+          Boolean(
+            snapshot.plan &&
+              snapshot.plan.analyses.length > 0 &&
+              snapshot.completedAnalysisCount >= snapshot.plan.analyses.length
+          );
+        const qualitativeComplete =
+          qualitativeQuestions.length === 0 ||
+          qualitativeQuestions.every(
+            (question) => question.status === "qualitative_complete"
+          );
+
+        if (quantitativeComplete && qualitativeComplete) return "complete";
+        if (
+          snapshot.plan?.lockedAt ||
+          snapshot.qualitativeWorkstreams.length > 0
+        ) {
+          return "ready";
+        }
+        return "missing";
+      })()
     },
     mappingSummary: mapping,
     questions,
@@ -628,7 +794,10 @@ export type OrchestratorAutomaticAction =
   | "extract_protocol"
   | "create_draft_plan"
   | "run_analyses"
-  | "prepare_qualitative_analysis";
+  | "prepare_qualitative_analysis"
+  | "propose_qualitative_codebook"
+  | "propose_qualitative_codings"
+  | "propose_qualitative_themes";
 
 export interface OrchestratorDecision {
   id: string;
@@ -639,6 +808,9 @@ export interface OrchestratorDecision {
     | "resolve_mapping_gap"
     | "select_method"
     | "approve_plan"
+    | "review_qualitative_codebook"
+    | "review_qualitative_codings"
+    | "review_qualitative_themes"
     | "review_results";
   prompt: string;
   questionId?: string;
@@ -842,6 +1014,62 @@ export function buildOrchestratorView(
     }
   }
 
+  const activeQualitativeQuestion = readiness.questions.find(
+    (question) =>
+      question.mode === "qualitative" &&
+      question.qualitativeWorkstream &&
+      [
+        "qualitative_codebook_review",
+        "qualitative_coding_review",
+        "qualitative_theme_review"
+      ].includes(question.status)
+  );
+
+  if (
+    readiness.nextAction.code === "review_qualitative_codebook" &&
+    activeQualitativeQuestion?.qualitativeWorkstream
+  ) {
+    decisions.push({
+      id: `decision:qualitative-codebook:${activeQualitativeQuestion.qualitativeWorkstream.id}`,
+      kind: "review_qualitative_codebook",
+      prompt:
+        "Review, edit if needed, and confirm the proposed qualitative codebook before coding begins.",
+      questionId: activeQualitativeQuestion.questionId,
+      analysisId: activeQualitativeQuestion.qualitativeWorkstream.id,
+      blocking: true
+    });
+  }
+
+  if (
+    readiness.nextAction.code === "review_qualitative_codings" &&
+    activeQualitativeQuestion?.qualitativeWorkstream
+  ) {
+    decisions.push({
+      id: `decision:qualitative-codings:${activeQualitativeQuestion.qualitativeWorkstream.id}`,
+      kind: "review_qualitative_codings",
+      prompt:
+        "Confirm or reject proposed coding and explicitly review segments with no proposed code.",
+      questionId: activeQualitativeQuestion.questionId,
+      analysisId: activeQualitativeQuestion.qualitativeWorkstream.id,
+      blocking: true
+    });
+  }
+
+  if (
+    readiness.nextAction.code === "review_qualitative_themes" &&
+    activeQualitativeQuestion?.qualitativeWorkstream
+  ) {
+    decisions.push({
+      id: `decision:qualitative-themes:${activeQualitativeQuestion.qualitativeWorkstream.id}`,
+      kind: "review_qualitative_themes",
+      prompt:
+        "Review the candidate themes, source evidence and synthesis before confirming qualitative results.",
+      questionId: activeQualitativeQuestion.questionId,
+      analysisId: activeQualitativeQuestion.qualitativeWorkstream.id,
+      blocking: true
+    });
+  }
+
   if (readiness.nextAction.code === "review_results") {
     decisions.push({
       id: "decision:review-results",
@@ -864,7 +1092,11 @@ export function buildOrchestratorView(
     const automatic = new Map<WorkflowActionCode, OrchestratorAutomaticAction>([
       ["extract_protocol", "extract_protocol"],
       ["build_analysis_plan", "create_draft_plan"],
-      ["run_analyses", "run_analyses"]
+      ["run_analyses", "run_analyses"],
+      ["prepare_qualitative_analysis", "prepare_qualitative_analysis"],
+      ["propose_qualitative_codebook", "propose_qualitative_codebook"],
+      ["propose_qualitative_codings", "propose_qualitative_codings"],
+      ["propose_qualitative_themes", "propose_qualitative_themes"]
     ]);
     automaticAction = automatic.get(readiness.nextAction.code);
     status = automaticAction ? "ready_to_execute" : "blocked";
