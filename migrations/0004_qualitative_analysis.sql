@@ -66,12 +66,15 @@ CREATE TABLE qualitative_codings (
   source TEXT NOT NULL CHECK (source IN ('model','researcher')),
   rationale TEXT,
   created_by TEXT NOT NULL,
+  reviewed_by TEXT,
+  reviewed_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE (analysis_id, segment_id, code_id),
   FOREIGN KEY (analysis_id) REFERENCES qualitative_analyses(id) ON DELETE CASCADE,
   FOREIGN KEY (segment_id) REFERENCES qualitative_segments(id) ON DELETE CASCADE,
-  FOREIGN KEY (created_by) REFERENCES users(id)
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  FOREIGN KEY (reviewed_by) REFERENCES users(id)
 );
 
 CREATE TABLE qualitative_theme_versions (
