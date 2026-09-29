@@ -2785,6 +2785,18 @@ app.post(
         404
       );
     }
+    if (!["prepared", "codebook_review"].includes(detail.analysis.status)) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODEBOOK_STAGE_CLOSED",
+            message:
+              "Codebook proposals are only available before a codebook has been confirmed for coding."
+          }
+        },
+        409
+      );
+    }
     if (detail.codings.length > 0) {
       return c.json(
         {
@@ -3016,6 +3028,23 @@ app.post(
       );
     }
 
+    if (
+      !["codebook_confirmed", "coding_in_progress"].includes(
+        detail.analysis.status
+      )
+    ) {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODING_STAGE_NOT_READY",
+            message:
+              "Coding proposals are only available after codebook confirmation and before coding review begins."
+          }
+        },
+        409
+      );
+    }
+
     const latestCodebook = latestByVersion(detail.codebookVersions);
     if (!latestCodebook || latestCodebook.source !== "researcher") {
       return c.json(
@@ -3217,6 +3246,19 @@ app.put(
           }
         },
         404
+      );
+    }
+
+    if (detail.analysis.status !== "coding_review") {
+      return c.json(
+        {
+          error: {
+            code: "QUALITATIVE_CODING_REVIEW_NOT_READY",
+            message:
+              "Complete coding proposals for all source segments before researcher coding review."
+          }
+        },
+        409
       );
     }
 
