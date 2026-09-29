@@ -5,6 +5,10 @@ import type {
 } from "@methodome/study-spec";
 
 export type MethodMaturity = "validated" | "supported" | "experimental";
+export type MethodologySupportStatus =
+  | "source_supported"
+  | "source_supported_concept"
+  | "deferred";
 
 export interface MethodDefinition {
   id: string;
@@ -12,6 +16,8 @@ export interface MethodDefinition {
   family: string;
   maturity: MethodMaturity;
   executable: boolean;
+  methodologyStatus: MethodologySupportStatus;
+  methodologyRuleIds: string[];
   outcomeTypes: string[];
   supportsClustering: boolean;
   supportsRepeatedMeasures: boolean;
@@ -25,6 +31,8 @@ export interface CandidateMethod {
   displayName: string;
   maturity: MethodMaturity;
   executable: boolean;
+  methodologyStatus: MethodologySupportStatus;
+  methodologyRuleIds: string[];
   rationale: string;
   requiredChecks: string[];
   decisionRequired?: string;
@@ -37,7 +45,7 @@ export interface CandidateSelection {
   blockedReason?: string;
 }
 
-export const registryVersion = "0.2.0";
+export const registryVersion = "0.3.0";
 
 export const methodRegistry: Record<string, MethodDefinition> = {
   descriptive_statistics: {
@@ -46,6 +54,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "descriptive",
     maturity: "validated",
     executable: true,
+    methodologyStatus: "source_supported",
+    methodologyRuleIds: ["var-type-001","descriptive-categorical-001","descriptive-continuous-001"],
     outcomeTypes: [
       "binary",
       "categorical_nominal",
@@ -65,6 +75,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "association",
     maturity: "validated",
     executable: true,
+    methodologyStatus: "source_supported",
+    methodologyRuleIds: ["pearson-001"],
     outcomeTypes: ["continuous"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -78,6 +90,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "association",
     maturity: "validated",
     executable: true,
+    methodologyStatus: "source_supported",
+    methodologyRuleIds: ["spearman-correlation-001"],
     outcomeTypes: ["continuous", "categorical_ordinal"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -91,6 +105,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "regression",
     maturity: "validated",
     executable: true,
+    methodologyStatus: "source_supported",
+    methodologyRuleIds: ["linear-regression-001","multicollinearity-001"],
     outcomeTypes: ["continuous"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -104,6 +120,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "regression",
     maturity: "validated",
     executable: true,
+    methodologyStatus: "source_supported",
+    methodologyRuleIds: ["logistic-regression-001","logistic-gof-001","logistic-separation-001","logistic-sparse-events-001"],
     outcomeTypes: ["binary"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -117,6 +135,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "multilevel",
     maturity: "supported",
     executable: false,
+    methodologyStatus: "source_supported_concept",
+    methodologyRuleIds: ["repeated-001","repeated-002","cluster-001"],
     outcomeTypes: ["binary"],
     supportsClustering: true,
     supportsRepeatedMeasures: true,
@@ -130,6 +150,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "multilevel",
     maturity: "supported",
     executable: false,
+    methodologyStatus: "source_supported_concept",
+    methodologyRuleIds: ["repeated-001","repeated-002","cluster-001"],
     outcomeTypes: ["binary"],
     supportsClustering: true,
     supportsRepeatedMeasures: true,
@@ -143,6 +165,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "count_regression",
     maturity: "validated",
     executable: false,
+    methodologyStatus: "deferred",
+    methodologyRuleIds: ["poisson-regression-001","count-overdispersion-001"],
     outcomeTypes: ["count"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -156,6 +180,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "count_regression",
     maturity: "validated",
     executable: false,
+    methodologyStatus: "deferred",
+    methodologyRuleIds: ["count-overdispersion-001"],
     outcomeTypes: ["count"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -169,6 +195,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "group_comparison",
     maturity: "supported",
     executable: true,
+    methodologyStatus: "source_supported",
+    methodologyRuleIds: ["independent-two-sample-t-001"],
     outcomeTypes: ["continuous"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -186,6 +214,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "paired_comparison",
     maturity: "supported",
     executable: true,
+    methodologyStatus: "source_supported",
+    methodologyRuleIds: ["paired-t-001"],
     outcomeTypes: ["continuous"],
     supportsClustering: false,
     supportsRepeatedMeasures: true,
@@ -203,6 +233,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "group_comparison",
     maturity: "supported",
     executable: true,
+    methodologyStatus: "source_supported",
+    methodologyRuleIds: ["one-way-anova-001","multi-group-gate-001"],
     outcomeTypes: ["continuous"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -220,6 +252,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "paired_comparison",
     maturity: "supported",
     executable: true,
+    methodologyStatus: "source_supported",
+    methodologyRuleIds: ["wilcoxon-signed-rank-001"],
     outcomeTypes: ["continuous", "categorical_ordinal"],
     supportsClustering: false,
     supportsRepeatedMeasures: true,
@@ -238,6 +272,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "group_comparison",
     maturity: "supported",
     executable: true,
+    methodologyStatus: "source_supported",
+    methodologyRuleIds: ["mann-whitney-001"],
     outcomeTypes: ["continuous", "categorical_ordinal"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -251,6 +287,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "group_comparison",
     maturity: "supported",
     executable: true,
+    methodologyStatus: "source_supported",
+    methodologyRuleIds: ["kruskal-wallis-001"],
     outcomeTypes: ["continuous", "categorical_ordinal"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -264,6 +302,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "association",
     maturity: "validated",
     executable: true,
+    methodologyStatus: "source_supported",
+    methodologyRuleIds: ["chi-square-001"],
     outcomeTypes: ["binary", "categorical_nominal", "categorical_ordinal"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -277,6 +317,8 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     family: "association",
     maturity: "validated",
     executable: true,
+    methodologyStatus: "source_supported",
+    methodologyRuleIds: ["fisher-exact-001"],
     outcomeTypes: ["binary", "categorical_nominal"],
     supportsClustering: false,
     supportsRepeatedMeasures: false,
@@ -346,6 +388,8 @@ function candidate(id: string, rationale: string, decisionRequired?: string): Ca
     displayName: method.displayName,
     maturity: method.maturity,
     executable: method.executable,
+    methodologyStatus: method.methodologyStatus,
+    methodologyRuleIds: method.methodologyRuleIds,
     rationale,
     requiredChecks: method.diagnostics,
     ...(decisionRequired ? { decisionRequired } : {})
