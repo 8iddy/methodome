@@ -1011,17 +1011,27 @@ export function buildOrchestratorView(
   if (plan && !plan.lockedAt) {
     for (const analysis of plan.analyses) {
       if (analysis.selectedMethodId) continue;
+      const question = readiness.questions.find(
+        (item) => item.questionId === analysis.researchQuestionId
+      );
       decisions.push({
         id: `decision:method:${analysis.id}`,
         kind: "select_method",
-        prompt:
-          "Choose the method for this planned analysis after reviewing the candidate rationale and required diagnostics.",
+        prompt: question
+          ? `Methodome found more than one defensible way to answer “${question.text}”. The options below differ in what they estimate. Choose the interpretation that matches the study intent.`
+          : "Methodome found more than one defensible method. Choose the interpretation that matches the study intent.",
         questionId: analysis.researchQuestionId,
         analysisId: analysis.id,
-        options: analysis.candidateMethodIds.map((methodId) => ({
-          id: methodId,
-          label: methodId.replaceAll("_", " ")
-        })),
+        options: analysis.candidateMethodIds.map((methodId) => {
+          const candidate = question?.candidates.find(
+            (item) => item.methodId === methodId
+          );
+          return {
+            id: methodId,
+            label: candidate?.displayName ?? methodId.replaceAll("_", " "),
+            ...(candidate?.rationale ? { detail: candidate.rationale } : {})
+          };
+        }),
         blocking: true
       });
     }
