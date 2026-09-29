@@ -1,5 +1,38 @@
 {
   "rule_set_id": "methodome-count-models-v0.1",
   "status": "draft",
-  "rules": []
+  "rules": [
+    {
+      "rule_id": "poisson-regression-001",
+      "topic": "poisson_regression",
+      "decision": "Treat a Poisson count response as a count-regression problem rather than ordinary linear regression on raw counts.",
+      "conditions": [
+        "Outcome is a count",
+        "The scientific question requires modelling expected counts using predictors"
+      ],
+      "action": "Consider Poisson regression as a candidate and require a count-model diagnostic step before this method is activated for automatic use.",
+      "assumptions": [
+        "Outcome is appropriately represented as a count"
+      ],
+      "diagnostics": [
+        "Mean-variance behaviour",
+        "Excess zeros",
+        "Influential observations"
+      ],
+      "warnings": [
+        "Current corpus evidence supports routing Poisson counts away from ordinary linear regression but does not yet support a complete rule for overdispersion thresholds.",
+        "A separate source-backed rule is required before Methodome automatically selects negative-binomial regression."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-013-penn-state-stat-501-regression-methods",
+          "support": "Penn State notes that Poisson count responses have nonconstant variance under ordinary linear regression and recommends Poisson regression rather than relying on a square-root transformation.",
+          "section": "Lesson 9: More on Transformations",
+          "page": "41 of 73"
+        }
+      ],
+      "validation_status": "draft"
+    }
+  ]
 }
