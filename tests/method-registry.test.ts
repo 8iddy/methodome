@@ -46,6 +46,13 @@ describe("deterministic method registry", () => {
       "gee_logistic_regression"
     ]);
     expect(selection.candidates.every((item) => item.decisionRequired)).toBe(true);
+    expect(selection.candidates.every((item) => item.methodologyRuleIds.length > 0)).toBe(true);
+    expect(
+      selection.candidates.map((item) => item.methodologyStatus)
+    ).toEqual([
+      "source_supported_concept",
+      "source_supported_concept"
+    ]);
   });
 
   it("keeps qualitative questions out of the quantitative method pipeline", () => {
@@ -305,5 +312,28 @@ describe("comparison method routing", () => {
 
     expect(selection.candidates).toHaveLength(0);
     expect(selection.blockedReason).toContain("Repeated observations");
+  });
+});
+
+
+describe("methodology provenance", () => {
+  it("exposes methodology support separately from software maturity", () => {
+    const study = clusteredBinaryStudy();
+    study.clustered = false;
+    study.clusterVariable = null;
+
+    const selection = selectCandidateMethods(study, "rq1");
+    const logistic = selection.candidates.find(
+      (item) => item.methodId === "binary_logistic_regression"
+    );
+
+    expect(logistic?.maturity).toBe("validated");
+    expect(logistic?.methodologyStatus).toBe("source_supported");
+    expect(logistic?.methodologyRuleIds).toEqual([
+      "logistic-regression-001",
+      "logistic-gof-001",
+      "logistic-separation-001",
+      "logistic-sparse-events-001"
+    ]);
   });
 });
