@@ -74,6 +74,7 @@ export type WorkflowStageStatus =
 
 export type OrchestratorAutomaticAction =
   | "extract_protocol"
+  | "map_variables"
   | "create_draft_plan"
   | "run_analyses"
   | "prepare_qualitative_analysis"
@@ -969,6 +970,21 @@ export async function getProjectOrchestrator(projectId: string) {
     registryVersion: string;
     datasetVersionId?: string;
   }>(`/projects/${projectId}/orchestrator`);
+}
+
+export async function askProjectAssistant(
+  projectId: string,
+  message: string,
+  history: Array<{ role: "user" | "assistant"; content: string }> = []
+) {
+  return request<{
+    reply: string;
+    grounded: boolean;
+    modelUsed: boolean;
+  }>(`/projects/${projectId}/assistant`, {
+    method: "POST",
+    body: JSON.stringify({ message, history })
+  });
 }
 
 export async function advanceProjectOrchestrator(

@@ -44,24 +44,55 @@ export function Mark() {
   );
 }
 
+export function ActivitySpinner({ label = "Working" }: { label?: string }) {
+  return (
+    <span className="activity-spinner" role="status" aria-label={label}>
+      <span aria-hidden="true" />
+    </span>
+  );
+}
+
 export function Button({
   children,
   href,
   variant = "primary",
   type = "button",
-  onClick
+  onClick,
+  loading = false,
+  loadingLabel = "Working…",
+  disabled = false
 }: {
   children: ReactNode;
   href?: string;
   variant?: "primary" | "secondary" | "quiet";
   type?: "button" | "submit";
   onClick?: () => void;
+  loading?: boolean;
+  loadingLabel?: string;
+  disabled?: boolean;
 }) {
   const className = `button ${variant}`;
-  return href ? (
-    <Link href={href} className={className}>{children}</Link>
-  ) : (
-    <button type={type} className={className} onClick={onClick}>{children}</button>
+  const body = loading ? (
+    <>
+      <ActivitySpinner label={loadingLabel} />
+      <span>{loadingLabel}</span>
+    </>
+  ) : children;
+
+  if (href && !loading && !disabled) {
+    return <Link href={href} className={className}>{body}</Link>;
+  }
+
+  return (
+    <button
+      type={type}
+      className={className}
+      onClick={onClick}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+    >
+      {body}
+    </button>
   );
 }
 

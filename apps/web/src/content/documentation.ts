@@ -13,7 +13,7 @@ export const documentationSections: DocumentationSection[] = [
       "Methodome is a research analysis workspace that connects research intent to an executable and reviewable analysis process.",
     points: [
       "A project can contain protocols, instruments, codebooks, datasets, study specifications, variable mappings, analysis plans, results and audit records.",
-      "Methodome is structured research software. It is not a chat interface placed on top of a dataset.",
+      "Its conversation layer sits above a structured research workflow rather than replacing the research record, methodology rules or computation engine.",
       "Language models may help extract, map, suggest and explain. They are not the numerical source of statistical results.",
       "Statistical values are produced by deterministic statistical software."
     ]
@@ -27,7 +27,7 @@ export const documentationSections: DocumentationSection[] = [
       "Protocol and research instruments define the study context.",
       "Datasets are uploaded and profiled before analysis planning.",
       "Study design and research questions are represented in a study specification.",
-      "Research concepts are mapped to dataset variables and uncertain mappings require researcher review.",
+      "Methodome resolves research concepts against dataset variables using protocol, instrument, codebook and dataset metadata; exact evidence-backed matches can proceed automatically while ambiguous mappings require researcher review.",
       "Candidate methods are checked against the Methodome method registry.",
       "The researcher reviews and locks an analysis plan before planned analyses are run.",
       "Analysis jobs run through deterministic computation and return structured results, diagnostics and provenance."
@@ -68,7 +68,7 @@ export const documentationSections: DocumentationSection[] = [
       "Profiles include row count, column count, detected data types, missing values, unique values and ranges or categories where available.",
       "Profiling is performed by the deterministic statistics service.",
       "Profiling output supports later variable mapping and method checks.",
-      "General interactive cleaning rules remain a post-MVP area and should not be presented as complete."
+      "General interactive cleaning remains limited, so transformations continue to create traceable derived dataset versions rather than implying a fully automated cleaning system."
     ]
   },
   {
@@ -93,7 +93,7 @@ export const documentationSections: DocumentationSection[] = [
       "Mapping evidence can come from instrument metadata, codebooks, exact field relations and reviewed semantic suggestions.",
       "Mapping status should reflect the available evidence rather than an unsupported model probability.",
       "An uncertain mapping must not silently become confirmed.",
-      "Primary analysis variables should be reviewed before analysis planning proceeds."
+      "Researcher review is reserved for ambiguous mappings or confirmed data gaps rather than every analytical variable."
     ]
   },
   {
@@ -120,7 +120,13 @@ export const documentationSections: DocumentationSection[] = [
       "Chi-square",
       "Fisher exact",
       "Linear regression",
-      "Binary logistic regression"
+      "Binary logistic regression",
+      "Welch independent-samples t test",
+      "Paired t test",
+      "One-way ANOVA",
+      "Wilcoxon signed-rank test",
+      "Mann-Whitney U test",
+      "Kruskal-Wallis test"
     ]
   },
   {
@@ -183,7 +189,7 @@ export const documentationSections: DocumentationSection[] = [
       "The project can record its data class and whether identifiable information is present.",
       "External model processing can be restricted by project policy.",
       "Row-level quantitative data does not need to be sent to a language model for statistical analysis.",
-      "Sensitive qualitative text requires separate handling and is outside the current MVP workflow."
+      "Qualitative source text follows the project processing policy and enters the source-linked coding and synthesis workflow only when the configured processor is permitted."
     ]
   },
   {
@@ -195,22 +201,21 @@ export const documentationSections: DocumentationSection[] = [
       "A model may extract study information from research documents.",
       "A model may suggest possible mappings between research concepts and dataset variables.",
       "A model may assist with analysis planning inside the permitted method boundary.",
+      "A model may explain the live project state conversationally and help the researcher understand a genuine decision.",
       "A model may explain verified statistical output.",
-      "A model must not calculate, alter or invent the statistical values reported by Methodome."
+      "A model must not calculate, alter or invent the statistical values reported by Methodome, and the conversation layer cannot silently rewrite confirmed scientific decisions."
     ]
   },
   {
     id: "current-limits",
-    title: "Current MVP limits",
+    title: "Current release boundaries",
     summary:
-      "The v0.1.0 MVP is a working quantitative release, not the full long-term product.",
+      "Methodome now supports orchestrated quantitative analysis and source-linked qualitative coding and synthesis, while several advanced capabilities remain deliberately outside the current execution boundary.",
     points: [
-      "Email verification and password-reset delivery still require production email configuration.",
-      "Qualitative and mixed-methods workflows are not yet implemented.",
-      "Bayesian and structural equation modelling workflows are not yet implemented.",
-      "General interactive data cleaning is still limited.",
-      "The current production dataset upload path supports CSV. Protocol and research-document text extraction supports text-based PDF, DOCX, TXT and Markdown through Workers AI document conversion.",
-      "Full DOCX, PDF, HTML, LaTeX and Quarto reporting remains post-MVP work."
+      "Bayesian, structural equation, complex survey and several advanced longitudinal workflows are represented methodologically but are not all executable yet.",
+      "General interactive data cleaning remains limited; transformations should continue to create traceable derived dataset versions.",
+      "The production dataset path currently prioritises CSV, while protocol and research-document extraction supports text-based PDF, DOCX, TXT and Markdown through Workers AI document conversion.",
+      "Rich report generation to DOCX, PDF, HTML, LaTeX and Quarto remains a later release capability."
     ]
   }
 ];

@@ -46,6 +46,7 @@ export type WorkflowActionCode =
   | "extract_protocol"
   | "confirm_study_design"
   | "upload_dataset"
+  | "map_variables"
   | "review_variable_mappings"
   | "resolve_mapping_gaps"
   | "build_analysis_plan"
@@ -61,10 +62,14 @@ export type WorkflowActionCode =
   | "review_qualitative_themes"
   | "review_project";
 
+export const AUTO_MAPPING_EVIDENCE_MARKER =
+  "Methodome automatic mapping pass completed.";
+
 export interface VariableMappingSnapshot {
   researchConcept: string;
   datasetVariable?: string;
   mappingStatus: "direct_match" | "probable_match" | "uncertain" | "no_match";
+  evidence?: string[];
   confirmedBy?: string;
 }
 
@@ -188,8 +193,9 @@ function variableReadiness(
 
   for (const { role, variable } of variableEntries(question)) {
     const mapping = mappings.get(normalize(variable.concept));
-    const confirmed = Boolean(mapping?.confirmedBy);
     const represented = Boolean(mapping?.datasetVariable);
+    const confirmed = Boolean(mapping?.confirmedBy) ||
+      Boolean(mapping?.mappingStatus === "direct_match" && represented);
 
     variables.push({
       concept: variable.concept,
@@ -411,12 +417,15 @@ function mappingSummary(
 
   for (const conceptKey of concepts.keys()) {
     const mapping = byConcept.get(conceptKey);
-    if (!mapping?.confirmedBy) {
+    const safelyResolved =
+      Boolean(mapping?.confirmedBy) ||
+      Boolean(mapping?.mappingStatus === "direct_match" && mapping?.datasetVariable);
+    if (!safelyResolved) {
       unreviewedCount += 1;
       continue;
     }
     reviewedCount += 1;
-    if (mapping.datasetVariable) representedCount += 1;
+    if (mapping?.datasetVariable) representedCount += 1;
     else gapCount += 1;
   }
 
@@ -576,11 +585,30 @@ function chooseNextAction(
     );
   }
 
+  const automaticMappingAttempted = snapshot.mappings.some((item) =>
+    item.evidence?.includes(AUTO_MAPPING_EVIDENCE_MARKER)
+  );
+  if (
+    mapping.totalConcepts > 0 &&
+    (
+      snapshot.mappings.length < mapping.totalConcepts ||
+      (mapping.status === "needs_review" && !automaticMappingAttempted)
+    )
+  ) {
+    return action(
+      "map_variables",
+      "Resolve analytical variables",
+      "Methodome can compare the study concepts with dataset metadata, instruments and codebooks and resolve the mappings it can support from evidence.",
+      "variables",
+      false
+    );
+  }
+
   if (mapping.status === "needs_review") {
     return action(
       "review_variable_mappings",
-      "Review variable mappings",
-      "Confirm the links between research concepts and observed dataset variables.",
+      "Resolve ambiguous variables",
+      `Methodome resolved ${mapping.reviewedCount} of ${mapping.totalConcepts} analytical concepts. Only the remaining ambiguous or unresolved mappings need your decision.`,
       "variables",
       true
     );
@@ -792,6 +820,7 @@ export type OrchestratorStatus =
 
 export type OrchestratorAutomaticAction =
   | "extract_protocol"
+  | "map_variables"
   | "create_draft_plan"
   | "run_analyses"
   | "prepare_qualitative_analysis"
@@ -891,12 +920,19 @@ function mappingDecisions(readiness: ProjectReadiness): OrchestratorDecision[] {
         blocker.code === "mapping_missing" ||
         blocker.code === "mapping_unconfirmed"
       ) {
+        const variable = question.variables.find(
+          (item) =>
+            item.concept === blocker.concept &&
+            (!blocker.role || item.role === blocker.role)
+        );
         output.push({
           id: `decision:mapping:${blocker.questionId}:${normalize(
             blocker.concept ?? "concept"
           )}`,
           kind: "review_mapping",
-          prompt: blocker.message,
+          prompt: variable?.datasetVariable
+            ? `Methodome matched “${blocker.concept}” to dataset field “${variable.datasetVariable}”, but the evidence is not strong enough to accept silently. Confirm or change this one mapping.`
+            : `Methodome could not resolve “${blocker.concept}” from the available dataset metadata and research instruments. Choose the field only if you can identify it, or leave the concept unresolved.`,
           questionId: blocker.questionId,
           blocking: true
         });
@@ -983,22 +1019,35 @@ export function buildOrchestratorView(
     }
   ];
 
-  const decisions = mappingDecisions(readiness);
+  const decisions =
+    readiness.nextAction.code === "map_variables"
+      ? []
+      : mappingDecisions(readiness);
 
   if (plan && !plan.lockedAt) {
     for (const analysis of plan.analyses) {
       if (analysis.selectedMethodId) continue;
+      const question = readiness.questions.find(
+        (item) => item.questionId === analysis.researchQuestionId
+      );
       decisions.push({
         id: `decision:method:${analysis.id}`,
         kind: "select_method",
-        prompt:
-          "Choose the method for this planned analysis after reviewing the candidate rationale and required diagnostics.",
+        prompt: question
+          ? `Methodome found more than one defensible way to answer “${question.text}”. The options below differ in what they estimate. Choose the interpretation that matches the study intent.`
+          : "Methodome found more than one defensible method. Choose the interpretation that matches the study intent.",
         questionId: analysis.researchQuestionId,
         analysisId: analysis.id,
-        options: analysis.candidateMethodIds.map((methodId) => ({
-          id: methodId,
-          label: methodId.replaceAll("_", " ")
-        })),
+        options: analysis.candidateMethodIds.map((methodId) => {
+          const candidate = question?.candidates.find(
+            (item) => item.methodId === methodId
+          );
+          return {
+            id: methodId,
+            label: candidate?.displayName ?? methodId.replaceAll("_", " "),
+            ...(candidate?.rationale ? { detail: candidate.rationale } : {})
+          };
+        }),
         blocking: true
       });
     }
@@ -1091,6 +1140,7 @@ export function buildOrchestratorView(
   } else {
     const automatic = new Map<WorkflowActionCode, OrchestratorAutomaticAction>([
       ["extract_protocol", "extract_protocol"],
+      ["map_variables", "map_variables"],
       ["build_analysis_plan", "create_draft_plan"],
       ["run_analyses", "run_analyses"],
       ["prepare_qualitative_analysis", "prepare_qualitative_analysis"],

@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
-import { Badge, Button } from "@/components/ui";
+import { ActivitySpinner, Badge, Button } from "@/components/ui";
 import {
   advanceProjectOrchestrator,
+  askProjectAssistant,
   confirmQualitativeCodebook,
   confirmQualitativeThemes,
   getAnalysisPlan,
@@ -26,6 +27,12 @@ import {
 } from "@/lib/api";
 
 type OrchestratorPayload = Awaited<ReturnType<typeof getProjectOrchestrator>>;
+
+type ConversationMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+};
 
 function human(value: string) {
   return value
@@ -69,6 +76,12 @@ export function ResearchWorkspaceHome({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [conversation, setConversation] = useState<ConversationMessage[]>([]);
+  const [conversationInput, setConversationInput] = useState("");
+  const [conversationBusy, setConversationBusy] = useState(false);
+  const lastAutomaticAction = useRef("");
+  const analysisPollCount = useRef(0);
+  const analysisPollBusy = useRef(false);
 
   async function refresh() {
     const [next, currentPlan] = await Promise.all([
@@ -77,6 +90,9 @@ export function ResearchWorkspaceHome({
     ]);
     setPayload(next);
     setPlan(currentPlan);
+    if (!next.orchestrator.automaticAction) {
+      lastAutomaticAction.current = "";
+    }
   }
 
   useEffect(() => {
@@ -85,12 +101,78 @@ export function ResearchWorkspaceHome({
     );
   }, [projectId]);
 
+  useEffect(() => {
+    const action = payload?.orchestrator.automaticAction;
+    if (!action || busy) return;
+
+    const key = `${action}:${payload?.readiness.nextAction.code ?? ""}`;
+    if (lastAutomaticAction.current === key) return;
+    lastAutomaticAction.current = key;
+    void advance(action);
+  }, [
+    payload?.orchestrator.automaticAction,
+    payload?.readiness.nextAction.code,
+    busy
+  ]);
+
+  useEffect(() => {
+    const action = payload?.orchestrator.automaticAction;
+    const key = `${action ?? ""}:${payload?.readiness.nextAction.code ?? ""}`;
+
+    if (
+      action !== "run_analyses" ||
+      busy ||
+      lastAutomaticAction.current !== key
+    ) {
+      analysisPollCount.current = 0;
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      if (analysisPollBusy.current) return;
+      if (analysisPollCount.current >= 80) {
+        window.clearInterval(timer);
+        setNotice(
+          "The approved analyses are still running. Methodome will show the updated state when you refresh the workspace."
+        );
+        return;
+      }
+
+      analysisPollBusy.current = true;
+      analysisPollCount.current += 1;
+      void refresh()
+        .catch((err) =>
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Methodome could not refresh the running analyses."
+          )
+        )
+        .finally(() => {
+          analysisPollBusy.current = false;
+        });
+    }, 2500);
+
+    return () => window.clearInterval(timer);
+  }, [
+    payload?.orchestrator.automaticAction,
+    payload?.readiness.nextAction.code,
+    busy,
+    projectId
+  ]);
+
   async function advance(action?: OrchestratorAutomaticAction) {
     setBusy(action ?? "advance");
     setError("");
     setNotice("");
     try {
       const result = await advanceProjectOrchestrator(projectId, action);
+      if (
+        action === "propose_qualitative_codings" &&
+        Number(result.mutation?.remainingUncoded ?? 0) > 0
+      ) {
+        lastAutomaticAction.current = "";
+      }
       setPayload({
         orchestrator: result.orchestrator,
         readiness: result.readiness,
@@ -136,10 +218,52 @@ export function ResearchWorkspaceHome({
     }
   }
 
+  async function askMethodome(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const message = conversationInput.trim();
+    if (!message || conversationBusy) return;
+
+    const userMessage: ConversationMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: message
+    };
+    const history = conversation.map(({ role, content }) => ({ role, content }));
+    setConversation((current) => [...current, userMessage]);
+    setConversationInput("");
+    setConversationBusy(true);
+
+    try {
+      const response = await askProjectAssistant(projectId, message, history);
+      setConversation((current) => [
+        ...current,
+        {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: response.reply
+        }
+      ]);
+    } catch (err) {
+      setConversation((current) => [
+        ...current,
+        {
+          id: `assistant-error-${Date.now()}`,
+          role: "assistant",
+          content:
+            err instanceof Error
+              ? err.message
+              : "I could not answer that from the current project state."
+        }
+      ]);
+    } finally {
+      setConversationBusy(false);
+    }
+  }
+
   if (!payload) {
     return (
       <section className="workspace-loading">
-        <span className="pulse-dot" />
+        <ActivitySpinner label="Reading the study record" />
         <p>Reading the study record…</p>
         {error && <p className="inline-error">{error}</p>}
       </section>
@@ -147,6 +271,11 @@ export function ResearchWorkspaceHome({
   }
 
   const { orchestrator, readiness } = payload;
+  const automaticKey = `${orchestrator.automaticAction ?? ""}:${readiness.nextAction.code}`;
+  const waitingOnAnalysis =
+    orchestrator.automaticAction === "run_analyses" &&
+    lastAutomaticAction.current === automaticKey &&
+    !busy;
   const completeTasks = orchestrator.tasks.filter((task) => task.status === "complete").length;
   const waitingTasks = orchestrator.tasks.filter((task) => task.status === "waiting" || task.status === "blocked").length;
 
@@ -169,19 +298,98 @@ export function ResearchWorkspaceHome({
         </div>
       </header>
 
+      <section className="project-conversation" aria-label="Conversation with Methodome">
+        <div className="conversation-intro">
+          <p className="workspace-kicker">TALK TO METHODOME</p>
+          <h2>Work through the study in plain language.</h2>
+          <p>
+            Tell Methodome what you are trying to understand, ask why it needs a
+            decision, or ask what it will do next. Methodome uses the current
+            study record to answer and does not silently change scientific
+            decisions.
+          </p>
+        </div>
+
+        <div className="conversation-thread" aria-live="polite">
+          <article className="conversation-message assistant">
+            <small>METHODOME</small>
+            <p>{orchestrator.summary}</p>
+            <p>{orchestrator.nextAction.detail}</p>
+          </article>
+
+          {conversation.map((item) => (
+            <article
+              className={`conversation-message ${item.role}`}
+              key={item.id}
+            >
+              <small>{item.role === "assistant" ? "METHODOME" : "YOU"}</small>
+              <p>{item.content}</p>
+            </article>
+          ))}
+
+          {conversationBusy && (
+            <div className="conversation-thinking">
+              <ActivitySpinner label="Methodome is responding" />
+              <span>Methodome is reading the current study state…</span>
+            </div>
+          )}
+        </div>
+
+        <form className="conversation-compose" onSubmit={askMethodome}>
+          <textarea
+            value={conversationInput}
+            onChange={(event) => setConversationInput(event.target.value)}
+            placeholder="Tell Methodome what you want to analyse, or ask what it needs from you…"
+            rows={2}
+            maxLength={4000}
+            disabled={conversationBusy}
+          />
+          <Button
+            type="submit"
+            loading={conversationBusy}
+            loadingLabel="Thinking…"
+            disabled={!conversationInput.trim()}
+          >
+            Send
+          </Button>
+        </form>
+        <p className="conversation-footnote">
+          Conversation is guidance over the live project state. Confirmed
+          scientific decisions remain explicit and auditable.
+        </p>
+      </section>
+
       <section className="workspace-now">
-        <div className="now-label">NOW</div>
+        <div className="now-label">CURRENT</div>
         <div className="now-body">
           <p className="orchestrator-summary">{orchestrator.summary}</p>
           <h2>{orchestrator.nextAction.label}</h2>
           <p>{orchestrator.nextAction.detail}</p>
 
           {orchestrator.automaticAction && (
-            <div className="now-actions">
-              <Button onClick={() => void advance(orchestrator.automaticAction)}>
-                {busy ? "Working…" : "Continue"}
-              </Button>
-              <span className="action-note">This step does not require a research decision.</span>
+            <div className="now-actions orchestration-working" aria-live="polite">
+              <ActivitySpinner label={orchestrator.nextAction.label} />
+              <span>
+                <b>
+                  {busy || waitingOnAnalysis
+                    ? "Methodome is working…"
+                    : "Methodome can handle this step automatically."}
+                </b>
+                <small>{orchestrator.nextAction.detail}</small>
+              </span>
+              {!busy &&
+                orchestrator.automaticAction !== "run_analyses" &&
+                lastAutomaticAction.current === automaticKey && (
+                <Button
+                  variant="quiet"
+                  onClick={() => {
+                    lastAutomaticAction.current = "";
+                    void advance(orchestrator.automaticAction);
+                  }}
+                >
+                  Retry
+                </Button>
+              )}
             </div>
           )}
 
@@ -198,7 +406,7 @@ export function ResearchWorkspaceHome({
       {orchestrator.decisions.length > 0 && (
         <section className="decision-stack" aria-label="Research decisions">
           <div className="section-rule">
-            <span>YOUR DECISION</span>
+            <span>METHODOME NEEDS YOUR INPUT</span>
             <small>{orchestrator.decisions.length} item{orchestrator.decisions.length === 1 ? "" : "s"}</small>
           </div>
 
@@ -231,8 +439,12 @@ export function ResearchWorkspaceHome({
                   </div>
                 ) : decision.kind === "approve_plan" && plan ? (
                   <div className="decision-actions">
-                    <Button onClick={() => void approvePlan()}>
-                      {busy === "approve-plan" ? "Locking…" : "Approve and lock plan"}
+                    <Button
+                      onClick={() => void approvePlan()}
+                      loading={busy === "approve-plan"}
+                      loadingLabel="Approving plan…"
+                    >
+                      Approve and lock plan
                     </Button>
                     <Button href={`/app/projects/${projectId}/analysis-plan`} variant="quiet">
                       Inspect plan
@@ -241,7 +453,7 @@ export function ResearchWorkspaceHome({
                 ) : (
                   <div className="decision-actions">
                     <Button href={decisionHref(projectId, decision, readiness)}>
-                      Review
+                      Answer this
                     </Button>
                   </div>
                 )}
@@ -251,7 +463,9 @@ export function ResearchWorkspaceHome({
         </section>
       )}
 
-      <section className="workspace-ledger">
+      <details className="workspace-inspection">
+        <summary>Inspect what Methodome has understood and completed</summary>
+        <section className="workspace-ledger">
         <div className="section-rule">
           <span>STUDY STATE</span>
           <small>{completeTasks} completed · {waitingTasks} waiting</small>
@@ -311,6 +525,7 @@ export function ResearchWorkspaceHome({
           ))}
         </div>
       </section>
+      </details>
 
       <footer className="workspace-foot">
         <span>Registry {payload.registryVersion}</span>

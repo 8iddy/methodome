@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Badge, Button, PageHeader, ThemeToggle } from "@/components/ui";
+import { ActivitySpinner, Badge, Button, PageHeader, ThemeToggle } from "@/components/ui";
 import { ProjectPage as PrototypeProjectPage } from "@/components/workspace";
 import { ResearchAnalysisSurface, ResearchSectionContext, ResearchWorkspaceHome } from "@/components/research-workspace";
 import {
@@ -10,7 +10,6 @@ import {
   appendDatasets,
   compareDatasetSchemas,
   createAnalysisJob,
-  createAnalysisPlan,
   createProject,
   createUpload,
   getAnalysisJob,
@@ -25,7 +24,6 @@ import {
   getAuditTrail,
   getDatasets,
   getDatasetProfile,
-  getMethodCandidates,
   getMethods,
   getAnalysisHistory,
   getProject,
@@ -35,7 +33,6 @@ import {
   getSession,
   getStudySpecification,
   getVariableMappings,
-  lockAnalysisPlan,
   registerDataset,
   saveStudySpecification,
   saveVariableMappings,
@@ -48,7 +45,6 @@ import {
   type MethodRegistryEntry,
   type AnalysisResult,
   type BackendProject,
-  type CandidateSelection,
   type DatasetVersion,
   type ProjectFile,
   type ProtocolExtraction,
@@ -239,7 +235,7 @@ export function LiveAuthPage({ signup }: { signup: boolean }) {
               placeholder="000000"
             />
           </label>
-          <Button type="submit">{busy ? "Verifying…" : "Verify email"}</Button>
+          <Button type="submit" loading={busy} loadingLabel="Verifying…">Verify email</Button>
           <Button variant="quiet" onClick={() => void resend()}>
             Send another code
           </Button>
@@ -293,7 +289,13 @@ export function LiveAuthPage({ signup }: { signup: boolean }) {
             />
           )}
 
-          <Button type="submit">{busy ? "Working…" : signup ? "Create account" : "Sign in"}</Button>
+          <Button
+            type="submit"
+            loading={busy}
+            loadingLabel={signup ? "Creating account…" : "Signing in…"}
+          >
+            {signup ? "Create account" : "Sign in"}
+          </Button>
           {notice && <p className="confirmation" role="status">{notice}</p>}
           {error && <p className="confirmation" role="alert">{error}</p>}
           <p className="muted">
@@ -423,7 +425,7 @@ export function LiveNewProjectPage() {
             <option value="mixed_methods">Mixed methods</option>
           </select>
         </label>
-        <Button type="submit">{busy ? "Creating…" : "Create project"}</Button>
+        <Button type="submit" loading={busy} loadingLabel="Creating project…">Create project</Button>
         {error && <p className="confirmation" role="alert">{error}</p>}
       </form>
     </main>
@@ -903,6 +905,15 @@ function LiveProjectFiles({
   );
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [activity, setActivity] = useState<
+    | "idle"
+    | "preparing"
+    | "uploading"
+    | "extracting"
+    | "complete"
+    | "upload_error"
+    | "extraction_error"
+  >("idle");
   const [extraction, setExtraction] = useState<ProtocolExtraction | null>(null);
 
   async function refresh() {
@@ -926,6 +937,7 @@ function LiveProjectFiles({
   async function upload() {
     if (!file) return;
     setBusy(true);
+    setActivity("preparing");
     setStatus("");
     try {
       const intent = await createUpload(projectId, {
@@ -934,27 +946,34 @@ function LiveProjectFiles({
         fileKind: kind,
         sizeBytes: file.size
       });
+
+      setActivity("uploading");
       await uploadFile(intent.uploadPath, file, file.type || "application/octet-stream");
       setFile(null);
 
       if (mode === "protocol") {
-        setStatus("Protocol uploaded. Extracting study information…");
+        setActivity("extracting");
+        setStatus("Protocol uploaded. Methodome is extracting the study now.");
         try {
           const extracted = await extractProtocol(projectId, intent.fileId);
           setExtraction(extracted);
+          setActivity("complete");
           setStatus(
-            `Protocol uploaded and study information extracted. Review ${extracted.researchQuestions.length} research question${extracted.researchQuestions.length === 1 ? "" : "s"} before analysis planning.`
+            `Protocol uploaded and study information extracted. Methodome found ${extracted.researchQuestions.length} research question${extracted.researchQuestions.length === 1 ? "" : "s"}.`
           );
         } catch (err) {
+          setActivity("extraction_error");
           setStatus(
-            `Protocol uploaded. Automatic extraction needs review: ${message(err)}`
+            `The protocol upload completed, but study extraction needs attention: ${message(err)}`
           );
         }
       } else {
+        setActivity("complete");
         setStatus("Research file uploaded.");
       }
       await refresh();
     } catch (err) {
+      setActivity("upload_error");
       setStatus(message(err));
     } finally {
       setBusy(false);
@@ -965,12 +984,15 @@ function LiveProjectFiles({
     const latest = files[0];
     if (!latest) return;
     setBusy(true);
+    setActivity("extracting");
     setStatus("Extracting study information…");
     try {
       const extracted = await extractProtocol(projectId, latest.id);
       setExtraction(extracted);
+      setActivity("complete");
       setStatus("Study information extracted from the latest protocol.");
     } catch (err) {
+      setActivity("extraction_error");
       setStatus(message(err));
     } finally {
       setBusy(false);
@@ -1012,11 +1034,77 @@ function LiveProjectFiles({
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           />
         </label>
-        <Button onClick={() => void upload()}>{busy ? "Working…" : "Upload file"}</Button>
+        <Button
+          onClick={() => void upload()}
+          loading={busy}
+          loadingLabel={
+            activity === "uploading"
+              ? "Uploading…"
+              : activity === "extracting"
+                ? "Extracting…"
+                : "Preparing…"
+          }
+          disabled={!file && !busy}
+        >
+          Upload file
+        </Button>
         {mode === "protocol" && files.length > 0 && (
-          <Button variant="secondary" onClick={() => void reExtract()}>
+          <Button
+            variant="secondary"
+            onClick={() => void reExtract()}
+            loading={busy && activity === "extracting"}
+            loadingLabel="Extracting…"
+          >
             Re-extract latest protocol
           </Button>
+        )}
+        {activity !== "idle" && (
+          <div className="activity-flow" aria-live="polite">
+            <div className={activity === "upload_error" ? "activity-step error" : "activity-step"}>
+              {activity === "preparing" || activity === "uploading" ? (
+                <ActivitySpinner label="Uploading research file" />
+              ) : activity === "upload_error" ? (
+                <span className="activity-step-mark error">!</span>
+              ) : (
+                <span className="activity-step-mark complete">✓</span>
+              )}
+              <span>
+                <b>Upload research file</b>
+                <small>
+                  {activity === "preparing"
+                    ? "Preparing secure storage"
+                    : activity === "uploading"
+                      ? "Uploading to Methodome"
+                      : "Upload complete"}
+                </small>
+              </span>
+            </div>
+            {mode === "protocol" && (
+              <div className={`activity-step ${activity === "extraction_error" ? "error" : ""}`}>
+                {activity === "extracting" ? (
+                  <ActivitySpinner label="Extracting study information" />
+                ) : activity === "complete" ? (
+                  <span className="activity-step-mark complete">✓</span>
+                ) : activity === "extraction_error" ? (
+                  <span className="activity-step-mark error">!</span>
+                ) : (
+                  <span className="activity-step-mark">2</span>
+                )}
+                <span>
+                  <b>Extract study information</b>
+                  <small>
+                    {activity === "extracting"
+                      ? "Reading research questions, objectives and study design"
+                      : activity === "complete"
+                        ? "Extraction complete"
+                        : activity === "extraction_error"
+                          ? "Extraction needs attention"
+                          : "Starts automatically after upload"}
+                  </small>
+                </span>
+              </div>
+            )}
+          </div>
         )}
         {status && <p className="confirmation" role="status">{status}</p>}
         {mode === "instruments" && (
@@ -1990,7 +2078,7 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
       </label>
 
       <div className="action-row">
-        <Button onClick={() => void save()}>{busy ? "Saving…" : "Confirm study specification"}</Button>
+        <Button onClick={() => void save()} loading={busy} loadingLabel="Saving study design…">Confirm study specification</Button>
         {source === "saved" && (
           <Button href={`/app/projects/${projectId}/variables`} variant="secondary">
             Continue to variable mapping
@@ -2014,7 +2102,9 @@ function LiveVariables({ projectId }: { projectId: string }) {
 
   const [spec, setSpec] = useState<StudySpecification | null>(null);
   const [rows, setRows] = useState<MappingRow[]>([]);
-  const [variables, setVariables] = useState<Awaited<ReturnType<typeof getVariableMappingSuggestions>>["variables"]>([]);
+  const [variables, setVariables] = useState<
+    Awaited<ReturnType<typeof getVariableMappingSuggestions>>["variables"]
+  >([]);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -2025,7 +2115,10 @@ function LiveVariables({ projectId }: { projectId: string }) {
   function usagesForSpecification(specification: StudySpecification) {
     const map = new Map<string, { concept: string; usages: string[] }>();
     specification.researchQuestions.forEach((question, index) => {
-      const roles: Array<[string, StudySpecification["researchQuestions"][number]["outcomes"]]> = [
+      if (question.objectiveType === "qualitative") return;
+      const roles: Array<
+        [string, StudySpecification["researchQuestions"][number]["outcomes"]]
+      > = [
         ["Outcome", question.outcomes],
         ["Predictor", question.predictors],
         ["Covariate", question.covariates]
@@ -2042,11 +2135,14 @@ function LiveVariables({ projectId }: { projectId: string }) {
     return map;
   }
 
-  async function loadSuggestions(specification: StudySpecification, saved: VariableMapping[]) {
+  async function loadSuggestions(
+    specification: StudySpecification,
+    saved: VariableMapping[]
+  ) {
     const usageMap = usagesForSpecification(specification);
     if (usageMap.size === 0) {
       setRows([]);
-      setStatus("No outcome, predictor or covariate concepts are defined in the study specification.");
+      setStatus("This study has no quantitative concepts that require dataset mapping.");
       return;
     }
 
@@ -2057,36 +2153,48 @@ function LiveVariables({ projectId }: { projectId: string }) {
       const suggested = new Map(
         response.suggestions.map((item) => [conceptKey(item.researchConcept), item])
       );
-      const existing = new Map(saved.map((item) => [conceptKey(item.researchConcept), item]));
+      const existing = new Map(
+        saved.map((item) => [conceptKey(item.researchConcept), item])
+      );
 
-      setRows(
-        Array.from(usageMap.values()).map(({ concept, usages }) => {
-          const stored = existing.get(conceptKey(concept));
-          if (stored) {
-            return {
-              researchConcept: concept,
-              usages,
-              ...(stored.datasetVariable ? { datasetVariable: stored.datasetVariable } : {}),
-              mappingStatus: stored.mappingStatus,
-              evidence: stored.evidence,
-              confirmed: Boolean(stored.confirmedBy)
-            };
-          }
-          const candidate = suggested.get(conceptKey(concept));
+      const nextRows = Array.from(usageMap.values()).map(({ concept, usages }) => {
+        const stored = existing.get(conceptKey(concept));
+        const candidate = suggested.get(conceptKey(concept));
+
+        if (stored?.confirmedBy) {
           return {
             researchConcept: concept,
             usages,
-            ...(candidate?.datasetVariable ? { datasetVariable: candidate.datasetVariable } : {}),
-            mappingStatus: candidate?.mappingStatus ?? "no_match",
-            evidence: candidate?.evidence ?? ["No mapping suggestion is available."],
-            confirmed: false
+            ...(stored.datasetVariable
+              ? { datasetVariable: stored.datasetVariable }
+              : {}),
+            mappingStatus: stored.mappingStatus,
+            evidence: stored.evidence,
+            confirmed: true
           };
-        })
-      );
+        }
+
+        const refreshed = candidate ?? stored;
+        return {
+          researchConcept: concept,
+          usages,
+          ...(refreshed?.datasetVariable
+            ? { datasetVariable: refreshed.datasetVariable }
+            : {}),
+          mappingStatus: refreshed?.mappingStatus ?? "no_match",
+          evidence:
+            refreshed?.evidence ??
+            ["Methodome did not find enough evidence to resolve this concept automatically."],
+          confirmed: false
+        };
+      });
+
+      setRows(nextRows);
+      const remaining = nextRows.filter((row) => !row.confirmed).length;
       setStatus(
-        saved.length
-          ? "Saved mappings loaded. Review any unconfirmed mappings."
-          : "Mapping suggestions are ready. Confirm, change, or mark each concept as not represented."
+        remaining === 0
+          ? "Methodome resolved all analytical variables from the available evidence."
+          : `Methodome resolved ${nextRows.length - remaining} mapping${nextRows.length - remaining === 1 ? "" : "s"} safely. ${remaining} still need${remaining === 1 ? "s" : ""} your input.`
       );
     } catch (err) {
       setStatus(message(err));
@@ -2096,11 +2204,14 @@ function LiveVariables({ projectId }: { projectId: string }) {
   }
 
   useEffect(() => {
-    Promise.all([getStudySpecification(projectId), getVariableMappings(projectId)])
+    Promise.all([
+      getStudySpecification(projectId),
+      getVariableMappings(projectId)
+    ])
       .then(([specification, saved]) => {
         setSpec(specification);
         if (!specification) {
-          setStatus("Confirm the study specification before mapping variables.");
+          setStatus("Methodome needs the study design before it can resolve analytical variables.");
           return;
         }
         void loadSuggestions(specification, saved);
@@ -2116,24 +2227,59 @@ function LiveVariables({ projectId }: { projectId: string }) {
     );
   }
 
-  async function confirmMappings() {
-    if (!spec || rows.length === 0) return;
+  async function confirmRow(index: number, confirmAbsent = false) {
+    const row = rows[index];
+    if (!row) return;
+    if (!row.datasetVariable && !confirmAbsent) {
+      setStatus(
+        "Choose a dataset field, or explicitly confirm that this concept is not represented."
+      );
+      return;
+    }
+
     setBusy(true);
     setStatus("");
     try {
-      await saveVariableMappings(
-        projectId,
-        rows.map((row) => ({
+      await saveVariableMappings(projectId, [
+        {
           id: `map_${simpleHash(conceptKey(row.researchConcept))}`,
           researchConcept: row.researchConcept,
-          ...(row.datasetVariable ? { datasetVariable: row.datasetVariable } : {}),
-          mappingStatus: row.datasetVariable ? row.mappingStatus : "no_match",
-          evidence: row.evidence,
+          ...(confirmAbsent || !row.datasetVariable
+            ? {}
+            : { datasetVariable: row.datasetVariable }),
+          mappingStatus:
+            confirmAbsent || !row.datasetVariable
+              ? "no_match"
+              : row.mappingStatus === "no_match"
+                ? "uncertain"
+                : row.mappingStatus,
+          evidence: confirmAbsent
+            ? [
+                ...row.evidence,
+                "Researcher explicitly confirmed that this analytical concept is not represented in the selected dataset."
+              ]
+            : row.evidence,
           confirmed: true
-        }))
+        }
+      ]);
+      updateRow(index, {
+        confirmed: true,
+        ...(confirmAbsent
+          ? {
+              datasetVariable: undefined,
+              mappingStatus: "no_match",
+              evidence: [
+                ...row.evidence,
+                "Researcher explicitly confirmed that this analytical concept is not represented in the selected dataset."
+              ]
+            }
+          : {})
+      });
+      setStatus(
+        confirmAbsent
+          ? "Recorded as a confirmed analysis-data gap."
+          : "Mapping confirmed. Methodome will use it when constructing the analysis."
       );
-      setRows((current) => current.map((row) => ({ ...row, confirmed: true })));
-      setStatus("Reviewed variable mappings saved and confirmed.");
     } catch (err) {
       setStatus(message(err));
     } finally {
@@ -2142,140 +2288,179 @@ function LiveVariables({ projectId }: { projectId: string }) {
   }
 
   function variableSummary(variableName?: string) {
-    if (!variableName) return "Not represented";
+    if (!variableName) return "Methodome could not resolve this yet";
     const variable = variables.find((item) => item.variableName === variableName);
     if (!variable) return variableName;
     const range = variable.range
       ? ` · ${variable.range.min} to ${variable.range.max}`
       : variable.responseChoices?.length
-        ? ` · ${variable.responseChoices.map((choice) => choice.label).join(", ")}`
+        ? ` · ${variable.responseChoices
+            .map((choice) => choice.label)
+            .join(", ")}`
         : "";
     return `${variable.dataType.replaceAll("_", " ")}${range}`;
   }
 
-  function humanStatus(value: MappingRow["mappingStatus"]) {
-    return value.replaceAll("_", " ").replace(/^./, (character) => character.toUpperCase());
-  }
+  const unresolved = rows
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => !row.confirmed);
+  const resolved = rows.filter((row) => row.confirmed);
 
   return (
-    <section className="panel table-wrap">
+    <section className="panel mapping-review">
       <div className="panel-heading">
         <div>
-          <h2>Variable mappings</h2>
+          <p className="eyebrow">ONLY WHEN METHODOME IS UNSURE</p>
+          <h2>Resolve ambiguous variables</h2>
           <p className="muted">
-            Research concepts come from the study specification. Dataset variables come from the profiled analysis data.
+            Methodome compares the protocol, instrument or codebook and dataset metadata first.
+            Exact evidence-backed matches do not need you to map the dataset by hand.
           </p>
         </div>
         <Button
           variant="secondary"
+          loading={busy}
+          loadingLabel="Checking mappings…"
           onClick={() =>
             spec
-              ? void Promise.all([getVariableMappings(projectId)]).then(([saved]) =>
+              ? void getVariableMappings(projectId).then((saved) =>
                   loadSuggestions(spec, saved)
                 )
               : undefined
           }
         >
-          Refresh suggestions
+          Recheck evidence
         </Button>
       </div>
 
-      {rows.length > 0 ? (
-        <>
-          <table>
-            <thead>
-              <tr>
-                <th>Research concept</th>
-                <th>Used in</th>
-                <th>Dataset variable</th>
-                <th>Observed metadata</th>
-                <th>Status</th>
-                <th>Evidence</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={row.researchConcept}>
-                  <td>
-                    <strong>{row.researchConcept}</strong>
-                    {row.confirmed && <><br /><Badge kind="success">Confirmed</Badge></>}
-                  </td>
-                  <td>{row.usages.join("; ")}</td>
-                  <td>
-                    <select
-                      value={row.datasetVariable ?? ""}
-                      onChange={(event) => {
-                        const selected = event.target.value;
-                        updateRow(index, selected
-                          ? {
-                              datasetVariable: selected,
-                              mappingStatus:
-                                row.datasetVariable === selected
-                                  ? row.mappingStatus
-                                  : "uncertain",
-                              evidence:
-                                row.datasetVariable === selected
-                                  ? row.evidence
-                                  : ["Researcher selected this dataset variable during mapping review."],
-                              confirmed: false
-                            }
-                          : {
-                              datasetVariable: undefined,
-                              mappingStatus: "no_match",
-                              evidence: ["Researcher marked this concept as not represented in the dataset."],
-                              confirmed: false
-                            });
-                      }}
-                    >
-                      <option value="">Not represented</option>
-                      {variables.map((variable) => (
-                        <option key={variable.variableName} value={variable.variableName}>
-                          {variable.variableName}
-                          {variable.label && variable.label !== variable.variableName
-                            ? ` · ${variable.label}`
-                            : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>{variableSummary(row.datasetVariable)}</td>
-                  <td>
-                    <Badge
-                      kind={
-                        row.mappingStatus === "direct_match"
-                          ? "success"
-                          : row.mappingStatus === "probable_match"
-                            ? "blue"
-                            : "warning"
-                      }
-                    >
-                      {humanStatus(row.mappingStatus)}
-                    </Badge>
-                  </td>
-                  <td>{row.evidence.join(" ")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="muted">
-            Direct match is reserved for exact metadata evidence. Semantic suggestions remain probable or uncertain until you confirm them.
-          </p>
-          <Button onClick={() => void confirmMappings()}>
-            {busy ? "Working…" : "Confirm reviewed mappings"}
-          </Button>
-        </>
-      ) : (
-        <p className="muted">
-          {busy ? "Preparing mapping suggestions…" : "No mappings are available yet."}
-        </p>
+      {busy && rows.length === 0 && (
+        <div className="mapping-thinking">
+          <ActivitySpinner label="Resolving analytical variables" />
+          <span>
+            <b>Methodome is resolving the analytical variables.</b>
+            <small>Comparing study concepts with dataset fields and source metadata.</small>
+          </span>
+        </div>
       )}
-      {rows.length > 0 && rows.every((row) => row.confirmed) && (
+
+      {!busy && rows.length > 0 && unresolved.length === 0 && (
+        <div className="mapping-complete">
+          <span className="activity-step-mark complete">✓</span>
+          <div>
+            <b>Variable resolution is complete.</b>
+            <p>There is nothing for you to map manually. Methodome can continue from the workspace.</p>
+          </div>
+        </div>
+      )}
+
+      {unresolved.length > 0 && (
+        <div className="mapping-question-list">
+          {unresolved.map(({ row, index }) => (
+            <article className="mapping-question" key={row.researchConcept}>
+              <div className="mapping-question-copy">
+                <Badge kind={row.datasetVariable ? "blue" : "warning"}>
+                  {row.datasetVariable ? "Suggested match" : "Unresolved"}
+                </Badge>
+                <h3>{row.researchConcept}</h3>
+                <p className="muted">{row.usages.join("; ")}</p>
+                <p>{row.evidence.join(" ")}</p>
+              </div>
+
+              <label>
+                {row.datasetVariable
+                  ? "Methodome's suggested dataset field"
+                  : "Which dataset field represents this concept?"}
+                <select
+                  value={row.datasetVariable ?? ""}
+                  onChange={(event) => {
+                    const selected = event.target.value;
+                    updateRow(
+                      index,
+                      selected
+                        ? {
+                            datasetVariable: selected,
+                            mappingStatus:
+                              row.datasetVariable === selected
+                                ? row.mappingStatus
+                                : "uncertain",
+                            evidence:
+                              row.datasetVariable === selected
+                                ? row.evidence
+                                : [
+                                    "Researcher selected this field after reviewing Methodome's unresolved mapping."
+                                  ]
+                          }
+                        : {
+                            datasetVariable: undefined,
+                            mappingStatus: "no_match"
+                          }
+                    );
+                  }}
+                >
+                  <option value="">I cannot identify a matching field</option>
+                  {variables.map((variable) => (
+                    <option
+                      key={variable.variableName}
+                      value={variable.variableName}
+                    >
+                      {variable.variableName}
+                      {variable.label &&
+                      variable.label !== variable.variableName
+                        ? ` · ${variable.label}`
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+                <small>{variableSummary(row.datasetVariable)}</small>
+              </label>
+
+              <div className="action-row">
+                <Button
+                  onClick={() => void confirmRow(index)}
+                  loading={busy}
+                  loadingLabel="Saving…"
+                  disabled={!row.datasetVariable}
+                >
+                  {row.datasetVariable ? "Yes, use this field" : "Confirm mapping"}
+                </Button>
+                {!row.datasetVariable && (
+                  <Button
+                    variant="quiet"
+                    onClick={() => void confirmRow(index, true)}
+                    loading={busy}
+                    loadingLabel="Saving…"
+                  >
+                    Confirm it is not represented
+                  </Button>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {resolved.length > 0 && (
+        <details className="resolved-mappings">
+          <summary>
+            Inspect {resolved.length} resolved mapping{resolved.length === 1 ? "" : "s"}
+          </summary>
+          {resolved.map((row) => (
+            <div className="resolved-mapping-row" key={row.researchConcept}>
+              <span>{row.researchConcept}</span>
+              <strong>{row.datasetVariable ?? "Confirmed data gap"}</strong>
+            </div>
+          ))}
+        </details>
+      )}
+
+      {rows.length > 0 && unresolved.length === 0 && (
         <div className="action-row">
-          <Button href={`/app/projects/${projectId}/analysis-plan`}>
-            Continue to analysis plan
+          <Button href={`/app/projects/${projectId}/overview`}>
+            Return to workspace
           </Button>
         </div>
       )}
+
       {status && <p className="confirmation" role="status">{status}</p>}
     </section>
   );
@@ -2291,282 +2476,144 @@ function simpleHash(value: string): string {
 }
 
 function LiveAnalysisPlan({ projectId }: { projectId: string }) {
-  const [selections, setSelections] = useState<CandidateSelection[]>([]);
-  const [datasets, setDatasets] = useState<DatasetVersion[]>([]);
-  const [spec, setSpec] = useState<StudySpecification | null>(null);
-  const [mappings, setMappings] = useState<VariableMapping[]>([]);
   const [plan, setPlan] = useState<AnalysisPlan | null>(null);
-  const [selectedMethods, setSelectedMethods] = useState<Record<string, string>>({});
-  const [selectedDatasetId, setSelectedDatasetId] = useState("");
-  const [status, setStatus] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function refresh() {
-    const [candidateResponse, ds, existing, specification, savedMappings] =
-      await Promise.all([
-        getMethodCandidates(projectId),
-        getDatasets(projectId),
-        getAnalysisPlan(projectId),
-        getStudySpecification(projectId),
-        getVariableMappings(projectId)
-      ]);
-
-    setSelections(candidateResponse.selections);
-    setDatasets(ds);
-    setPlan(existing);
-    setSpec(specification);
-    setMappings(savedMappings);
-
-    const preferred =
-      existing?.datasetVersionId ??
-      ds.find((dataset) => dataset.sourceKind === "derived")?.id ??
-      ds[0]?.id ??
-      "";
-    setSelectedDatasetId(preferred);
-
-    setSelectedMethods((current) => {
-      const next = { ...current };
-      for (const selection of candidateResponse.selections) {
-        if (!next[selection.questionId]) {
-          const executable = selection.candidates.find((candidate) => candidate.executable);
-          if (executable) next[selection.questionId] = executable.methodId;
-        }
-      }
-      return next;
-    });
-  }
+  const [spec, setSpec] = useState<StudySpecification | null>(null);
+  const [datasets, setDatasets] = useState<DatasetVersion[]>([]);
+  const [status, setStatus] = useState("Loading Methodome's analysis plan…");
 
   useEffect(() => {
-    void refresh().catch((err) => setStatus(message(err)));
+    Promise.all([
+      getAnalysisPlan(projectId),
+      getStudySpecification(projectId),
+      getDatasets(projectId)
+    ])
+      .then(([currentPlan, specification, currentDatasets]) => {
+        setPlan(currentPlan);
+        setSpec(specification);
+        setDatasets(currentDatasets);
+        setStatus("");
+      })
+      .catch((err) => setStatus(message(err)));
   }, [projectId]);
 
-  function mappingFor(concept: string) {
-    const key = concept.trim().toLowerCase();
-    return mappings.find(
-      (mapping) =>
-        mapping.researchConcept.trim().toLowerCase() === key &&
-        Boolean(mapping.confirmedBy)
+  if (!plan) {
+    return (
+      <section className="panel analysis-plan-reader">
+        <p className="eyebrow">METHODOME BUILDS THIS</p>
+        <h2>The analysis plan is not ready yet</h2>
+        <p>
+          You do not need to construct a statistical plan by hand. Methodome will create it
+          after the study design and analytical variables are sufficiently resolved. If a
+          genuine methodological choice remains, the workspace will ask you one specific
+          question and explain why it matters.
+        </p>
+        {status ? (
+          <div className="mapping-thinking">
+            <ActivitySpinner label="Reading analysis state" />
+            <span>{status}</span>
+          </div>
+        ) : (
+          <Button href={`/app/projects/${projectId}/overview`}>
+            Return to workspace
+          </Button>
+        )}
+      </section>
     );
   }
 
-  function resolvedVariables(question: StudySpecification["researchQuestions"][number]) {
-    const outcome = question.outcomes
-      .map((item) => mappingFor(item.concept)?.datasetVariable)
-      .find(Boolean);
-    const predictors = question.predictors.flatMap((item) => {
-      const value = mappingFor(item.concept)?.datasetVariable;
-      return value ? [value] : [];
-    });
-    const covariates = question.covariates.flatMap((item) => {
-      const value = mappingFor(item.concept)?.datasetVariable;
-      return value ? [value] : [];
-    });
-    return { outcome, predictors, covariates };
-  }
-
-  async function createPlan() {
-    if (!spec) {
-      setStatus("Confirm the study specification before creating an analysis plan.");
-      return;
-    }
-    if (!selectedDatasetId) {
-      setStatus("Upload and select a dataset before creating an analysis plan.");
-      return;
-    }
-
-    const analyses = selections.flatMap((selection, index) => {
-      const question = spec.researchQuestions.find(
-        (item) => item.id === selection.questionId
-      );
-      const selectedMethodId = selectedMethods[selection.questionId];
-      const candidate = selection.candidates.find(
-        (item) => item.methodId === selectedMethodId
-      );
-      if (!question || !selectedMethodId || !candidate?.executable) return [];
-      const resolved = resolvedVariables(question);
-      if (!resolved.outcome) return [];
-
-      return [
-        {
-          id: `analysis-${index + 1}`,
-          researchQuestionId: question.id,
-          outcome: resolved.outcome,
-          predictors: resolved.predictors,
-          covariates: resolved.covariates,
-          candidateMethodIds: selection.candidates.map((item) => item.methodId),
-          selectedMethodId,
-          requiredDecisions: candidate.decisionRequired
-            ? [candidate.decisionRequired]
-            : [],
-          warnings: selection.warnings,
-          diagnostics: candidate.requiredChecks,
-          addedAfterLock: false
-        }
-      ];
-    });
-
-    if (analyses.length === 0) {
-      setStatus(
-        "No research question is ready for an executable analysis. Review mappings and method blockers below."
-      );
-      return;
-    }
-
-    setBusy(true);
-    setStatus("");
-    try {
-      const created = await createAnalysisPlan(projectId, {
-        versionId: `plan-${Date.now()}`,
-        datasetVersionId: selectedDatasetId,
-        status: "planned_before_analysis",
-        analyses
-      });
-      setPlan(created);
-      setStatus(
-        `Analysis plan created with ${created.analyses.length} planned analysis${created.analyses.length === 1 ? "" : "es"}.`
-      );
-    } catch (err) {
-      setStatus(message(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function lock() {
-    if (!plan) return;
-    setBusy(true);
-    try {
-      const locked = await lockAnalysisPlan(projectId, plan.id);
-      setPlan(locked);
-      setStatus("Analysis plan locked. Planned analyses are now distinguished from later exploratory work.");
-    } catch (err) {
-      setStatus(message(err));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const dataset = datasets.find((item) => item.id === plan.datasetVersionId);
+  const questions = new Map(
+    spec?.researchQuestions.map((question) => [question.id, question]) ?? []
+  );
 
   return (
-    <section className="panel">
+    <section className="panel analysis-plan-reader">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">ANALYSIS DATASET</p>
-          <h2>Build analysis plan</h2>
+          <p className="eyebrow">METHODOME'S ANALYSIS PLAN</p>
+          <h2>{plan.lockedAt ? "Approved analysis plan" : "Draft analysis plan"}</h2>
+          <p className="muted">
+            This is an inspection surface. Methodome constructs the plan from the protocol,
+            confirmed analytical variables and deterministic method rules.
+          </p>
         </div>
-        {plan && (
-          <Badge kind={plan.lockedAt ? "success" : "blue"}>
-            {plan.lockedAt ? "Locked" : "Draft"}
-          </Badge>
-        )}
+        <Badge kind={plan.lockedAt ? "success" : "warning"}>
+          {plan.lockedAt ? "Locked" : "Awaiting approval"}
+        </Badge>
       </div>
 
-      <label>
-        Dataset version
-        <select
-          value={selectedDatasetId}
-          disabled={Boolean(plan)}
-          onChange={(event) => setSelectedDatasetId(event.target.value)}
-        >
-          <option value="">Select dataset</option>
-          {datasets.map((dataset) => (
-            <option key={dataset.id} value={dataset.id}>
-              {dataset.label} · {dataset.sourceKind}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="muted">
-        Methodome prefers the newest derived dataset when one exists. You can change the selection before the plan is created.
-      </p>
+      <div className="plan-summary-line">
+        <span>
+          <small>Analysis dataset</small>
+          <strong>{dataset?.label ?? plan.datasetVersionId ?? "Not resolved"}</strong>
+        </span>
+        <span>
+          <small>Planned analyses</small>
+          <strong>{plan.analyses.length}</strong>
+        </span>
+      </div>
 
-      <div className="method-list">
-        {selections.map((selection, index) => {
-          const question = spec?.researchQuestions.find(
-            (item) => item.id === selection.questionId
-          );
-          const resolved = question ? resolvedVariables(question) : null;
-          const mappingBlocker =
-            question && !resolved?.outcome
-              ? "The outcome concept does not have a confirmed dataset mapping."
-              : null;
+      <div className="plan-narrative-list">
+        {plan.analyses.map((analysis, index) => {
+          const question = questions.get(analysis.researchQuestionId);
           return (
-            <article className="method-card" key={selection.questionId}>
-              <p className="eyebrow">RESEARCH QUESTION {index + 1}</p>
-              <h3>{question?.text ?? selection.questionId}</h3>
-              {resolved?.outcome && (
-                <p>
-                  <b>Outcome:</b> <code>{resolved.outcome}</code>
-                  {resolved.predictors.length > 0 && (
-                    <> · <b>Predictors:</b> <code>{resolved.predictors.join(", ")}</code></>
-                  )}
-                </p>
-              )}
-
-              {(mappingBlocker || selection.blockedReason) && (
-                <div className="warning-panel">
-                  <b>Needs review</b>
-                  <p>{mappingBlocker ?? selection.blockedReason}</p>
-                </div>
-              )}
-
-              {selection.warnings.map((warning) => (
-                <p className="muted" key={warning}>{warning}</p>
-              ))}
-
-              {selection.candidates.map((candidate) => (
-                <label className="candidate" key={candidate.methodId}>
-                  <input
-                    type="radio"
-                    name={`candidate-${selection.questionId}`}
-                    checked={selectedMethods[selection.questionId] === candidate.methodId}
-                    disabled={!candidate.executable || Boolean(plan)}
-                    onChange={() =>
-                      setSelectedMethods((current) => ({
-                        ...current,
-                        [selection.questionId]: candidate.methodId
-                      }))
-                    }
-                  />
-                  <span>
-                    <b>{candidate.displayName}</b>
-                    <small>{candidate.rationale}</small>
-                    {candidate.decisionRequired && <small>{candidate.decisionRequired}</small>}
-                  </span>
-                  <Badge kind={candidate.executable ? "success" : "warning"}>
-                    {candidate.executable ? candidate.maturity : "Execution pending"}
-                  </Badge>
-                </label>
-              ))}
+            <article className="plan-narrative" key={analysis.id}>
+              <div className="plan-narrative-number">
+                {String(index + 1).padStart(2, "0")}
+              </div>
+              <div>
+                <p className="eyebrow">RESEARCH QUESTION</p>
+                <h3>{question?.text ?? analysis.researchQuestionId}</h3>
+                {analysis.selectedMethodId ? (
+                  <p>
+                    Methodome proposes <strong>{analysis.selectedMethodId.replaceAll("_", " ")}</strong>
+                    {" "}using <code>{analysis.outcome}</code> as the outcome
+                    {analysis.predictors.length > 0
+                      ? <> and <code>{analysis.predictors.join(", ")}</code> as predictor{analysis.predictors.length === 1 ? "" : "s"}</>
+                      : null}.
+                  </p>
+                ) : (
+                  <div className="plain-decision-note">
+                    <b>One methodological decision remains.</b>
+                    <p>
+                      Methodome found more than one defensible analysis for this question.
+                      The workspace will present the alternatives in plain language before
+                      anything is executed.
+                    </p>
+                  </div>
+                )}
+                {analysis.warnings.length > 0 && (
+                  <details>
+                    <summary>Method notes and diagnostics</summary>
+                    {analysis.warnings.map((warning) => (
+                      <p className="muted" key={warning}>{warning}</p>
+                    ))}
+                  </details>
+                )}
+              </div>
             </article>
           );
         })}
       </div>
 
-      {!plan ? (
-        <Button onClick={() => void createPlan()}>
-          {busy ? "Creating…" : "Create analysis plan"}
+      <div className="action-row">
+        <Button href={`/app/projects/${projectId}/overview`}>
+          Return to workspace
         </Button>
-      ) : (
-        <div className="action-row">
-          <span>
-            {plan.analyses.length} planned analysis{plan.analyses.length === 1 ? "" : "es"}
-          </span>
-          {!plan.lockedAt && (
-            <Button onClick={() => void lock()}>
-              {busy ? "Locking…" : "Lock analysis plan"}
-            </Button>
-          )}
-          {plan.lockedAt && (
-            <Button href={`/app/projects/${projectId}/analysis`}>
-              Run analyses
-            </Button>
-          )}
-        </div>
-      )}
-      {plan?.lockHash && (
-        <p className="muted">
-          SHA-256 plan hash: <code>{plan.lockHash}</code>
-        </p>
+        {plan.lockedAt && (
+          <Button href={`/app/projects/${projectId}/analysis`} variant="secondary">
+            Inspect execution
+          </Button>
+        )}
+      </div>
+
+      {plan.lockHash && (
+        <details className="technical-plan-record">
+          <summary>Technical plan record</summary>
+          <p className="muted">
+            SHA-256 plan hash: <code>{plan.lockHash}</code>
+          </p>
+        </details>
       )}
       {status && <p className="confirmation" role="status">{status}</p>}
     </section>
