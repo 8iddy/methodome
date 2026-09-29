@@ -1,7 +1,7 @@
 {
   "corpus_id": "methodome-methodology-corpus-v1",
   "drive_folder_id": "1HExso0MBgFlAonZz3CR6aqMi3Ws4ODc8",
-  "file_count": 85,
+  "file_count": 87,
   "generated_date": "2026-09-29",
   "authority_tiers": {
     "A": "Authoritative guideline, official institutional source, major methodological text, or major methods paper.",
@@ -1731,6 +1731,51 @@
       "priority": "medium",
       "metadata_status": "verified",
       "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-086-royston-white-mice-implementation-stata",
+      "drive_id": "1Tb-fLETRassQtWBnfTuf_pWxNLCgJ-07",
+      "file_name": "Multiple_Imputation_by_Chained_Equations_MICE_Impl.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 663634,
+      "source_family": "Multiple Imputation by Chained Equations (MICE): Implementation in Stata",
+      "organization": "Journal of Statistical Software",
+      "year": 2011,
+      "domains": [
+        "missing_data",
+        "multiple_imputation",
+        "mice",
+        "imputation_models",
+        "diagnostics"
+      ],
+      "authority_tier": "B",
+      "role": "supporting",
+      "priority": "medium",
+      "metadata_status": "verified",
+      "extraction_status": "partial"
+    },
+    {
+      "source_id": "src-087-resche-rigon-white-multilevel-mice-duplicate",
+      "drive_id": "18khNToED5s6rLEjx74CwzvbXY7v3Kc6-",
+      "file_name": "emss-71930.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 419201,
+      "source_family": "Multiple imputation by chained equations for systematically and sporadically missing multilevel data",
+      "organization": "Statistical Methods in Medical Research",
+      "year": 2018,
+      "domains": [
+        "missing_data",
+        "multiple_imputation",
+        "mice",
+        "multilevel_data",
+        "clustered_data"
+      ],
+      "authority_tier": "A",
+      "role": "supporting",
+      "priority": "low",
+      "metadata_status": "verified",
+      "extraction_status": "duplicate_no_extraction",
+      "duplicate_of": "src-085-resche-rigon-white-multilevel-mice"
     }
   ]
 }
