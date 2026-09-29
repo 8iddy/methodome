@@ -87,10 +87,11 @@
         "src-009-penn-state-stat-501-regression-methods"
       ],
       "rule_ids": [
-        "logistic-regression-001"
+        "logistic-regression-001",
+        "logistic-gof-001"
       ],
-      "finding": "Binary-response eligibility is source-backed. Separation, sparse-event and influence guidance still needs stronger direct corpus extraction.",
-      "action": "Keep executable; expand diagnostic evidence before treating the recommendation logic as complete."
+      "finding": "Binary-response eligibility, structure-aware goodness-of-fit checks, and deviance/Pearson residual diagnostics are source-backed. Complete or quasi-complete separation, sparse-event bias, and influence safeguards still need stronger direct corpus extraction.",
+      "action": "Keep executable inside the current design boundary; retain explicit warnings for unresolved separation and sparse-event safeguards and benchmark the diagnostic routing before methodology validation."
     },
     {
       "method_id": "chi_square",
@@ -162,11 +163,13 @@
       "registry_maturity": "validated",
       "executable": false,
       "computational_status": "not_in_runtime",
-      "methodology_status": "gap",
-      "evidence_sources": [],
+      "methodology_status": "partial",
+      "evidence_sources": [
+        "src-013-penn-state-stat-501-regression-methods"
+      ],
       "rule_ids": [],
-      "finding": "The current 74-file corpus has not yet yielded a sufficiently explicit source-grounded Poisson regression selection and diagnostic rule.",
-      "action": "Do not use the registry maturity label as methodology validation. Extract or add authoritative count-regression guidance before activation."
+      "finding": "The corpus now directly supports routing Poisson count responses away from ordinary constant-variance linear regression toward Poisson regression. It does not yet provide a complete automated rule covering exposure offsets, dispersion checks, excess zeros, or model diagnostics.",
+      "action": "Keep non-executable and outside automatic recommendation. Treat the count-outcome evidence as partial until count-regression assumptions and diagnostics are source-backed."
     },
     {
       "method_id": "negative_binomial_regression",
