@@ -1,6 +1,6 @@
 {
   "rule_set_id": "methodome-specialized-methodology-v0.1",
-  "status": "draft",
+  "status": "supported",
   "rules": [
     {
       "rule_id": "diagnostic-accuracy-001",
@@ -36,7 +36,7 @@
           "page": "A-1 to A-3"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "psychometric-model-001",
@@ -69,7 +69,7 @@
           "page": "43"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "competing-risks-001",
@@ -99,7 +99,74 @@
           "page": null
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "psychometric-internal-consistency-001",
+      "topic": "psychometrics",
+      "decision": "Do not use Cronbach alpha, omega, or another internal-consistency statistic as stand-alone evidence that a scale is valid or unidimensional.",
+      "conditions": [
+        "A reflective multi-item scale is being evaluated",
+        "Internal consistency is proposed or reported"
+      ],
+      "action": "Check the intended dimensional structure first. Interpret internal-consistency statistics only when structural validity supports the scoring structure and the items form an appropriate unidimensional scale or subscale.",
+      "assumptions": [
+        "The instrument is reflective rather than formative"
+      ],
+      "diagnostics": [
+        "Structural validity/factor structure",
+        "Dimensionality",
+        "Internal-consistency estimate",
+        "Item count and scoring structure"
+      ],
+      "warnings": [
+        "High internal consistency does not establish content validity, structural validity, criterion validity, or responsiveness.",
+        "Internal consistency and unidimensionality are not the same property."
+      ],
+      "exceptions": [
+        "For formative composites, internal-consistency logic may be inappropriate altogether."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-036-cosmin-manual-v20",
+          "support": "COSMIN states that unidimensionality is a prerequisite for clear interpretation of internal consistency and that structural-validity evidence should be considered when interpreting alpha/omega-like parameters.",
+          "section": "6.3 Internal consistency",
+          "page": "167 onward"
+        }
+      ],
+      "validation_status": "supported"
+    },
+    {
+      "rule_id": "psychometric-reliability-error-001",
+      "topic": "psychometrics",
+      "decision": "Keep reliability and measurement error separate when evaluating an instrument.",
+      "conditions": [
+        "Repeated measurements or measurement-quality evidence are available"
+      ],
+      "action": "Represent reliability as consistency/discrimination between people and measurement error as precision/error in individual scores; do not substitute one for the other.",
+      "assumptions": [
+        "Repeated measurements for reliability/error evaluation are taken in participants stable on the construct"
+      ],
+      "diagnostics": [
+        "Reliability coefficient appropriate to design",
+        "Standard error of measurement",
+        "Smallest detectable change or limits of agreement where appropriate",
+        "Stability between repeated measurements"
+      ],
+      "warnings": [
+        "A reliability coefficient does not quantify absolute agreement or individual-score precision by itself.",
+        "Measurement error and reliability can lead to different conclusions about instrument usefulness."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-036-cosmin-manual-v20",
+          "support": "COSMIN defines reliability as true-score variance relative to total variance and measurement error as systematic/random error not due to true change.",
+          "section": "6.5 Reliability and 6.6 Measurement error",
+          "page": "179-186"
+        }
+      ],
+      "validation_status": "supported"
     }
   ]
 }
