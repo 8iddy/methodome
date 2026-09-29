@@ -1,0 +1,25 @@
+{
+  "batch_id": "categorical-regression-batch-4",
+  "status": "draft",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-nominal-logit-001",
+      "topic": "multinomial_logistic_regression",
+      "statement": "Nominal logistic regression is used when a categorical response has three or more categories with no natural ordering among the levels.",
+      "source_id": "src-009-penn-state-stat-501-regression-methods",
+      "section": "Lesson 13.2: Logistic Regression; 13.2.1 Nominal Logistic Regression",
+      "page": "11-12 of 33",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-ordinal-logit-001",
+      "topic": "ordinal_logistic_regression",
+      "statement": "Ordinal logistic regression is used when a categorical response has three or more categories with a natural ordering, and the ordering does not imply equal intervals between adjacent levels.",
+      "source_id": "src-009-penn-state-stat-501-regression-methods",
+      "section": "Lesson 13.2: Logistic Regression; 13.2.2 Ordinal Logistic Regression",
+      "page": "11-12 of 33",
+      "support_type": "direct"
+    }
+  ]
+}
