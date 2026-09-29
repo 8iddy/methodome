@@ -2179,11 +2179,7 @@ function LiveVariables({ projectId }: { projectId: string }) {
           evidence:
             refreshed?.evidence ??
             ["Methodome did not find enough evidence to resolve this concept automatically."],
-          confirmed:
-            Boolean(
-              refreshed?.datasetVariable &&
-                refreshed.mappingStatus === "direct_match"
-            )
+          confirmed: false
         };
       });
 
