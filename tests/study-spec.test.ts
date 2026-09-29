@@ -37,7 +37,47 @@ describe("study specification", () => {
 
     expect(parsed.clustered).toBe(true);
     expect(parsed.clusterVariable).toBe("district");
+    expect(parsed.paired).toBe(false);
     expect(parsed.researchQuestions[0]?.outcomes[0]?.variableType).toBe("binary");
+  });
+
+  it("preserves explicit paired design and observed group-level metadata", () => {
+    const parsed = parseStudySpecification({
+      version: "1.0",
+      researchQuestions: [
+        {
+          id: "rq1",
+          text: "Did mean blood pressure change from baseline to follow-up?",
+          objectiveType: "association",
+          outcomes: [
+            {
+              concept: "follow-up blood pressure",
+              datasetVariable: "bp_followup",
+              variableType: "continuous",
+              mappingStatus: "direct_match"
+            }
+          ],
+          predictors: [
+            {
+              concept: "baseline blood pressure",
+              datasetVariable: "bp_baseline",
+              variableType: "continuous",
+              observedLevelCount: 42,
+              mappingStatus: "direct_match"
+            }
+          ],
+          covariates: []
+        }
+      ],
+      studyDesign: "longitudinal",
+      unitOfAnalysis: "participant",
+      repeatedMeasures: true,
+      paired: true
+    });
+
+    expect(parsed.paired).toBe(true);
+    expect(parsed.repeatedMeasures).toBe(true);
+    expect(parsed.researchQuestions[0]?.predictors[0]?.observedLevelCount).toBe(42);
   });
 
   it("rejects a study without research questions", () => {
