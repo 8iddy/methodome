@@ -1,0 +1,70 @@
+{
+  "batch_id": "specialized-methodology-batch-1",
+  "status": "draft",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-fisher-001",
+      "topic": "fisher_exact",
+      "statement": "For two independent small samples with binary/discrete outcomes arranged in a 2x2 table, NIST identifies Fisher's exact probability test as an appropriate exact nonparametric procedure.",
+      "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
+      "section": "7.3.3 Comparing two proportions, exact test for small samples",
+      "page": null,
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-fisher-002",
+      "topic": "fisher_exact",
+      "statement": "CDC notes that chi-square works well in larger outbreak-study samples and that Fisher exact may be more appropriate for smaller studies.",
+      "source_id": "src-074-principles-of-epidemiology-in-public-health-practice-3rd-ed",
+      "section": "Lesson Six, Investigating an Outbreak",
+      "page": "6-44",
+      "support_type": "supporting"
+    },
+    {
+      "evidence_id": "ev-diagnostic-001",
+      "topic": "diagnostic_accuracy",
+      "statement": "Diagnostic test performance can be represented in a 2x2 table against a reference standard, with sensitivity, specificity, predictive values, likelihood ratios, and diagnostic odds ratio derived from true/false positive and negative counts.",
+      "source_id": "src-034-test-performance-metrics",
+      "section": "Appendix: Test Performance Metrics",
+      "page": "A-1",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-diagnostic-002",
+      "topic": "diagnostic_accuracy",
+      "statement": "Sensitivity and specificity trade off as the diagnostic threshold changes; ROC analysis summarizes this threshold-dependent trade-off.",
+      "source_id": "src-034-test-performance-metrics",
+      "section": "Sensitivity and Specificity",
+      "page": "A-1 to A-2",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-diagnostic-003",
+      "topic": "diagnostic_accuracy",
+      "statement": "Positive and negative predictive values depend on disease prevalence as well as test sensitivity and specificity.",
+      "source_id": "src-034-test-performance-metrics",
+      "section": "Appendix: Test Performance Metrics",
+      "page": "A-1",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-psychometric-001",
+      "topic": "psychometrics",
+      "statement": "Structural validity and internal consistency are relevant to reflective measurement models, where items are manifestations of a common underlying construct; factor analysis is not generally relevant to formative models whose items collectively form the construct.",
+      "source_id": "src-036-cosmin-manual-v20",
+      "section": "Assess the relevance of structural validity and internal consistency",
+      "page": "43",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-psychometric-002",
+      "topic": "psychometrics",
+      "statement": "COSMIN evaluates measurement properties including structural validity, internal consistency, cross-cultural validity/measurement invariance, reliability, measurement error, criterion validity, construct validity, and responsiveness.",
+      "source_id": "src-036-cosmin-manual-v20",
+      "section": "Step 6: Evaluate the nine measurement properties",
+      "page": "45 onward",
+      "support_type": "direct"
+    }
+  ]
+}
