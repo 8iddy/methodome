@@ -146,8 +146,8 @@
     },
     {
       "domain": "reporting_standards",
-      "status": "registered",
-      "notes": "STROBE, CONSORT, RECORD, STARD, TRIPOD+AI and PRISMA are registered for later reporting-layer translation."
+      "status": "ruled",
+      "notes": "Draft source-backed reporting rules now cover observational studies (STROBE), randomized trials (CONSORT 2025), diagnostic accuracy (STARD 2015), and prediction models (TRIPOD+AI). Reporting rules remain separate from method-selection validation."
     },
     {
       "domain": "bayesian_methods",
