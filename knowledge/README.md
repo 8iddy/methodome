@@ -4,7 +4,7 @@ This directory contains Methodome's structured methodology knowledge. Raw litera
 
 ## v1 release boundary
 
-The 2026-09-29 v1 source freeze contains 87 Drive files across 40 source families. The structured repository layer contains 107 source-grounded evidence statements, 62 operational rules, and 32 synthetic methodology regression cases.
+The 2026-09-29 v1 source freeze contains 87 Drive files across 40 source families. The structured repository layer contains 103 source-grounded evidence statements, 62 operational rules, and 32 synthetic methodology regression cases.
 
 v1 is **source-supported**, not methodology-validated. A supported rule has traceable source evidence and has passed corpus consistency review. The stronger `validated` state is reserved for the planned expert-labelled protocol-to-analysis benchmark. Synthetic cases protect software behaviour from regressions but are not a substitute for expert methodological validation.
 
