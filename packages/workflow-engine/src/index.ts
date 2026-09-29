@@ -62,10 +62,14 @@ export type WorkflowActionCode =
   | "review_qualitative_themes"
   | "review_project";
 
+export const AUTO_MAPPING_EVIDENCE_MARKER =
+  "Methodome automatic mapping pass completed.";
+
 export interface VariableMappingSnapshot {
   researchConcept: string;
   datasetVariable?: string;
   mappingStatus: "direct_match" | "probable_match" | "uncertain" | "no_match";
+  evidence?: string[];
   confirmedBy?: string;
 }
 
@@ -581,9 +585,15 @@ function chooseNextAction(
     );
   }
 
+  const automaticMappingAttempted = snapshot.mappings.some((item) =>
+    item.evidence?.includes(AUTO_MAPPING_EVIDENCE_MARKER)
+  );
   if (
     mapping.totalConcepts > 0 &&
-    snapshot.mappings.length < mapping.totalConcepts
+    (
+      snapshot.mappings.length < mapping.totalConcepts ||
+      (mapping.status === "needs_review" && !automaticMappingAttempted)
+    )
   ) {
     return action(
       "map_variables",
