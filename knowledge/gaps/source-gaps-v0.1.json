@@ -11,9 +11,9 @@
       "resolution": {
         "source_ids": [
           "src-002-nistsematech-e-handbook-of-statistical-methods",
-          "src-074-principles-of-epidemiology-in-public-health-practice-3rd-ed"
+          "src-068-penn-state-stat-200-elementary-statistics"
         ],
-        "note": "NIST explicitly recommends Fisher exact for small independent-sample 2x2 discrete data; CDC independently notes Fisher may be more appropriate for smaller studies."
+        "note": "NIST explicitly supports Fisher exact for small independent-sample 2x2 discrete data; Penn State independently states Fisher exact may be used when large-sample two-proportion approximation assumptions are not met."
       }
     },
     {
