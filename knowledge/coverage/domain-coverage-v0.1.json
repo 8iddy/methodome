@@ -81,8 +81,8 @@
     },
     {
       "domain": "poisson_negative_binomial",
-      "status": "registered",
-      "notes": "Basic Poisson count-outcome routing evidence is now extracted. Full Poisson diagnostics and negative-binomial selection, including overdispersion criteria, remain pending."
+      "status": "extracted",
+      "notes": "Poisson count routing is source-backed and has a conservative draft rule. Dispersion/zero diagnostics and negative-binomial selection remain open source gaps."
     },
     {
       "domain": "repeated_measures_longitudinal",
