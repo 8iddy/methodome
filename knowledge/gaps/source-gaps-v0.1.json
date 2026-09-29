@@ -49,7 +49,7 @@
       "topic": "negative_binomial_regression",
       "need": "Primary source-backed decision rule for when negative-binomial regression should replace or supplement Poisson regression, including overdispersion diagnostics.",
       "reason": "A specialist source now directly supports quasi-Poisson and negative-binomial regression as alternatives for overdispersed counts and explains their different mean-variance relationships. A fully automated negative-binomial selection rule still needs operational diagnostics for matching variance structure and other count-data features.",
-      "status": "partial",
+      "status": "deferred",
       "resolution_progress": {
         "source_ids": [
           "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data"
@@ -58,14 +58,16 @@
           "count-overdispersion-001"
         ],
         "note": "Ver Hoef & Boveng (2007) supports overdispersion-aware model selection but does not justify the crude rule 'overdispersion => negative binomial'."
-      }
+      },
+      "non_blocking_for_release": true,
+      "resolution_note": "Methodome v1 has source-backed count routing and an explicit safeguard against automatic overdispersion→negative-binomial switching. Detailed automated negative-binomial selection remains a v1.1 expansion and the method is not executable in the current runtime."
     },
     {
       "gap_id": "gap-poisson-dispersion-001",
       "topic": "poisson_regression",
       "need": "Source-backed operational guidance for dispersion assessment, excess zeros, and model adequacy before automated Poisson recommendation.",
       "reason": "The specialist source supports detecting overdispersion as a reason to reconsider ordinary Poisson and comparing quasi-Poisson versus negative-binomial variance structures. Excess-zero handling and a complete automated adequacy workflow remain unresolved.",
-      "status": "partial",
+      "status": "deferred",
       "resolution_progress": {
         "source_ids": [
           "src-076-quasi-poisson-vs-negative-binomial-regression-overdispersed-count-data"
@@ -74,7 +76,9 @@
           "count-overdispersion-001"
         ],
         "note": "Overdispersion now has direct source support; excess zeros and full operational thresholds remain open."
-      }
+      },
+      "non_blocking_for_release": true,
+      "resolution_note": "Methodome v1 records the Poisson mean-variance assumption and requires dispersion/model-adequacy review before future automatic recommendation. Full operational dispersion thresholds and remediation are deferred because Poisson is not executable in the current runtime."
     },
     {
       "gap_id": "gap-logit-separation-001",
@@ -127,7 +131,9 @@
       "topic": "count_regression",
       "need": "Source-backed decision guidance for excess-zero count data, including when zero-inflated or hurdle models should enter the candidate set.",
       "reason": "The overdispersion source does not by itself support an automated zero-inflation or hurdle-model decision rule.",
-      "status": "open"
+      "status": "deferred",
+      "non_blocking_for_release": true,
+      "resolution_note": "Zero-inflated and hurdle-model routing is intentionally deferred to the advanced count-model expansion. Methodome v1 must flag excess zeros for review and must not invent an automatic zero-inflated/hurdle choice."
     },
     {
       "gap_id": "gap-mice-general-guidance-001",
@@ -153,5 +159,6 @@
       "non_blocking_for_release": true,
       "resolution_note": "Methodome v1 has sufficient source-backed safeguards from Sterne et al. (2009), Royston & White (2011 implementation paper), and Resche-Rigon & White (2018) to proceed. White, Royston & Wood (2011) remains a desirable v1.1 enrichment source for deeper generic MICE implementation guidance, but it is not a release blocker."
     }
-  ]
+  ],
+  "release_boundary_note": "For v1, unresolved advanced-method source gaps are recorded as deferred and non-blocking. Deferred means Methodome must not autonomously recommend or execute the unresolved branch until the rule is expanded and benchmarked."
 }
