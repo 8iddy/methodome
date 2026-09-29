@@ -84,12 +84,14 @@ function selection(
 function mapping(
   concept: string,
   datasetVariable?: string,
-  confirmed = true
+  confirmed = true,
+  mappingStatus: VariableMappingSnapshot["mappingStatus"] =
+    datasetVariable ? "direct_match" : "no_match"
 ): VariableMappingSnapshot {
   return {
     researchConcept: concept,
     ...(datasetVariable ? { datasetVariable } : {}),
-    mappingStatus: datasetVariable ? "direct_match" : "no_match",
+    mappingStatus,
     ...(confirmed ? { confirmedBy: "user-1" } : {})
   };
 }
@@ -172,7 +174,7 @@ describe("project readiness", () => {
     const readiness = assessProjectReadiness(
       snapshot({
         mappings: [
-          mapping("stockout frequency", "stockout_days", false),
+          mapping("stockout frequency", "stockout_days", false, "probable_match"),
           mapping("routine data use", "data_use_score")
         ]
       })
@@ -181,6 +183,36 @@ describe("project readiness", () => {
     expect(readiness.stages.mappings).toBe("needs_review");
     expect(readiness.mappingSummary.unreviewedCount).toBe(1);
     expect(readiness.nextAction.code).toBe("review_variable_mappings");
+  });
+
+  it("accepts exact metadata mappings without asking for redundant confirmation", () => {
+    const readiness = assessProjectReadiness(
+      snapshot({
+        mappings: [
+          mapping("stockout frequency", "stockout_days", false),
+          mapping("routine data use", "data_use_score", false)
+        ]
+      })
+    );
+
+    expect(readiness.mappingSummary.reviewedCount).toBe(2);
+    expect(readiness.mappingSummary.unreviewedCount).toBe(0);
+    expect(readiness.stages.mappings).toBe("ready");
+    expect(readiness.nextAction.code).toBe("build_analysis_plan");
+  });
+
+  it("hands missing mappings to the orchestrator before asking the researcher", () => {
+    const readiness = assessProjectReadiness(
+      snapshot({
+        mappings: []
+      })
+    );
+    const orchestrator = buildOrchestratorView(readiness, null);
+
+    expect(readiness.nextAction.code).toBe("map_variables");
+    expect(orchestrator.status).toBe("ready_to_execute");
+    expect(orchestrator.automaticAction).toBe("map_variables");
+    expect(orchestrator.decisions).toHaveLength(0);
   });
 
   it("hides next-action guidance when the researcher is already on its work surface", () => {
