@@ -1,0 +1,79 @@
+{
+  "batch_id": "descriptive-two-group-batch-3",
+  "status": "draft",
+  "extracted_date": "2026-09-29",
+  "records": [
+    {
+      "evidence_id": "ev-descriptive-001",
+      "topic": "descriptive_analysis",
+      "statement": "One categorical variable can be summarized with counts/proportions, while quantitative variables require numerical summaries and inspection of distribution shape.",
+      "source_id": "src-061-penn-state-stat-200-elementary-statistics",
+      "section": "Lesson 2: Describing Data, Part 1",
+      "page": "1-2, 38-48 of 56",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-descriptive-002",
+      "topic": "descriptive_analysis",
+      "statement": "For a symmetric quantitative distribution the mean is often preferred; for skewed distributions or distributions with outliers, the median is often preferred because it is more resistant to outliers.",
+      "source_id": "src-061-penn-state-stat-200-elementary-statistics",
+      "section": "Skewness & Central Tendency",
+      "page": "43 of 56",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-descriptive-003",
+      "topic": "descriptive_analysis",
+      "statement": "Standard deviation is a common variability measure for interval- or ratio-level variables; the five-number summary and interquartile range are also available descriptive summaries for quantitative data.",
+      "source_id": "src-061-penn-state-stat-200-elementary-statistics",
+      "section": "Measures of Spread and Display Descriptive Statistics",
+      "page": "44-48 of 56",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-ttest-001",
+      "topic": "independent_two_sample_t",
+      "statement": "The pooled two-sample t procedure for comparing two population means requires independent random samples from normal populations with equal variances; the source describes independence as the most critical condition.",
+      "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
+      "section": "Chapter 6.2 Inferences about two population central values: independent samples",
+      "page": "293-305",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-ttest-002",
+      "topic": "independent_two_sample_t",
+      "statement": "When population variances differ, the text presents a separate-variance t procedure and notes it is more reliable than a pooled t procedure when sample sizes and variances are very unequal.",
+      "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
+      "section": "Chapter 6.2",
+      "page": "303-305",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-paired-t-001",
+      "topic": "paired_t",
+      "statement": "Paired samples are dependent observations matched in a meaningful way, commonly repeated measurements on the same participant; inference is conducted on within-pair difference scores.",
+      "source_id": "src-067-penn-state-stat-200-elementary-statistics",
+      "section": "8.3 Paired Means",
+      "page": "48-53 of 58",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-paired-t-002",
+      "topic": "paired_t",
+      "statement": "Penn State states that a paired-means t procedure requires paired data and a normally distributed population of differences, or a sample size of at least 30 for the course's approximation rule.",
+      "source_id": "src-067-penn-state-stat-200-elementary-statistics",
+      "section": "8.3.2 Hypothesis Testing",
+      "page": "50-53 of 58",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-anova-multiplicity-001",
+      "topic": "multiple_group_comparisons",
+      "statement": "Using multiple independent t tests to compare more than two group means increases the chance of Type I error; one-way ANOVA provides an overall multi-group comparison.",
+      "source_id": "src-069-penn-state-stat-200-elementary-statistics",
+      "section": "Lesson 10: One-Way ANOVA",
+      "page": "1 of 15",
+      "support_type": "direct"
+    }
+  ]
+}
