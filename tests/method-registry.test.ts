@@ -197,3 +197,113 @@ describe("deterministic method registry", () => {
     expect(selection.warnings.join(" ")).toContain("population representativeness");
   });
 });
+
+
+describe("comparison method routing", () => {
+  it("routes a continuous outcome with two independent groups to Welch t and Mann-Whitney", () => {
+    const study = clusteredBinaryStudy();
+    study.clustered = false;
+    study.clusterVariable = null;
+    study.researchQuestions[0]!.outcomes[0]!.variableType = "continuous";
+    study.researchQuestions[0]!.predictors = [
+      {
+        concept: "treatment group",
+        datasetVariable: "group",
+        variableType: "categorical_nominal",
+        observedLevelCount: 2,
+        mappingStatus: "direct_match"
+      }
+    ];
+
+    const selection = selectCandidateMethods(study, "rq1");
+
+    expect(selection.candidates.map((item) => item.methodId)).toEqual([
+      "independent_two_sample_t",
+      "mann_whitney"
+    ]);
+    expect(selection.candidates.every((item) => item.executable)).toBe(true);
+  });
+
+  it("routes a continuous outcome with three or more groups to ANOVA and Kruskal-Wallis", () => {
+    const study = clusteredBinaryStudy();
+    study.clustered = false;
+    study.clusterVariable = null;
+    study.researchQuestions[0]!.outcomes[0]!.variableType = "continuous";
+    study.researchQuestions[0]!.predictors = [
+      {
+        concept: "clinic type",
+        datasetVariable: "clinic_type",
+        variableType: "categorical_nominal",
+        observedLevelCount: 4,
+        mappingStatus: "direct_match"
+      }
+    ];
+
+    const selection = selectCandidateMethods(study, "rq1");
+
+    expect(selection.candidates.map((item) => item.methodId)).toEqual([
+      "one_way_anova",
+      "kruskal_wallis"
+    ]);
+  });
+
+  it("blocks categorical group comparison until the group level count is known", () => {
+    const study = clusteredBinaryStudy();
+    study.clustered = false;
+    study.clusterVariable = null;
+    study.researchQuestions[0]!.outcomes[0]!.variableType = "continuous";
+    study.researchQuestions[0]!.predictors = [
+      {
+        concept: "clinic type",
+        datasetVariable: "clinic_type",
+        variableType: "categorical_nominal",
+        mappingStatus: "direct_match"
+      }
+    ];
+
+    const selection = selectCandidateMethods(study, "rq1");
+
+    expect(selection.candidates).toHaveLength(0);
+    expect(selection.blockedReason).toContain("level count");
+  });
+
+  it("routes an explicitly paired two-measurement design to paired methods", () => {
+    const study = clusteredBinaryStudy();
+    study.clustered = false;
+    study.clusterVariable = null;
+    study.repeatedMeasures = true;
+    study.paired = true;
+    study.studyDesign = "longitudinal";
+    study.researchQuestions[0]!.outcomes[0]!.variableType = "continuous";
+    study.researchQuestions[0]!.predictors = [
+      {
+        concept: "baseline measurement",
+        datasetVariable: "baseline",
+        variableType: "continuous",
+        mappingStatus: "direct_match"
+      }
+    ];
+
+    const selection = selectCandidateMethods(study, "rq1");
+
+    expect(selection.candidates.map((item) => item.methodId)).toEqual([
+      "paired_t",
+      "wilcoxon_signed_rank"
+    ]);
+  });
+
+  it("does not treat generic repeated measures as a paired test design", () => {
+    const study = clusteredBinaryStudy();
+    study.clustered = false;
+    study.clusterVariable = null;
+    study.repeatedMeasures = true;
+    study.paired = false;
+    study.studyDesign = "longitudinal";
+    study.researchQuestions[0]!.outcomes[0]!.variableType = "continuous";
+
+    const selection = selectCandidateMethods(study, "rq1");
+
+    expect(selection.candidates).toHaveLength(0);
+    expect(selection.blockedReason).toContain("Repeated observations");
+  });
+});

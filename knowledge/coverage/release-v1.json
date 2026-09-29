@@ -24,15 +24,15 @@
     "chi_square",
     "fisher_exact",
     "linear_regression",
-    "binary_logistic_regression"
-  ],
-  "source_supported_nonruntime_branches": [
+    "binary_logistic_regression",
     "independent_two_sample_t",
     "paired_t",
     "one_way_anova",
     "wilcoxon_signed_rank",
     "mann_whitney",
-    "kruskal_wallis",
+    "kruskal_wallis"
+  ],
+  "source_supported_nonruntime_branches": [
     "complex_survey_analysis",
     "repeated_measures_and_cluster_gates",
     "causal_identification_and_difference_in_differences",

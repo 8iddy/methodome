@@ -372,7 +372,7 @@ async function resolveStudySpecificationForMethods(
       const profiled = byName.get(mapping.datasetVariable);
       variable.datasetVariable = mapping.datasetVariable;
       variable.mappingStatus = mapping.mappingStatus as typeof variable.mappingStatus;
-      variable.variableType =
+      const profiledType =
         profiled?.dataType && [
           "binary",
           "categorical_nominal",
@@ -385,7 +385,12 @@ async function resolveStudySpecificationForMethods(
           "unknown"
         ].includes(profiled.dataType)
           ? (profiled.dataType as typeof variable.variableType)
-          : variable.variableType;
+          : null;
+      if (!variable.variableType || variable.variableType === "unknown") {
+        variable.variableType = profiledType ?? variable.variableType;
+      }
+      variable.observedLevelCount =
+        profiled?.uniqueCount ?? variable.observedLevelCount;
     }
   }
 

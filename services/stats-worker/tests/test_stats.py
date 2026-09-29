@@ -142,3 +142,151 @@ def test_fisher_exact_known_table():
     estimate = result["estimates"][0]
     assert math.isclose(estimate["estimate"], 1 / 9, rel_tol=1e-12)
     assert 0 <= estimate["pValue"] <= 1
+
+
+def test_independent_two_sample_t_uses_welch_inference():
+    csv_text = (
+        "outcome,group\n"
+        "1,A\n2,A\n3,A\n4,A\n5,A\n"
+        "3,B\n4,B\n5,B\n6,B\n7,B\n8,B\n"
+    )
+    result = run_analysis(
+        {
+            "methodId": "independent_two_sample_t",
+            "csv": csv_text,
+            "outcome": "outcome",
+            "predictors": ["group"],
+        }
+    )
+    estimate = result["estimates"][0]
+    assert result["n"] == 11
+    assert math.isclose(estimate["estimate"], -2.5, abs_tol=1e-12)
+    assert math.isclose(estimate["statistic"], -2.401922307076307, rel_tol=1e-10)
+    assert math.isclose(estimate["pValue"], 0.039803082024136245, rel_tol=1e-8)
+    assert math.isclose(
+        estimate["confidenceInterval"]["lower"],
+        -4.854952643964417,
+        rel_tol=1e-8,
+    )
+    assert math.isclose(
+        estimate["confidenceInterval"]["upper"],
+        -0.14504735603558316,
+        rel_tol=1e-8,
+    )
+
+
+def test_paired_t_uses_within_pair_differences():
+    csv_text = (
+        "followup,baseline\n"
+        "10,8\n12,11\n9,7\n11,10\n13,10\n8,9\n"
+    )
+    result = run_analysis(
+        {
+            "methodId": "paired_t",
+            "csv": csv_text,
+            "outcome": "followup",
+            "predictors": ["baseline"],
+        }
+    )
+    estimate = result["estimates"][0]
+    assert result["n"] == 6
+    assert math.isclose(estimate["estimate"], 4 / 3, rel_tol=1e-12)
+    assert math.isclose(estimate["statistic"], 2.3904572186687876, rel_tol=1e-10)
+    assert math.isclose(estimate["pValue"], 0.062352416002150406, rel_tol=1e-8)
+
+
+def test_one_way_anova_known_groups():
+    csv_text = (
+        "outcome,group\n"
+        "1,A\n2,A\n3,A\n4,A\n"
+        "3,B\n4,B\n5,B\n6,B\n"
+        "8,C\n9,C\n10,C\n11,C\n"
+    )
+    result = run_analysis(
+        {
+            "methodId": "one_way_anova",
+            "csv": csv_text,
+            "outcome": "outcome",
+            "predictors": ["group"],
+        }
+    )
+    estimate = result["estimates"][0]
+    assert result["n"] == 12
+    assert math.isclose(estimate["statistic"], 31.2, rel_tol=1e-12)
+    assert math.isclose(estimate["pValue"], 8.962916273002204e-05, rel_tol=1e-8)
+
+
+def test_mann_whitney_exact_without_ties():
+    csv_text = (
+        "outcome,group\n"
+        "1,A\n2,A\n3,A\n4,A\n5,A\n"
+        "6,B\n7,B\n8,B\n9,B\n10,B\n"
+    )
+    result = run_analysis(
+        {
+            "methodId": "mann_whitney",
+            "csv": csv_text,
+            "outcome": "outcome",
+            "predictors": ["group"],
+        }
+    )
+    estimate = result["estimates"][0]
+    assert math.isclose(estimate["statistic"], 0.0, abs_tol=1e-12)
+    assert math.isclose(estimate["pValue"], 0.007936507936507936, rel_tol=1e-12)
+    exact = next(item for item in result["diagnostics"] if item["id"] == "exact_inference")
+    assert exact["value"] is True
+
+
+def test_wilcoxon_signed_rank_exact_without_ties():
+    csv_text = (
+        "after,before\n"
+        "6,5\n7,5\n8,5\n10,5\n12,5\n"
+    )
+    result = run_analysis(
+        {
+            "methodId": "wilcoxon_signed_rank",
+            "csv": csv_text,
+            "outcome": "after",
+            "predictors": ["before"],
+        }
+    )
+    estimate = result["estimates"][0]
+    assert math.isclose(estimate["statistic"], 0.0, abs_tol=1e-12)
+    assert math.isclose(estimate["pValue"], 0.0625, rel_tol=1e-12)
+
+
+def test_kruskal_wallis_known_groups_with_ties():
+    csv_text = (
+        "outcome,group\n"
+        "1,A\n2,A\n3,A\n4,A\n"
+        "3,B\n4,B\n5,B\n6,B\n"
+        "8,C\n9,C\n10,C\n11,C\n"
+    )
+    result = run_analysis(
+        {
+            "methodId": "kruskal_wallis",
+            "csv": csv_text,
+            "outcome": "outcome",
+            "predictors": ["group"],
+        }
+    )
+    estimate = result["estimates"][0]
+    assert math.isclose(estimate["statistic"], 8.830985915492962, rel_tol=1e-10)
+    assert math.isclose(estimate["pValue"], 0.012088593490222907, rel_tol=1e-8)
+
+
+def test_group_comparison_rejects_covariates():
+    csv_text = "outcome,group,z\n1,A,1\n2,A,2\n3,B,3\n4,B,4\n"
+    try:
+        run_analysis(
+            {
+                "methodId": "independent_two_sample_t",
+                "csv": csv_text,
+                "outcome": "outcome",
+                "predictors": ["group"],
+                "covariates": ["z"],
+            }
+        )
+        assert False, "expected ValueError"
+    except ValueError as exc:
+        assert "no covariates" in str(exc)

@@ -1,4 +1,4 @@
-export const METHODOME_METHODOLOGY_KNOWLEDGE_VERSION = "2026-09-29.1";
+export const METHODOME_METHODOLOGY_KNOWLEDGE_VERSION = "2026-09-29.2";
 
 export const objectiveTypeGuidance = {
   descriptive:
@@ -28,6 +28,8 @@ export const studyDesignGuidance = {
     "The entity represented by one analytical observation, such as participant, household, health facility, district, interview, or record.",
   repeatedMeasures:
     "True only when the same analytical units are measured more than once.",
+  paired:
+    "True only when the intended analysis compares exactly two meaningfully matched measurements or matched units through within-pair differences. Repeated measures with more than two occasions are not automatically paired-test designs.",
   clustered:
     "True when lower-level observations are nested within higher-level units or cluster sampling materially affects analysis.",
   surveyWeights:
@@ -59,6 +61,7 @@ export function protocolInterpretationSystemPrompt(): string {
     `- samplingDesign: ${studyDesignGuidance.samplingDesign}`,
     `- unitOfAnalysis: ${studyDesignGuidance.unitOfAnalysis}`,
     `- repeatedMeasures: ${studyDesignGuidance.repeatedMeasures}`,
+    `- paired: ${studyDesignGuidance.paired}`,
     `- clustered: ${studyDesignGuidance.clustered}`,
     `- surveyWeights: ${studyDesignGuidance.surveyWeights}`,
     `- stratified: ${studyDesignGuidance.stratified}`,

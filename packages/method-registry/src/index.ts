@@ -37,7 +37,7 @@ export interface CandidateSelection {
   blockedReason?: string;
 }
 
-export const registryVersion = "0.1.0";
+export const registryVersion = "0.2.0";
 
 export const methodRegistry: Record<string, MethodDefinition> = {
   descriptive_statistics: {
@@ -162,6 +162,101 @@ export const methodRegistry: Record<string, MethodDefinition> = {
     supportsSurveyWeights: false,
     assumptions: ["count outcome", "overdispersion parameter estimable"],
     diagnostics: ["overdispersion", "zero inflation", "influence"]
+  },
+  independent_two_sample_t: {
+    id: "independent_two_sample_t",
+    displayName: "Independent two-sample t-test (Welch)",
+    family: "group_comparison",
+    maturity: "supported",
+    executable: true,
+    outcomeTypes: ["continuous"],
+    supportsClustering: false,
+    supportsRepeatedMeasures: false,
+    supportsSurveyWeights: false,
+    assumptions: [
+      "two independent groups",
+      "mean difference is the target",
+      "t-based inference is adequate"
+    ],
+    diagnostics: ["group sizes", "group distributions", "outliers", "variance structure"]
+  },
+  paired_t: {
+    id: "paired_t",
+    displayName: "Paired t-test",
+    family: "paired_comparison",
+    maturity: "supported",
+    executable: true,
+    outcomeTypes: ["continuous"],
+    supportsClustering: false,
+    supportsRepeatedMeasures: true,
+    supportsSurveyWeights: false,
+    assumptions: [
+      "exactly two correctly matched measurements",
+      "independent pairs",
+      "mean within-pair difference is the target"
+    ],
+    diagnostics: ["complete pairs", "difference distribution", "outlying differences"]
+  },
+  one_way_anova: {
+    id: "one_way_anova",
+    displayName: "One-way ANOVA",
+    family: "group_comparison",
+    maturity: "supported",
+    executable: true,
+    outcomeTypes: ["continuous"],
+    supportsClustering: false,
+    supportsRepeatedMeasures: false,
+    supportsSurveyWeights: false,
+    assumptions: [
+      "independent groups",
+      "group means are the target",
+      "ordinary fixed-effect ANOVA error structure is adequate"
+    ],
+    diagnostics: ["group sizes", "group variance pattern", "residual structure", "outliers"]
+  },
+  wilcoxon_signed_rank: {
+    id: "wilcoxon_signed_rank",
+    displayName: "Wilcoxon signed-rank test",
+    family: "paired_comparison",
+    maturity: "supported",
+    executable: true,
+    outcomeTypes: ["continuous", "categorical_ordinal"],
+    supportsClustering: false,
+    supportsRepeatedMeasures: true,
+    supportsSurveyWeights: false,
+    assumptions: [
+      "exactly two correctly matched measurements",
+      "independent pairs",
+      "rankable within-pair differences",
+      "symmetric difference distribution for the usual signed-rank interpretation"
+    ],
+    diagnostics: ["complete pairs", "zero differences", "ties", "difference symmetry"]
+  },
+  mann_whitney: {
+    id: "mann_whitney",
+    displayName: "Mann-Whitney U test",
+    family: "group_comparison",
+    maturity: "supported",
+    executable: true,
+    outcomeTypes: ["continuous", "categorical_ordinal"],
+    supportsClustering: false,
+    supportsRepeatedMeasures: false,
+    supportsSurveyWeights: false,
+    assumptions: ["two independent groups", "rankable outcome"],
+    diagnostics: ["group sizes", "ties", "group shapes", "group spreads"]
+  },
+  kruskal_wallis: {
+    id: "kruskal_wallis",
+    displayName: "Kruskal-Wallis test",
+    family: "group_comparison",
+    maturity: "supported",
+    executable: true,
+    outcomeTypes: ["continuous", "categorical_ordinal"],
+    supportsClustering: false,
+    supportsRepeatedMeasures: false,
+    supportsSurveyWeights: false,
+    assumptions: ["three or more independent groups", "rankable outcome"],
+    diagnostics: ["group sizes", "ties", "group shapes", "group spreads"]
   },
   chi_square: {
     id: "chi_square",
@@ -380,19 +475,55 @@ export function selectCandidateMethods(
     };
   }
 
-  if (
-    (study.clustered || study.repeatedMeasures) &&
-    outcome.variableType !== "binary"
-  ) {
+  if (study.clustered && outcome.variableType !== "binary") {
     return {
       questionId,
       candidates: [],
       warnings: [
         ...baseWarnings,
-        "The current deterministic registry has no correlation-aware executable method for this outcome type."
+        "The current deterministic registry has no cluster-aware executable method for this outcome type."
       ],
       blockedReason:
-        "Repeated or clustered observations must not be analysed with an iid method."
+        "Clustered observations must not be analysed with an iid method."
+    };
+  }
+
+  if (
+    study.paired &&
+    outcome.variableType === "continuous" &&
+    question.objectiveType === "association" &&
+    question.predictors.length === 1 &&
+    question.predictors[0]?.variableType === "continuous" &&
+    question.covariates.length === 0
+  ) {
+    return {
+      questionId,
+      candidates: [
+        candidate(
+          "paired_t",
+          "The study declares an exactly paired design and the analysis concerns a quantitative within-pair difference.",
+          "Use when the mean within-pair difference is the target and the difference-score distribution supports t-based inference."
+        ),
+        candidate(
+          "wilcoxon_signed_rank",
+          "The study declares an exactly paired design and a rank-based within-pair comparison is available.",
+          "Use only when a signed-rank interpretation is appropriate, including plausible symmetry of the difference distribution."
+        )
+      ],
+      warnings: baseWarnings
+    };
+  }
+
+  if (study.repeatedMeasures && outcome.variableType !== "binary") {
+    return {
+      questionId,
+      candidates: [],
+      warnings: [
+        ...baseWarnings,
+        "Repeated measures with more than a simple two-measurement paired structure require a correlation-aware repeated-measures method."
+      ],
+      blockedReason:
+        "Repeated observations must not be analysed with an iid method."
     };
   }
 
@@ -506,6 +637,70 @@ export function selectCandidateMethods(
   }
 
   if (outcome.variableType === "continuous") {
+    if (
+      question.objectiveType === "association" &&
+      question.predictors.length === 1 &&
+      question.covariates.length === 0 &&
+      ["binary", "categorical_nominal", "categorical_ordinal"].includes(
+        question.predictors[0]?.variableType ?? "unknown"
+      )
+    ) {
+      const group = question.predictors[0]!;
+      const levelCount =
+        group.variableType === "binary"
+          ? 2
+          : group.observedLevelCount;
+
+      if (levelCount === 2) {
+        return {
+          questionId,
+          candidates: [
+            candidate(
+              "independent_two_sample_t",
+              "A quantitative outcome is being compared across exactly two independent groups.",
+              "Use Welch's two-sample t-test when the mean difference is the target; do not use a universal sample-size or normality-test cutoff."
+            ),
+            candidate(
+              "mann_whitney",
+              "A quantitative outcome is being compared across exactly two independent groups using ranks.",
+              "Use only when a rank/distribution comparison matches the estimand; do not describe this automatically as a median test."
+            )
+          ],
+          warnings: baseWarnings
+        };
+      }
+
+      if (typeof levelCount === "number" && levelCount >= 3) {
+        return {
+          questionId,
+          candidates: [
+            candidate(
+              "one_way_anova",
+              "A quantitative outcome is being compared across three or more independent groups.",
+              "Use only when an ordinary fixed-effect mean-comparison model matches the design and residual structure."
+            ),
+            candidate(
+              "kruskal_wallis",
+              "A quantitative outcome is being compared across three or more independent groups using ranks.",
+              "Use only when a rank/distribution comparison matches the estimand; do not treat this as an automatic median test."
+            )
+          ],
+          warnings: baseWarnings
+        };
+      }
+
+      return {
+        questionId,
+        candidates: [],
+        warnings: [
+          ...baseWarnings,
+          "Confirm the observed number of grouping levels before Methodome chooses a two-group or multi-group comparison procedure."
+        ],
+        blockedReason:
+          "The grouping-variable level count is required for automatic comparison-method routing."
+      };
+    }
+
     const continuousPredictors = question.predictors.filter(
       (p) => p.variableType === "continuous"
     );

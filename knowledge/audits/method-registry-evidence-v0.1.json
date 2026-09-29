@@ -1,7 +1,7 @@
 {
   "audit_id": "methodome-method-registry-evidence-audit-v0.1",
   "updated_date": "2026-09-29",
-  "registry_version": "0.1.0",
+  "registry_version": "0.2.0",
   "purpose": "Audit every current method-registry entry against the v1 methodology corpus without conflating computational correctness, source support, and expert-benchmark validation.",
   "status_definitions": {
     "source_supported": "A source-backed operational decision rule exists; expert methodology benchmark validation is still pending.",
@@ -185,6 +185,95 @@
       ],
       "finding": "Exact independent 2x2 testing for sparse situations is source-supported without an arbitrary total-sample cutoff.",
       "action": "Keep executable; dependent/clustered/survey tables remain outside this simple test."
+    },
+    {
+      "method_id": "independent_two_sample_t",
+      "registry_maturity": "supported",
+      "executable": true,
+      "methodology_status": "source_supported",
+      "evidence_sources": [
+        "src-079-nist-two-sample-t-test-for-equal-means",
+        "src-068-penn-state-stat-200-elementary-statistics"
+      ],
+      "rule_ids": [
+        "independent-two-sample-t-001"
+      ],
+      "finding": "Two-independent-group mean comparison is source-supported; the executor uses the Welch form by default and does not encode a universal n>=30 or normality-test cutoff.",
+      "action": "Executable within the iid two-group boundary; expert-labelled methodology validation remains pending."
+    },
+    {
+      "method_id": "paired_t",
+      "registry_maturity": "supported",
+      "executable": true,
+      "methodology_status": "source_supported",
+      "evidence_sources": [
+        "src-002-nistsematech-e-handbook-of-statistical-methods"
+      ],
+      "rule_ids": [
+        "paired-t-001"
+      ],
+      "finding": "Paired mean inference based on one within-pair difference per matched unit is source-supported.",
+      "action": "Executable only when an explicit simple paired design is declared; generic repeated measures remain blocked."
+    },
+    {
+      "method_id": "one_way_anova",
+      "registry_maturity": "supported",
+      "executable": true,
+      "methodology_status": "source_supported",
+      "evidence_sources": [
+        "src-055-penn-state-stat-502-anova-and-design-of-experiments",
+        "src-047-penn-state-stat-502-anova-and-design-of-experiments",
+        "src-052-penn-state-stat-502-anova-and-design-of-experiments"
+      ],
+      "rule_ids": [
+        "one-way-anova-001",
+        "multi-group-gate-001"
+      ],
+      "finding": "Ordinary one-way fixed-effect mean comparison is source-supported after design and residual-structure checks.",
+      "action": "Executable only for independent multi-group designs; repeated, clustered and survey designs remain blocked."
+    },
+    {
+      "method_id": "wilcoxon_signed_rank",
+      "registry_maturity": "supported",
+      "executable": true,
+      "methodology_status": "source_supported",
+      "evidence_sources": [
+        "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed"
+      ],
+      "rule_ids": [
+        "wilcoxon-signed-rank-001"
+      ],
+      "finding": "Paired signed-rank inference is source-supported with an explicit difference-symmetry requirement for the usual shift interpretation.",
+      "action": "Executable only for an explicitly paired two-measurement structure; symmetry remains a review diagnostic."
+    },
+    {
+      "method_id": "mann_whitney",
+      "registry_maturity": "supported",
+      "executable": true,
+      "methodology_status": "source_supported",
+      "evidence_sources": [
+        "src-080-divine-wilcoxon-mann-whitney-fails-test-medians"
+      ],
+      "rule_ids": [
+        "mann-whitney-001"
+      ],
+      "finding": "Independent two-group rank/distribution comparison is source-supported; generic median-test and automatic non-normal-t-test interpretations are prohibited.",
+      "action": "Executable within the iid two-group boundary with exact inference when feasible and asymptotic tie-corrected inference otherwise."
+    },
+    {
+      "method_id": "kruskal_wallis",
+      "registry_maturity": "supported",
+      "executable": true,
+      "methodology_status": "source_supported",
+      "evidence_sources": [
+        "src-002-nistsematech-e-handbook-of-statistical-methods",
+        "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed"
+      ],
+      "rule_ids": [
+        "kruskal-wallis-001"
+      ],
+      "finding": "Independent multi-group rank comparison is source-supported with distribution/interpretation safeguards.",
+      "action": "Executable within the iid multi-group boundary; a significant omnibus result does not identify differing groups."
     }
   ]
 }
