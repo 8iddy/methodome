@@ -686,10 +686,6 @@ async function orchestratorMapVariables(
             ? ["Methodome accepted this exact metadata match automatically."]
             : [])
         ],
-        ...(suggestion.mappingStatus === "direct_match" &&
-        suggestion.datasetVariable
-          ? { confirmedBy: "methodome:auto:exact_metadata" }
-          : {})
       };
     });
 
