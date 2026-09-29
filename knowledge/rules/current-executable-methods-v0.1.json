@@ -273,6 +273,37 @@
         }
       ],
       "validation_status": "draft"
+    },
+    {
+      "rule_id": "logistic-diagnostics-001",
+      "topic": "binary_logistic_regression",
+      "decision": "Run goodness-of-fit and residual diagnostics that match the predictor-pattern structure before treating a binary logistic model as adequate.",
+      "conditions": [
+        "Binary logistic regression has been fitted"
+      ],
+      "action": "Use Pearson/deviance goodness-of-fit procedures when replicated predictor patterns make them appropriate; use the source-described Hosmer-Lemeshow approach for unreplicated or sparsely replicated predictor patterns, and inspect deviance or Pearson residuals for unusual observations or order structure.",
+      "assumptions": [],
+      "diagnostics": [
+        "Replicated predictor-pattern structure",
+        "Pearson or deviance goodness of fit where applicable",
+        "Hosmer-Lemeshow where applicable under the source guidance",
+        "Deviance or Pearson residuals",
+        "Residuals versus observation order when dependence or ordering is plausible"
+      ],
+      "warnings": [
+        "A fitted logistic model is not automatically adequate merely because coefficient estimation converges.",
+        "Goodness-of-fit procedures depend on the data structure; do not apply one diagnostic mechanically to every logistic model."
+      ],
+      "exceptions": [],
+      "source_evidence": [
+        {
+          "source_id": "src-009-penn-state-stat-501-regression-methods",
+          "support": "Penn State distinguishes Pearson/deviance goodness-of-fit tests for replicated predictor patterns from Hosmer-Lemeshow for unreplicated or sparsely replicated data and discusses deviance/Pearson residual diagnostics.",
+          "section": "Lesson 13: Goodness-of-Fit Tests and logistic diagnostics",
+          "page": "14, 18-19, 29 of 33"
+        }
+      ],
+      "validation_status": "draft"
     }
   ]
 }
