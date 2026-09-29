@@ -111,6 +111,7 @@ function snapshot(
     selections: [selection()],
     plan: null,
     completedAnalysisCount: 0,
+    qualitativeWorkstreams: [],
     ...patch
   };
 }
@@ -401,7 +402,148 @@ describe("project orchestrator view", () => {
     const orchestrator = buildOrchestratorView(readiness, null);
 
     expect(readiness.nextAction.code).toBe("prepare_qualitative_analysis");
-    expect(orchestrator.status).toBe("blocked");
-    expect(orchestrator.automaticAction).toBeUndefined();
+    expect(orchestrator.status).toBe("ready_to_execute");
+    expect(orchestrator.automaticAction).toBe("prepare_qualitative_analysis");
   });
+
+  it("steps qualitative work through codebook, coding and theme review checkpoints", () => {
+    const qualitative = specification("qualitative");
+    qualitative.researchQuestions[0]!.outcomes = [
+      {
+        concept: "implementation experience",
+        datasetVariable: null,
+        variableType: "text",
+        mappingStatus: null
+      }
+    ];
+
+    const base = {
+      specification: qualitative,
+      mappings: [],
+      selections: [selection(false, "Qualitative branch.")],
+      transcriptCount: 2,
+      datasetCount: 0
+    };
+
+    const prepared = assessProjectReadiness(
+      snapshot({
+        ...base,
+        qualitativeWorkstreams: [
+          {
+            id: "qual-1",
+            researchQuestionId: "rq1",
+            status: "prepared"
+          }
+        ]
+      })
+    );
+    expect(prepared.nextAction.code).toBe("propose_qualitative_codebook");
+    expect(buildOrchestratorView(prepared, null).automaticAction).toBe(
+      "propose_qualitative_codebook"
+    );
+
+    const codebookReview = assessProjectReadiness(
+      snapshot({
+        ...base,
+        qualitativeWorkstreams: [
+          {
+            id: "qual-1",
+            researchQuestionId: "rq1",
+            status: "codebook_review"
+          }
+        ]
+      })
+    );
+    const codebookView = buildOrchestratorView(codebookReview, null);
+    expect(codebookReview.nextAction.code).toBe(
+      "review_qualitative_codebook"
+    );
+    expect(codebookView.status).toBe("waiting_for_researcher");
+    expect(
+      codebookView.decisions.some(
+        (decision) => decision.kind === "review_qualitative_codebook"
+      )
+    ).toBe(true);
+
+    const coding = assessProjectReadiness(
+      snapshot({
+        ...base,
+        qualitativeWorkstreams: [
+          {
+            id: "qual-1",
+            researchQuestionId: "rq1",
+            status: "coding_in_progress"
+          }
+        ]
+      })
+    );
+    expect(coding.nextAction.code).toBe("propose_qualitative_codings");
+    expect(buildOrchestratorView(coding, null).automaticAction).toBe(
+      "propose_qualitative_codings"
+    );
+
+    const codingReview = assessProjectReadiness(
+      snapshot({
+        ...base,
+        qualitativeWorkstreams: [
+          {
+            id: "qual-1",
+            researchQuestionId: "rq1",
+            status: "coding_review"
+          }
+        ]
+      })
+    );
+    expect(codingReview.nextAction.code).toBe(
+      "review_qualitative_codings"
+    );
+
+    const themeReady = assessProjectReadiness(
+      snapshot({
+        ...base,
+        qualitativeWorkstreams: [
+          {
+            id: "qual-1",
+            researchQuestionId: "rq1",
+            status: "coding_confirmed"
+          }
+        ]
+      })
+    );
+    expect(themeReady.nextAction.code).toBe(
+      "propose_qualitative_themes"
+    );
+
+    const themeReview = assessProjectReadiness(
+      snapshot({
+        ...base,
+        qualitativeWorkstreams: [
+          {
+            id: "qual-1",
+            researchQuestionId: "rq1",
+            status: "theme_review"
+          }
+        ]
+      })
+    );
+    expect(themeReview.nextAction.code).toBe(
+      "review_qualitative_themes"
+    );
+
+    const complete = assessProjectReadiness(
+      snapshot({
+        ...base,
+        qualitativeWorkstreams: [
+          {
+            id: "qual-1",
+            researchQuestionId: "rq1",
+            status: "complete"
+          }
+        ]
+      })
+    );
+    expect(complete.nextAction.code).toBe("review_results");
+    expect(complete.stages.analysis).toBe("complete");
+  });
+
 });
