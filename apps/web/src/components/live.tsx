@@ -1106,7 +1106,7 @@ function LiveProjectFiles({
             )}
           </div>
         )}
-        {status && <p className="confirmation" role="status">{status}</p>
+        {status && <p className="confirmation" role="status">{status}</p>}
         {mode === "instruments" && (
           <div className="action-row">
             {files.length > 0 ? (
