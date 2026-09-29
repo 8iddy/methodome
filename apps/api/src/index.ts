@@ -2787,7 +2787,7 @@ app.post(
           error: {
             code: "QUALITATIVE_CODEBOOK_ALREADY_IN_USE",
             message:
-              "The codebook cannot be regenerated after coding has started. Start a new qualitative workstream to use a different codebook."
+              "The codebook is frozen after coding starts so the coding record remains reproducible."
           }
         },
         409
@@ -2902,7 +2902,7 @@ app.put(
           error: {
             code: "QUALITATIVE_CODEBOOK_ALREADY_IN_USE",
             message:
-              "Finish this workstream with its current codebook or start a new workstream before changing the codebook."
+              "The codebook is frozen after coding starts so the coding record remains reproducible."
           }
         },
         409
