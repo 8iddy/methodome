@@ -12,16 +12,18 @@ import {
   sha256BytesHex,
   type AuditEventPayload
 } from "@methodome/provenance";
-import type { AnalysisJob, PlannedAnalysis } from "@methodome/analysis-contracts";
+import type { AnalysisJob, AnalysisPlan, PlannedAnalysis } from "@methodome/analysis-contracts";
 import {
   createAnalysisPlan as buildAnalysisPlan,
-  lockAnalysisPlan
+  lockAnalysisPlan,
+  updateAnalysisMethodSelections
 } from "@methodome/analysis-plan";
 import type { Project } from "@methodome/domain";
 import { assertModelRequestAllowed, type ProjectProcessingPolicy } from "@methodome/policy-engine";
 import { compareDatasetSchemas } from "@methodome/schema-harmonisation";
 import {
   assessProjectReadiness,
+  buildOrchestratorView,
   type WorkflowSection
 } from "@methodome/workflow-engine";
 import { requireAuth } from "./auth";
@@ -63,6 +65,7 @@ import {
   getLatestAnalysisPlan,
   getLatestProtocolExtraction,
   listAnalysisHistory,
+  listAnalysisJobsForPlan,
   listAuditEvents,
   listDatasetVersions,
   listProjectFiles,
@@ -399,6 +402,376 @@ async function resolveStudySpecificationForMethods(
   }
 
   return { specification: resolved, datasetVersionId: preferred.id };
+}
+
+async function computeProjectReadiness(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  currentSection?: WorkflowSection
+) {
+  const [
+    files,
+    datasets,
+    specification,
+    mappings,
+    plan,
+    history,
+    extraction
+  ] = await Promise.all([
+    listProjectFiles(c.env.DB, projectId),
+    listDatasetVersions(c.env.DB, projectId),
+    getStudySpecification(c.env.DB, projectId),
+    listVariableMappings(c.env.DB, projectId),
+    getLatestAnalysisPlan(c.env.DB, projectId),
+    listAnalysisHistory(c.env.DB, getUserId(c)),
+    getLatestProtocolExtraction(c.env.DB, projectId)
+  ]);
+
+  let selections: ReturnType<typeof selectCandidateMethods>[] = [];
+  let resolvedDatasetVersionId: string | undefined;
+  let resolvedSpecification = specification;
+
+  if (specification) {
+    const resolved = await resolveStudySpecificationForMethods(
+      c,
+      projectId,
+      specification
+    );
+    resolvedDatasetVersionId = resolved.datasetVersionId;
+    resolvedSpecification = resolved.specification;
+    selections = resolved.specification.researchQuestions.map((question) =>
+      selectCandidateMethods(resolved.specification, question.id)
+    );
+  }
+
+  const projectHistory = history.filter((item) => item.projectId === projectId);
+  const planJobs = plan
+    ? await listAnalysisJobsForPlan(c.env.DB, projectId, plan.id)
+    : [];
+  const completedPlanSignatures = new Set(
+    planJobs
+      .filter(({ state }) => state === "complete")
+      .map(({ job }) => analysisJobSignature(job))
+  );
+  const completedAnalysisCount = Math.min(
+    plan?.analyses.length ?? 0,
+    completedPlanSignatures.size
+  );
+
+  const readiness = assessProjectReadiness(
+    {
+      hasProtocol: files.some((file) => file.fileKind === "protocol"),
+      hasProtocolExtraction: Boolean(extraction),
+      transcriptCount: files.filter((file) => file.fileKind === "transcript").length,
+      datasetCount: datasets.length,
+      hasDerivedDataset: datasets.some((dataset) => dataset.sourceKind === "derived"),
+      specification,
+      mappings: mappings.map((mapping) => ({
+        researchConcept: mapping.researchConcept,
+        ...(mapping.datasetVariable
+          ? { datasetVariable: mapping.datasetVariable }
+          : {}),
+        mappingStatus: mapping.mappingStatus as
+          | "direct_match"
+          | "probable_match"
+          | "uncertain"
+          | "no_match",
+        ...(mapping.confirmedBy ? { confirmedBy: mapping.confirmedBy } : {})
+      })),
+      selections,
+      plan,
+      completedAnalysisCount
+    },
+    currentSection
+  );
+
+  return {
+    readiness,
+    files,
+    datasets,
+    specification,
+    resolvedSpecification,
+    mappings,
+    plan,
+    history: projectHistory,
+    extraction,
+    selections,
+    ...(resolvedDatasetVersionId
+      ? { resolvedDatasetVersionId }
+      : {})
+  };
+}
+
+
+async function runProtocolExtractionForProject(
+  c: import("hono").Context<AppBindings>,
+  projectId: string
+) {
+  if (!c.env.FILES) {
+    throw new Error("Research file storage is required for protocol extraction.");
+  }
+  if (!c.env.AI) {
+    throw new Error("Workers AI is required for protocol extraction.");
+  }
+
+  const policy = await getProjectPolicy(c.env.DB, projectId);
+  if (policy) {
+    assertModelRequestAllowed(policy, {
+      processorId: "workers-ai",
+      providerKind: "internal",
+      payloadKind: "document_text",
+      containsIdentifiers: policy.containsIdentifiableData
+    });
+  }
+
+  const protocolFiles = await listProjectFiles(c.env.DB, projectId, "protocol");
+  const fileId = protocolFiles[0]?.id;
+  if (!fileId) throw new Error("Upload a protocol before extraction.");
+
+  const file = await getFileRecord(c.env.DB, fileId, getUserId(c));
+  if (!file || file.projectId !== projectId || file.fileKind !== "protocol") {
+    throw new Error("The protocol file could not be read.");
+  }
+  if (file.checksumSha256 === "pending") {
+    throw new Error("Finish uploading the protocol before extraction.");
+  }
+
+  const object = await c.env.FILES.get(file.objectKey);
+  if (!object) throw new Error("The stored protocol file could not be read.");
+
+  const text = await researchFileToText({
+    env: c.env,
+    filename: file.filename,
+    ...(file.mediaType ? { mediaType: file.mediaType } : {}),
+    bytes: await object.arrayBuffer()
+  });
+  const extraction = await extractProtocolWithAi(c.env, text);
+  const id = makeId("extract");
+
+  await saveProtocolExtraction(c.env.DB, {
+    id,
+    projectId,
+    protocolFileId: file.id,
+    protocolChecksum: file.checksumSha256,
+    extraction,
+    provider: "cloudflare-workers-ai",
+    model: PROTOCOL_EXTRACTION_MODEL,
+    promptVersion: PROTOCOL_EXTRACTION_PROMPT_VERSION
+  });
+
+  await addAudit(c, {
+    projectId,
+    action: "orchestrator_protocol_information_extracted",
+    objectType: "protocol_extraction",
+    objectId: id,
+    modelId: PROTOCOL_EXTRACTION_MODEL,
+    after: {
+      protocolFileId: file.id,
+      protocolChecksum: file.checksumSha256,
+      promptVersion: PROTOCOL_EXTRACTION_PROMPT_VERSION,
+      researchQuestionCount: extraction.researchQuestions.length
+    }
+  });
+
+  return extraction;
+}
+
+async function createOrchestratedDraftPlan(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+): Promise<AnalysisPlan> {
+  if (state.plan) return state.plan;
+  if (!state.specification || !state.resolvedSpecification) {
+    throw new Error("Confirm the study specification before building a plan.");
+  }
+  if (!state.resolvedDatasetVersionId) {
+    throw new Error("A quantitative analysis dataset is required before building a plan.");
+  }
+
+  const readyQuestionIds = new Set(
+    state.readiness.questions
+      .filter(
+        (question) =>
+          question.mode === "quantitative" && question.status === "ready"
+      )
+      .map((question) => question.questionId)
+  );
+
+  const analyses: PlannedAnalysis[] = [];
+  for (const question of state.resolvedSpecification.researchQuestions) {
+    if (
+      question.objectiveType === "qualitative" ||
+      !readyQuestionIds.has(question.id)
+    ) {
+      continue;
+    }
+
+    const outcomes = question.outcomes.filter((item) => item.datasetVariable);
+    const predictors = question.predictors.flatMap((item) =>
+      item.datasetVariable ? [item.datasetVariable] : []
+    );
+    const covariates = question.covariates.flatMap((item) =>
+      item.datasetVariable ? [item.datasetVariable] : []
+    );
+
+    if (outcomes.length === 0) continue;
+
+    for (const outcome of outcomes) {
+      const scoped = structuredClone(state.resolvedSpecification);
+      const scopedQuestion = scoped.researchQuestions.find(
+        (item) => item.id === question.id
+      );
+      if (!scopedQuestion) continue;
+      scopedQuestion.outcomes = [outcome];
+
+      const selection = selectCandidateMethods(scoped, question.id);
+      const executable = selection.candidates.filter(
+        (candidate) => candidate.executable
+      );
+      if (executable.length === 0) {
+        throw new Error(
+          `No executable candidate is available for ${question.id} outcome ${outcome.concept}.`
+        );
+      }
+
+      const selected = executable.length === 1 ? executable[0] : undefined;
+      const requiredDecisions = selected?.decisionRequired
+        ? [selected.decisionRequired]
+        : executable.length > 1
+          ? [
+              `Choose one method from: ${executable
+                .map((candidate) => candidate.displayName)
+                .join(", ")}.`
+            ]
+          : [];
+
+      analyses.push({
+        id: makeId("analysis"),
+        researchQuestionId: question.id,
+        outcome: outcome.datasetVariable!,
+        predictors,
+        covariates,
+        candidateMethodIds: executable.map((candidate) => candidate.methodId),
+        ...(selected ? { selectedMethodId: selected.methodId } : {}),
+        requiredDecisions,
+        warnings: selection.warnings,
+        diagnostics: Array.from(
+          new Set(executable.flatMap((candidate) => candidate.requiredChecks))
+        ),
+        addedAfterLock: false
+      });
+    }
+  }
+
+  if (analyses.length === 0) {
+    throw new Error(
+      "No quantitative research question is ready for an executable draft plan."
+    );
+  }
+
+  const now = new Date().toISOString();
+  const plan = buildAnalysisPlan({
+    id: makeId("plan"),
+    projectId,
+    versionId: `plan-${Date.now()}`,
+    datasetVersionId: state.resolvedDatasetVersionId,
+    studySpecificationVersion: state.specification.version,
+    status: "planned_before_analysis",
+    analyses,
+    createdBy: getUserId(c),
+    createdAt: now
+  });
+
+  await saveAnalysisPlan(c.env.DB, plan);
+  await addAudit(c, {
+    projectId,
+    action: "orchestrator_analysis_plan_created",
+    objectType: "analysis_plan",
+    objectId: plan.id,
+    after: plan
+  });
+  return plan;
+}
+
+function analysisJobSignature(input: {
+  methodId: string;
+  outcome?: string;
+  predictors: string[];
+  covariates: string[];
+}): string {
+  return JSON.stringify({
+    methodId: input.methodId,
+    outcome: input.outcome ?? null,
+    predictors: input.predictors,
+    covariates: input.covariates
+  });
+}
+
+async function enqueueOrchestratedPlan(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  plan: AnalysisPlan
+) {
+  if (!plan.lockedAt || !plan.lockHash) {
+    throw new Error("The analysis plan must be locked before execution.");
+  }
+  if (!plan.datasetVersionId) {
+    throw new Error("The locked plan does not identify an analysis dataset.");
+  }
+
+  const existing = await listAnalysisJobsForPlan(c.env.DB, projectId, plan.id);
+  const protectedSignatures = new Set(
+    existing
+      .filter(({ state }) => !["failed", "cancelled"].includes(state))
+      .map(({ job }) => analysisJobSignature(job))
+  );
+
+  const queued: string[] = [];
+  for (const analysis of plan.analyses) {
+    if (!analysis.selectedMethodId) {
+      throw new Error(
+        `Analysis ${analysis.id} has no approved method and cannot be executed.`
+      );
+    }
+
+    const signature = analysisJobSignature({
+      methodId: analysis.selectedMethodId,
+      outcome: analysis.outcome,
+      predictors: analysis.predictors,
+      covariates: analysis.covariates
+    });
+    if (protectedSignatures.has(signature)) continue;
+
+    const job: AnalysisJob = {
+      jobId: makeId("job"),
+      projectId,
+      datasetVersionId: plan.datasetVersionId,
+      analysisPlanId: plan.id,
+      methodId: analysis.selectedMethodId,
+      outcome: analysis.outcome,
+      predictors: analysis.predictors,
+      covariates: analysis.covariates,
+      filters: [],
+      requestedBy: getUserId(c),
+      registryVersion,
+      createdAt: new Date().toISOString()
+    };
+
+    await createAnalysisJob(c.env.DB, job, "queued");
+    await c.env.ANALYSIS_QUEUE.send({ jobId: job.jobId, projectId });
+    await addAudit(c, {
+      projectId,
+      action: "orchestrator_analysis_job_created",
+      objectType: "analysis_job",
+      objectId: job.jobId,
+      after: job
+    });
+    protectedSignatures.add(signature);
+    queued.push(job.jobId);
+  }
+
+  return queued;
 }
 
 const createProjectSchema = z.object({
@@ -1340,39 +1713,6 @@ app.get("/projects/:projectId/readiness", async (c) => {
   const access = await requireProject(c, projectId);
   if ("response" in access) return access.response;
 
-  const [
-    files,
-    datasets,
-    specification,
-    mappings,
-    plan,
-    history,
-    extraction
-  ] = await Promise.all([
-    listProjectFiles(c.env.DB, projectId),
-    listDatasetVersions(c.env.DB, projectId),
-    getStudySpecification(c.env.DB, projectId),
-    listVariableMappings(c.env.DB, projectId),
-    getLatestAnalysisPlan(c.env.DB, projectId),
-    listAnalysisHistory(c.env.DB, getUserId(c)),
-    getLatestProtocolExtraction(c.env.DB, projectId)
-  ]);
-
-  let selections: ReturnType<typeof selectCandidateMethods>[] = [];
-  let resolvedDatasetVersionId: string | undefined;
-
-  if (specification) {
-    const resolved = await resolveStudySpecificationForMethods(
-      c,
-      projectId,
-      specification
-    );
-    resolvedDatasetVersionId = resolved.datasetVersionId;
-    selections = resolved.specification.researchQuestions.map((question) =>
-      selectCandidateMethods(resolved.specification, question.id)
-    );
-  }
-
   const validSections = new Set<WorkflowSection>([
     "overview",
     "protocol",
@@ -1394,44 +1734,145 @@ app.get("/projects/:projectId/readiness", async (c) => {
       ? (requestedSection as WorkflowSection)
       : undefined;
 
-  const projectHistory = history.filter((item) => item.projectId === projectId);
-  const completedAnalysisCount = Math.min(
-    plan?.analyses.length ?? 0,
-    projectHistory.filter((item) => item.state === "complete").length
-  );
-
-  const readiness = assessProjectReadiness(
-    {
-      hasProtocol: files.some((file) => file.fileKind === "protocol"),
-      hasProtocolExtraction: Boolean(extraction),
-      transcriptCount: files.filter((file) => file.fileKind === "transcript").length,
-      datasetCount: datasets.length,
-      hasDerivedDataset: datasets.some((dataset) => dataset.sourceKind === "derived"),
-      specification,
-      mappings: mappings.map((mapping) => ({
-        researchConcept: mapping.researchConcept,
-        ...(mapping.datasetVariable
-          ? { datasetVariable: mapping.datasetVariable }
-          : {}),
-        mappingStatus: mapping.mappingStatus as
-          | "direct_match"
-          | "probable_match"
-          | "uncertain"
-          | "no_match",
-        ...(mapping.confirmedBy ? { confirmedBy: mapping.confirmedBy } : {})
-      })),
-      selections,
-      plan,
-      completedAnalysisCount
-    },
-    currentSection
-  );
+  const state = await computeProjectReadiness(c, projectId, currentSection);
 
   return c.json({
-    readiness,
+    readiness: state.readiness,
     registryVersion,
-    ...(resolvedDatasetVersionId
-      ? { datasetVersionId: resolvedDatasetVersionId }
+    ...(state.resolvedDatasetVersionId
+      ? { datasetVersionId: state.resolvedDatasetVersionId }
+      : {})
+  });
+});
+
+const orchestratorAdvanceSchema = z.object({
+  action: z.enum([
+    "extract_protocol",
+    "create_draft_plan",
+    "run_analyses"
+  ]).optional()
+});
+
+app.get("/projects/:projectId/orchestrator", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const state = await computeProjectReadiness(c, projectId);
+  return c.json({
+    orchestrator: buildOrchestratorView(state.readiness, state.plan),
+    readiness: state.readiness,
+    registryVersion,
+    ...(state.resolvedDatasetVersionId
+      ? { datasetVersionId: state.resolvedDatasetVersionId }
+      : {})
+  });
+});
+
+app.post("/projects/:projectId/orchestrator/advance", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const parsed = orchestratorAdvanceSchema.safeParse(
+    await c.req.json().catch(() => ({}))
+  );
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_ORCHESTRATOR_ACTION",
+          message: "The orchestrator action is invalid.",
+          details: parsed.error.flatten()
+        }
+      },
+      400
+    );
+  }
+
+  const before = await computeProjectReadiness(c, projectId);
+  const view = buildOrchestratorView(before.readiness, before.plan);
+
+  if (!view.automaticAction) {
+    return c.json({
+      advanced: false,
+      orchestrator: view,
+      readiness: before.readiness,
+      message:
+        view.status === "waiting_for_researcher"
+          ? "Methodome is waiting for a researcher decision before continuing."
+          : "Methodome has no safe automatic action from the current state."
+    });
+  }
+
+  if (parsed.data.action && parsed.data.action !== view.automaticAction) {
+    return c.json(
+      {
+        error: {
+          code: "ORCHESTRATOR_ACTION_OUT_OF_SEQUENCE",
+          message:
+            "The requested action is not the current safe automatic action.",
+          details: {
+            requested: parsed.data.action,
+            current: view.automaticAction
+          }
+        }
+      },
+      409
+    );
+  }
+
+  let mutation:
+    | { action: "extract_protocol"; researchQuestionCount: number }
+    | { action: "create_draft_plan"; planId: string; analysisCount: number }
+    | { action: "run_analyses"; queuedJobIds: string[] };
+
+  try {
+    if (view.automaticAction === "extract_protocol") {
+      const extraction = await runProtocolExtractionForProject(c, projectId);
+      mutation = {
+        action: "extract_protocol",
+        researchQuestionCount: extraction.researchQuestions.length
+      };
+    } else if (view.automaticAction === "create_draft_plan") {
+      const plan = await createOrchestratedDraftPlan(c, projectId, before);
+      mutation = {
+        action: "create_draft_plan",
+        planId: plan.id,
+        analysisCount: plan.analyses.length
+      };
+    } else {
+      if (!before.plan) {
+        throw new Error("The locked analysis plan could not be loaded.");
+      }
+      mutation = {
+        action: "run_analyses",
+        queuedJobIds: await enqueueOrchestratedPlan(c, projectId, before.plan)
+      };
+    }
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: "ORCHESTRATOR_ADVANCE_BLOCKED",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Methodome could not safely advance the project."
+        }
+      },
+      409
+    );
+  }
+
+  const after = await computeProjectReadiness(c, projectId);
+  return c.json({
+    advanced: true,
+    mutation,
+    orchestrator: buildOrchestratorView(after.readiness, after.plan),
+    readiness: after.readiness,
+    ...(after.resolvedDatasetVersionId
+      ? { datasetVersionId: after.resolvedDatasetVersionId }
       : {})
   });
 });
@@ -1751,6 +2192,115 @@ app.get("/projects/:projectId/analysis-plan", async (c) => {
   });
 });
 
+const updatePlanMethodsSchema = z.object({
+  methodSelections: z.array(
+    z.object({
+      analysisId: z.string().min(1),
+      methodId: z.string().min(1)
+    })
+  ).min(1)
+});
+
+app.patch("/projects/:projectId/analysis-plan/:planId", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const parsed = updatePlanMethodsSchema.safeParse(
+    await c.req.json().catch(() => null)
+  );
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_ANALYSIS_PLAN_UPDATE",
+          message: "Analysis plan method selections are invalid.",
+          details: parsed.error.flatten()
+        }
+      },
+      400
+    );
+  }
+
+  const plan = await getAnalysisPlanById(
+    c.env.DB,
+    projectId,
+    c.req.param("planId")
+  );
+  if (!plan) {
+    return c.json(
+      {
+        error: {
+          code: "ANALYSIS_PLAN_NOT_FOUND",
+          message: "Analysis plan was not found."
+        }
+      },
+      404
+    );
+  }
+  if (plan.lockedAt || plan.lockHash) {
+    return c.json(
+      {
+        error: {
+          code: "ANALYSIS_PLAN_ALREADY_LOCKED",
+          message: "A locked analysis plan cannot be changed."
+        }
+      },
+      409
+    );
+  }
+
+  for (const selection of parsed.data.methodSelections) {
+    const definition = methodRegistry[selection.methodId];
+    if (!definition || !definition.executable) {
+      return c.json(
+        {
+          error: {
+            code: "ANALYSIS_PLAN_METHOD_NOT_EXECUTABLE",
+            message:
+              "Every selected method must be an executable Methodome method.",
+            details: selection
+          }
+        },
+        409
+      );
+    }
+  }
+
+  let updated: AnalysisPlan;
+  try {
+    updated = updateAnalysisMethodSelections(
+      plan,
+      parsed.data.methodSelections
+    );
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: "ANALYSIS_PLAN_METHOD_OUTSIDE_CANDIDATES",
+          message:
+            error instanceof Error
+              ? error.message
+              : "A selected method is outside the candidate set."
+        }
+      },
+      409
+    );
+  }
+
+  await updateStoredAnalysisPlan(c.env.DB, updated);
+  await addAudit(c, {
+    projectId,
+    action: "analysis_plan_methods_selected",
+    objectType: "analysis_plan",
+    objectId: updated.id,
+    before: plan,
+    after: updated
+  });
+
+  return c.json({ plan: updated });
+});
+
 app.post("/projects/:projectId/analysis-plan", async (c) => {
   const projectId = c.req.param("projectId");
   const access = await requireProject(c, projectId);
@@ -1966,7 +2516,23 @@ app.post("/projects/:projectId/analysis-plan/:planId/lock", async (c) => {
     );
   }
 
-  const locked = await lockAnalysisPlan(plan, new Date().toISOString());
+  let locked: AnalysisPlan;
+  try {
+    locked = await lockAnalysisPlan(plan, new Date().toISOString());
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: "ANALYSIS_PLAN_NOT_READY_TO_LOCK",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Resolve all analysis-plan decisions before locking."
+        }
+      },
+      409
+    );
+  }
   await updateStoredAnalysisPlan(c.env.DB, locked);
   await addAudit(c, {
     projectId,

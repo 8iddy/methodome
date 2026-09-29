@@ -472,12 +472,40 @@ function chooseNextAction(
   }
 
   if (!snapshot.plan) {
+    const readyQuantitative = questions.some(
+      (question) =>
+        question.mode === "quantitative" && question.status === "ready"
+    );
+    const readyQualitative = questions.some(
+      (question) => question.status === "qualitative_ready"
+    );
+
+    if (readyQuantitative) {
+      return action(
+        "build_analysis_plan",
+        "Build the analysis plan",
+        "Methodome has enough confirmed information to construct the executable quantitative plan.",
+        "analysis-plan",
+        false
+      );
+    }
+
+    if (readyQualitative) {
+      return action(
+        "prepare_qualitative_analysis",
+        "Prepare qualitative analysis",
+        "Qualitative source material is ready for coding and synthesis.",
+        "analysis",
+        false
+      );
+    }
+
     return action(
-      "build_analysis_plan",
-      "Build the analysis plan",
-      "Methodome has enough confirmed information to construct the executable quantitative plan and qualitative workstreams.",
-      "analysis-plan",
-      false
+      "review_project",
+      "Resolve analysis blockers",
+      "No research question is currently inside an executable analysis boundary. Review the question-level blockers before continuing.",
+      "overview",
+      true
     );
   }
 
@@ -585,5 +613,280 @@ export function assessProjectReadiness(
           ? "already_on_action_surface"
           : "next_action_elsewhere"
     }
+  };
+}
+
+
+export type OrchestratorStatus =
+  | "working"
+  | "waiting_for_researcher"
+  | "ready_to_execute"
+  | "complete"
+  | "blocked";
+
+export type OrchestratorAutomaticAction =
+  | "extract_protocol"
+  | "create_draft_plan"
+  | "run_analyses"
+  | "prepare_qualitative_analysis";
+
+export interface OrchestratorDecision {
+  id: string;
+  kind:
+    | "provide_input"
+    | "confirm_study_design"
+    | "review_mapping"
+    | "resolve_mapping_gap"
+    | "select_method"
+    | "approve_plan"
+    | "review_results";
+  prompt: string;
+  questionId?: string;
+  analysisId?: string;
+  options?: Array<{
+    id: string;
+    label: string;
+    detail?: string;
+  }>;
+  blocking: boolean;
+}
+
+export interface OrchestratorTask {
+  id: string;
+  label: string;
+  status: "pending" | "ready" | "waiting" | "complete" | "blocked";
+  detail: string;
+}
+
+export interface OrchestratorView {
+  status: OrchestratorStatus;
+  summary: string;
+  tasks: OrchestratorTask[];
+  decisions: OrchestratorDecision[];
+  automaticAction?: OrchestratorAutomaticAction;
+  nextAction: WorkflowAction;
+}
+
+function taskStatus(
+  value: WorkflowStageStatus
+): OrchestratorTask["status"] {
+  if (value === "complete" || value === "locked") return "complete";
+  if (value === "ready") return "ready";
+  if (value === "needs_review" || value === "reviewed_with_gaps") return "waiting";
+  if (value === "blocked") return "blocked";
+  return "pending";
+}
+
+function mappingDecisions(readiness: ProjectReadiness): OrchestratorDecision[] {
+  const output: OrchestratorDecision[] = [];
+  const seen = new Set<string>();
+
+  for (const question of readiness.questions) {
+    for (const blocker of question.blockers) {
+      if (
+        ![
+          "mapping_missing",
+          "mapping_unconfirmed",
+          "confirmed_not_represented",
+          "objective_type_missing",
+          "method_blocked",
+          "qualitative_source_missing"
+        ].includes(blocker.code)
+      ) {
+        continue;
+      }
+
+      const key = [
+        blocker.code,
+        blocker.questionId,
+        blocker.concept ?? ""
+      ].join(":");
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      if (blocker.code === "objective_type_missing") {
+        output.push({
+          id: `decision:intent:${blocker.questionId}`,
+          kind: "confirm_study_design",
+          prompt: blocker.message,
+          questionId: blocker.questionId,
+          blocking: true
+        });
+        continue;
+      }
+
+      if (
+        blocker.code === "mapping_missing" ||
+        blocker.code === "mapping_unconfirmed"
+      ) {
+        output.push({
+          id: `decision:mapping:${blocker.questionId}:${normalize(
+            blocker.concept ?? "concept"
+          )}`,
+          kind: "review_mapping",
+          prompt: blocker.message,
+          questionId: blocker.questionId,
+          blocking: true
+        });
+        continue;
+      }
+
+      if (blocker.code === "confirmed_not_represented") {
+        output.push({
+          id: `decision:mapping-gap:${blocker.questionId}:${normalize(
+            blocker.concept ?? "concept"
+          )}`,
+          kind: "resolve_mapping_gap",
+          prompt: blocker.message,
+          questionId: blocker.questionId,
+          blocking: true
+        });
+        continue;
+      }
+
+      if (blocker.code === "qualitative_source_missing") {
+        output.push({
+          id: `decision:qualitative-source:${blocker.questionId}`,
+          kind: "provide_input",
+          prompt: blocker.message,
+          questionId: blocker.questionId,
+          blocking: true
+        });
+        continue;
+      }
+
+      output.push({
+        id: `decision:method-blocked:${blocker.questionId}`,
+        kind: "provide_input",
+        prompt: blocker.message,
+        questionId: blocker.questionId,
+        blocking: true
+      });
+    }
+  }
+
+  return output;
+}
+
+export function buildOrchestratorView(
+  readiness: ProjectReadiness,
+  plan: AnalysisPlan | null
+): OrchestratorView {
+  const tasks: OrchestratorTask[] = [
+    {
+      id: "protocol",
+      label: "Understand the protocol",
+      status: taskStatus(readiness.stages.protocol),
+      detail: "Extract and preserve the study questions, objectives and design."
+    },
+    {
+      id: "data",
+      label: "Prepare research data",
+      status: taskStatus(readiness.stages.data),
+      detail: "Profile quantitative datasets and register qualitative source material."
+    },
+    {
+      id: "study-design",
+      label: "Confirm research design",
+      status: taskStatus(readiness.stages.studyDesign),
+      detail: "Confirm the design features that constrain valid analysis."
+    },
+    {
+      id: "mappings",
+      label: "Resolve analytical variables",
+      status: taskStatus(readiness.stages.mappings),
+      detail: "Connect research concepts to observed variables without silently dropping gaps."
+    },
+    {
+      id: "plan",
+      label: "Construct analysis workstreams",
+      status: taskStatus(readiness.stages.plan),
+      detail: "Build the quantitative analysis plan and qualitative workstreams."
+    },
+    {
+      id: "analysis",
+      label: "Execute approved analyses",
+      status: taskStatus(readiness.stages.analysis),
+      detail: "Run deterministic statistics and auditable qualitative analysis."
+    }
+  ];
+
+  const decisions = mappingDecisions(readiness);
+
+  if (plan && !plan.lockedAt) {
+    for (const analysis of plan.analyses) {
+      if (analysis.selectedMethodId) continue;
+      decisions.push({
+        id: `decision:method:${analysis.id}`,
+        kind: "select_method",
+        prompt:
+          "Choose the method for this planned analysis after reviewing the candidate rationale and required diagnostics.",
+        questionId: analysis.researchQuestionId,
+        analysisId: analysis.id,
+        options: analysis.candidateMethodIds.map((methodId) => ({
+          id: methodId,
+          label: methodId.replaceAll("_", " ")
+        })),
+        blocking: true
+      });
+    }
+
+    if (plan.analyses.length > 0 && plan.analyses.every((analysis) => analysis.selectedMethodId)) {
+      decisions.push({
+        id: `decision:approve-plan:${plan.id}`,
+        kind: "approve_plan",
+        prompt:
+          "The executable plan is fully specified. Review it and approve locking before planned analysis runs.",
+        blocking: true
+      });
+    }
+  }
+
+  if (readiness.nextAction.code === "review_results") {
+    decisions.push({
+      id: "decision:review-results",
+      kind: "review_results",
+      prompt:
+        "Analysis outputs are ready. Review estimates, diagnostics, warnings and provenance before reporting.",
+      blocking: false
+    });
+  }
+
+  const blockingDecisions = decisions.filter((decision) => decision.blocking);
+  let status: OrchestratorStatus = "working";
+  let automaticAction: OrchestratorAutomaticAction | undefined;
+
+  if (readiness.nextAction.code === "review_results") {
+    status = "complete";
+  } else if (blockingDecisions.length > 0 || readiness.nextAction.requiresResearcher) {
+    status = "waiting_for_researcher";
+  } else {
+    const automatic = new Map<WorkflowActionCode, OrchestratorAutomaticAction>([
+      ["extract_protocol", "extract_protocol"],
+      ["build_analysis_plan", "create_draft_plan"],
+      ["run_analyses", "run_analyses"]
+    ]);
+    automaticAction = automatic.get(readiness.nextAction.code);
+    status = automaticAction ? "ready_to_execute" : "blocked";
+  }
+
+  const summary =
+    status === "waiting_for_researcher"
+      ? `Methodome is waiting on ${blockingDecisions.length || 1} researcher decision${blockingDecisions.length === 1 ? "" : "s"} before it can continue.`
+      : status === "ready_to_execute"
+        ? `Methodome can continue automatically with: ${readiness.nextAction.label}.`
+        : status === "complete"
+          ? "The currently supported analysis work is complete and ready for review."
+          : status === "blocked"
+            ? "Methodome cannot advance automatically from the current state."
+            : "Methodome is working through the project.";
+
+  return {
+    status,
+    summary,
+    tasks,
+    decisions,
+    ...(automaticAction ? { automaticAction } : {}),
+    nextAction: readiness.nextAction
   };
 }

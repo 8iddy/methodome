@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   addExploratoryAnalysis,
   createAnalysisPlan,
-  lockAnalysisPlan
+  lockAnalysisPlan,
+  updateAnalysisMethodSelections
 } from "@methodome/analysis-plan";
 
 const analysis = {
@@ -61,4 +62,67 @@ describe("analysis plan locking", () => {
     expect(exploratory.status).toBe("exploratory");
     expect(exploratory.analyses[1]?.addedAfterLock).toBe(true);
   });
+
+  it("refuses to lock an unresolved plan", async () => {
+    const { selectedMethodId: _selected, ...unresolvedAnalysis } = analysis;
+    const plan = createAnalysisPlan({
+      id: "plan_unresolved",
+      projectId: "proj_1",
+      versionId: "v1",
+      studySpecificationVersion: "1.0",
+      status: "planned_before_analysis",
+      analyses: [
+        {
+          ...unresolvedAnalysis,
+          id: "ana_unresolved"
+        }
+      ],
+      createdBy: "user_1",
+      createdAt: "2026-09-28T12:00:00.000Z"
+    });
+
+    await expect(
+      lockAnalysisPlan(plan, "2026-09-28T12:05:00.000Z")
+    ).rejects.toThrow("Select a method for every planned analysis");
+  });
+
+  it("updates a draft method only within its candidate set", () => {
+    const { selectedMethodId: _selected, ...unresolvedAnalysis } = analysis;
+    const plan = createAnalysisPlan({
+      id: "plan_choice",
+      projectId: "proj_1",
+      versionId: "v1",
+      studySpecificationVersion: "1.0",
+      status: "planned_before_analysis",
+      analyses: [
+        {
+          ...unresolvedAnalysis,
+          candidateMethodIds: [
+            "independent_two_sample_t",
+            "mann_whitney"
+          ]
+        }
+      ],
+      createdBy: "user_1",
+      createdAt: "2026-09-28T12:00:00.000Z"
+    });
+
+    const updated = updateAnalysisMethodSelections(plan, [
+      {
+        analysisId: "ana_1",
+        methodId: "mann_whitney"
+      }
+    ]);
+
+    expect(updated.analyses[0]?.selectedMethodId).toBe("mann_whitney");
+    expect(() =>
+      updateAnalysisMethodSelections(plan, [
+        {
+          analysisId: "ana_1",
+          methodId: "linear_regression"
+        }
+      ])
+    ).toThrow("is not a candidate");
+  });
+
 });
