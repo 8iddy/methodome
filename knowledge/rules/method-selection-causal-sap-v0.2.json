@@ -1,146 +1,7 @@
 {
   "rule_set_id": "methodome-method-selection-causal-sap-v0.2",
-  "status": "draft",
+  "status": "supported",
   "rules": [
-    {
-      "rule_id": "wilcoxon-rank-sum-001",
-      "topic": "nonparametric_two_sample",
-      "decision": "Use a rank-based two-sample procedure as an alternative when independent-sample mean-comparison assumptions are unsuitable and the estimand matches a distributional/location comparison.",
-      "conditions": [
-        "Two independent groups",
-        "Outcome is at least ordinal",
-        "Research question concerns a between-group location/distribution difference"
-      ],
-      "action": "Consider Wilcoxon rank-sum / Mann-Whitney U rather than forcing a t-test when parametric assumptions are not defensible.",
-      "assumptions": [
-        "Independent observations",
-        "Outcome can be meaningfully ranked"
-      ],
-      "diagnostics": [
-        "Group independence",
-        "Outcome scale",
-        "Distribution shape when interpreting as a location shift"
-      ],
-      "warnings": [
-        "Do not automatically interpret the test as a difference in medians unless the relevant distributional conditions justify that interpretation."
-      ],
-      "exceptions": [],
-      "source_evidence": [
-        {
-          "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
-          "support": "Ott and Longnecker present the Wilcoxon rank-sum test as a nonparametric alternative for two independent population central values and note equivalence to Mann-Whitney U.",
-          "section": "Chapter 6.3",
-          "page": "305-313"
-        }
-      ],
-      "validation_status": "draft"
-    },
-    {
-      "rule_id": "wilcoxon-signed-rank-001",
-      "topic": "nonparametric_paired",
-      "decision": "Use a paired rank-based method when paired-data parametric assumptions are unsuitable and a rank-based paired comparison matches the question.",
-      "conditions": [
-        "Paired or matched observations",
-        "Outcome is at least ordinal",
-        "Research question concerns within-pair change or difference"
-      ],
-      "action": "Consider Wilcoxon signed-rank as a nonparametric paired alternative.",
-      "assumptions": [
-        "Meaningful within-pair differences",
-        "Pairing is correctly represented"
-      ],
-      "diagnostics": [
-        "Pair completeness",
-        "Distribution of within-pair differences"
-      ],
-      "warnings": [
-        "Do not analyze paired observations as independent groups."
-      ],
-      "exceptions": [],
-      "source_evidence": [
-        {
-          "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
-          "support": "Ott and Longnecker present Wilcoxon signed-rank as a nonparametric alternative for paired data.",
-          "section": "Chapter 6.5",
-          "page": "319 onward"
-        }
-      ],
-      "validation_status": "draft"
-    },
-    {
-      "rule_id": "anova-one-way-001",
-      "topic": "anova",
-      "decision": "Use one-way ANOVA only when comparing mean responses across more than two independent groups under an appropriate one-factor model.",
-      "conditions": [
-        "One quantitative outcome",
-        "One categorical grouping factor with more than two levels",
-        "Independent observations"
-      ],
-      "action": "Consider one-way ANOVA and assess model assumptions before relying on F-test inference.",
-      "assumptions": [
-        "Independent observations",
-        "Approximately normal errors within groups for standard small-sample inference",
-        "Comparable error variances across groups"
-      ],
-      "diagnostics": [
-        "Residual plots",
-        "Variance comparison",
-        "Normality diagnostics when sample sizes are small",
-        "Outliers"
-      ],
-      "warnings": [
-        "Do not use ordinary one-way ANOVA for repeated, clustered, or otherwise dependent observations."
-      ],
-      "exceptions": [
-        "If parametric conditions are unsuitable and a rank-based comparison fits the question, consider Kruskal-Wallis."
-      ],
-      "source_evidence": [
-        {
-          "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
-          "support": "The text describes one-way ANOVA assumptions and emphasizes independence as the most critical condition.",
-          "section": "Chapter 8.3-8.4",
-          "page": "414-421"
-        }
-      ],
-      "validation_status": "draft"
-    },
-    {
-      "rule_id": "kruskal-wallis-001",
-      "topic": "kruskal_wallis",
-      "decision": "Use Kruskal-Wallis as a nonparametric alternative for comparing more than two independent groups when ANOVA conditions are unsuitable.",
-      "conditions": [
-        "More than two independent groups",
-        "Outcome is at least ordinal",
-        "Research question concerns a between-group distribution/location difference"
-      ],
-      "action": "Consider Kruskal-Wallis instead of forcing one-way ANOVA.",
-      "assumptions": [
-        "Independent observations",
-        "Outcome can be ranked"
-      ],
-      "diagnostics": [
-        "Group independence",
-        "Outcome scale",
-        "Distribution shapes if interpreting results as location differences"
-      ],
-      "warnings": [],
-      "exceptions": [],
-      "source_evidence": [
-        {
-          "source_id": "src-058-an-introduction-to-statistical-methods-and-data-analysis-6th-ed",
-          "support": "The text presents Kruskal-Wallis as the nonparametric alternative in the chapter on comparing more than two population central values.",
-          "section": "Chapter 8.6",
-          "page": "428 onward"
-        },
-        {
-          "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
-          "support": "NIST lists Kruskal-Wallis for comparing several populations with unknown distributions.",
-          "section": "7.4.1",
-          "page": null
-        }
-      ],
-      "validation_status": "draft"
-    },
     {
       "rule_id": "causal-gate-001",
       "topic": "causal_inference",
@@ -176,7 +37,7 @@
           "page": "13-38"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "did-001",
@@ -210,7 +71,7 @@
           "page": "129-141"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "sap-prespecification-001",
@@ -237,7 +98,7 @@
           "page": "7-8"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     },
     {
       "rule_id": "sap-scope-001",
@@ -271,7 +132,7 @@
           "page": "2337-2343"
         }
       ],
-      "validation_status": "draft"
+      "validation_status": "supported"
     }
   ]
 }
