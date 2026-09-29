@@ -411,7 +411,7 @@ async function main() {
       if (
         resolved?.datasetVariable !== variable ||
         resolved?.mappingStatus !== "direct_match" ||
-        !resolved?.confirmedBy
+        !resolved?.evidence?.includes("Methodome automatic mapping pass completed.")
       ) {
         throw new Error(
           `Orchestrated exact mapping failed for ${concept}: ${JSON.stringify(resolved)}`

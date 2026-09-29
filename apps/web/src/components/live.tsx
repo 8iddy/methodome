@@ -2161,7 +2161,14 @@ function LiveVariables({ projectId }: { projectId: string }) {
         const stored = existing.get(conceptKey(concept));
         const candidate = suggested.get(conceptKey(concept));
 
-        if (stored?.confirmedBy) {
+        if (
+          stored &&
+          (Boolean(stored.confirmedBy) ||
+            Boolean(
+              stored.datasetVariable &&
+                stored.mappingStatus === "direct_match"
+            ))
+        ) {
           return {
             researchConcept: concept,
             usages,
