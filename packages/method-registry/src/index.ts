@@ -37,7 +37,7 @@ export interface CandidateSelection {
   blockedReason?: string;
 }
 
-export const registryVersion = "0.1.0";
+export const registryVersion = "0.2.0";
 
 export const methodRegistry: Record<string, MethodDefinition> = {
   descriptive_statistics: {
