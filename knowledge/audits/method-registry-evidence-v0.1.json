@@ -2,187 +2,270 @@
   "audit_id": "methodome-method-registry-evidence-audit-v0.1",
   "updated_date": "2026-09-29",
   "registry_version": "0.1.0",
-  "purpose": "Compare the software method registry with the methodology corpus without conflating computational correctness with methodological recommendation validity.",
+  "purpose": "Compare Methodome's computational method capability with the methodology corpus without conflating numerical implementation correctness, source support, and expert-benchmark validation.",
   "status_definitions": {
-    "source_backed_draft": "Relevant corpus evidence and an operational draft decision rule exist, but expert methodology benchmark validation is not complete.",
-    "source_backed_concept": "Sources support the method family or design distinction, but the exact automated selection rule is not yet fully encoded.",
-    "partial": "Some supporting evidence exists, but the method-specific selection/diagnostic rule is incomplete.",
-    "gap": "The corpus does not yet support a defensible automated selection rule.",
-    "out_of_runtime": "Method is methodologically represented but is intentionally non-executable in the current runtime."
+    "source_supported": "A source-backed operational decision rule exists and has passed corpus consistency review; expert-labelled methodology benchmark validation is still pending.",
+    "source_supported_concept": "The method family/design distinction is source-backed, but autonomous model-specific selection or execution is intentionally outside v1.",
+    "deferred": "Known branch intentionally held outside v1 autonomous recommendation/execution.",
+    "executable": "The current deterministic runtime can calculate the method when explicitly selected.",
+    "non_executable": "The current deterministic runtime does not calculate the method."
   },
   "principles": [
     "Computational validation asks whether an implementation returns correct numerical results for a specified method.",
-    "Methodological validation asks whether Methodome selected or rejected the method appropriately for the research question, design, measurement structure, estimand and data conditions.",
-    "A method may be computationally validated while its automatic recommendation rule remains unvalidated.",
-    "No method should be promoted to methodology-validated status until it passes the planned expert-labelled protocol-to-analysis benchmark."
+    "Methodological validation asks whether Methodome selected, rejected, interpreted and diagnosed the method appropriately for the question, estimand, design, measurement structure and data conditions.",
+    "Source-supported does not mean expert-benchmark validated.",
+    "No method is promoted to methodology-validated status until it passes the planned expert-labelled protocol-to-analysis benchmark.",
+    "A non-executable method can still have source-supported routing rules that tell Methodome when to stop, warn or defer rather than make a bad recommendation."
   ],
   "methods": [
     {
       "method_id": "descriptive_statistics",
-      "registry_maturity": "validated",
       "executable": true,
-      "computational_status": "existing_runtime_validated",
-      "methodology_status": "source_backed_draft",
-      "evidence_sources": [
-        "src-061-penn-state-stat-200-elementary-statistics"
-      ],
+      "methodology_status": "source_supported",
       "rule_ids": [
         "var-type-001",
         "descriptive-categorical-001",
         "descriptive-continuous-001"
       ],
-      "finding": "Variable-type dependence, categorical count/proportion summaries, and quantitative mean-versus-median decisions by distribution shape and outliers are source-backed.",
-      "action": "Keep executable; extend count/rate/date summaries and validate automatic descriptive choices against the expert methodology benchmark."
+      "finding": "Variable-type routing, categorical counts/proportions and distribution-aware quantitative summaries are source-supported.",
+      "action": "Keep executable; validate autonomous summary choices against expert-labelled cases."
     },
     {
       "method_id": "pearson_correlation",
-      "registry_maturity": "validated",
       "executable": true,
-      "computational_status": "existing_runtime_validated",
-      "methodology_status": "source_backed_draft",
-      "evidence_sources": [
-        "src-071-penn-state-stat-200-elementary-statistics"
-      ],
+      "methodology_status": "source_supported",
       "rule_ids": [
         "pearson-001"
       ],
-      "finding": "Linear quantitative association, form and outlier checks are source-backed.",
-      "action": "Keep in the candidate set within the current independence boundary; expert benchmark validation remains pending."
+      "finding": "Linear quantitative association plus form/outlier checks are source-supported.",
+      "action": "Keep executable inside the independence/design boundary."
     },
     {
       "method_id": "spearman_correlation",
-      "registry_maturity": "validated",
       "executable": true,
-      "computational_status": "existing_runtime_validated",
-      "methodology_status": "gap",
-      "evidence_sources": [],
-      "rule_ids": [],
-      "finding": "The corpus mentions Pearson/Spearman in measurement contexts but does not yet provide an adequate general decision rule for monotonic or ordinal association.",
-      "action": "Do not describe automatic Spearman recommendation as methodology-validated. Keep the source gap open until direct guidance is extracted or added."
+      "methodology_status": "source_supported",
+      "rule_ids": [
+        "spearman-correlation-001"
+      ],
+      "finding": "Ordinal/ranked and monotonic association routing is source-supported, with explicit rejection of a normality-p-value auto-switch.",
+      "action": "Keep executable; benchmark monotonicity, repeated-observation and interpretation gates."
+    },
+    {
+      "method_id": "chi_square",
+      "executable": true,
+      "methodology_status": "source_supported",
+      "rule_ids": [
+        "chi-square-001"
+      ],
+      "finding": "Categorical eligibility and expected-count approximation checks are source-supported.",
+      "action": "Keep executable with exact-test routing where appropriate."
+    },
+    {
+      "method_id": "fisher_exact",
+      "executable": true,
+      "methodology_status": "source_supported",
+      "rule_ids": [
+        "fisher-exact-001"
+      ],
+      "finding": "Independent sparse 2x2 exact testing is source-supported without an arbitrary overall sample-size cutoff.",
+      "action": "Keep executable; dependence/cluster/survey structures remain blockers."
     },
     {
       "method_id": "linear_regression",
-      "registry_maturity": "validated",
       "executable": true,
-      "computational_status": "existing_runtime_validated",
-      "methodology_status": "source_backed_draft",
-      "evidence_sources": [
-        "src-018-penn-state-stat-501-regression-methods",
-        "src-010-penn-state-stat-501-regression-methods"
-      ],
+      "methodology_status": "source_supported",
       "rule_ids": [
         "linear-regression-001",
         "multicollinearity-001"
       ],
-      "finding": "Outcome eligibility, LINE assumptions, residual diagnostics and multicollinearity checks are source-backed.",
-      "action": "Keep executable inside the current independence/design boundary; benchmark the selection and blocker logic before methodology validation."
+      "finding": "Quantitative-outcome eligibility, LINE assumptions, residual diagnostics and multicollinearity safeguards are source-supported.",
+      "action": "Keep executable inside the current iid/design boundary."
     },
     {
       "method_id": "binary_logistic_regression",
-      "registry_maturity": "validated",
       "executable": true,
-      "computational_status": "existing_runtime_validated",
-      "methodology_status": "source_backed_draft",
-      "evidence_sources": [
-        "src-009-penn-state-stat-501-regression-methods"
-      ],
+      "methodology_status": "source_supported",
       "rule_ids": [
         "logistic-regression-001",
-        "logistic-gof-001"
+        "logistic-gof-001",
+        "logistic-separation-001",
+        "logistic-sparse-events-001"
       ],
-      "finding": "Binary-response eligibility, structure-aware goodness-of-fit checks, and deviance/Pearson residual diagnostics are source-backed. Complete or quasi-complete separation, sparse-event bias, and influence safeguards still need stronger direct corpus extraction.",
-      "action": "Keep executable inside the current design boundary; retain explicit warnings for unresolved separation and sparse-event safeguards and benchmark the diagnostic routing before methodology validation."
+      "finding": "Binary-response routing, fit/residual diagnostics, complete/quasi-complete separation safeguards and sparse-event safeguards are source-supported. A universal 10-EPV gate is explicitly rejected.",
+      "action": "Keep executable ordinary ML only when safeguards do not place the fit outside its reliability boundary; Firth remains non-executable."
     },
     {
-      "method_id": "chi_square",
-      "registry_maturity": "validated",
-      "executable": true,
-      "computational_status": "existing_runtime_validated",
-      "methodology_status": "source_backed_draft",
-      "evidence_sources": [
-        "src-070-penn-state-stat-200-elementary-statistics"
-      ],
-      "rule_ids": [
-        "chi-square-001"
-      ],
-      "finding": "Categorical-data eligibility and expected-count checks are source-backed.",
-      "action": "Keep executable, with expected-cell diagnostics and Fisher routing for sparse suitable 2x2 tables."
-    },
-    {
-      "method_id": "fisher_exact",
-      "registry_maturity": "validated",
-      "executable": true,
-      "computational_status": "existing_runtime_validated",
-      "methodology_status": "source_backed_draft",
-      "evidence_sources": [
-        "src-002-nistsematech-e-handbook-of-statistical-methods",
-        "src-068-penn-state-stat-200-elementary-statistics"
-      ],
-      "rule_ids": [
-        "fisher-exact-001"
-      ],
-      "finding": "Small-sample independent 2x2 use is directly supported.",
-      "action": "Keep executable for suitable tables; do not use it to repair dependence from repeated, clustered or survey designs."
-    },
-    {
-      "method_id": "mixed_effects_logistic_regression",
-      "registry_maturity": "supported",
+      "method_id": "independent_two_sample_t",
       "executable": false,
-      "computational_status": "not_in_runtime",
-      "methodology_status": "source_backed_concept",
-      "evidence_sources": [
-        "src-029-longitudinal-and-repeated-measures-analysis-tutorial"
+      "methodology_status": "source_supported",
+      "rule_ids": [
+        "independent-two-sample-t-001"
       ],
+      "finding": "Independent two-group mean comparison and Welch-versus-pooled logic are source-supported without a universal n>=30 rule.",
+      "action": "Candidate for the next deterministic executor expansion."
+    },
+    {
+      "method_id": "paired_t",
+      "executable": false,
+      "methodology_status": "source_supported",
+      "rule_ids": [
+        "paired-t-001"
+      ],
+      "finding": "Paired analysis based on within-pair differences is source-supported.",
+      "action": "Candidate for the next deterministic executor expansion."
+    },
+    {
+      "method_id": "one_way_anova",
+      "executable": false,
+      "methodology_status": "source_supported",
+      "rule_ids": [
+        "one-way-anova-001",
+        "multi-group-gate-001"
+      ],
+      "finding": "Ordinary one-way fixed-effect ANOVA is source-supported only after design and residual-structure checks; repeated/random/clustered structures are blocked.",
+      "action": "Candidate for deterministic executor expansion after design gate is wired."
+    },
+    {
+      "method_id": "wilcoxon_signed_rank",
+      "executable": false,
+      "methodology_status": "source_supported",
+      "rule_ids": [
+        "wilcoxon-signed-rank-001"
+      ],
+      "finding": "Paired rank inference with a symmetry requirement for the usual signed-rank interpretation is source-supported.",
+      "action": "Candidate for later executor expansion."
+    },
+    {
+      "method_id": "mann_whitney",
+      "executable": false,
+      "methodology_status": "source_supported",
+      "rule_ids": [
+        "mann-whitney-001"
+      ],
+      "finding": "Rank/distribution comparison is source-supported; generic 'test of medians' and 'non-normal t-test' interpretations are explicitly blocked.",
+      "action": "Candidate for later executor expansion after estimand/interpretation tests are benchmarked."
+    },
+    {
+      "method_id": "kruskal_wallis",
+      "executable": false,
+      "methodology_status": "source_supported",
+      "rule_ids": [
+        "kruskal-wallis-001"
+      ],
+      "finding": "Independent multi-group rank comparison is source-supported with design and interpretation safeguards.",
+      "action": "Candidate for later executor expansion."
+    },
+    {
+      "method_id": "survey_analysis",
+      "executable": false,
+      "methodology_status": "source_supported_concept",
+      "rule_ids": [
+        "survey-001",
+        "survey-weight-001",
+        "survey-variance-001",
+        "survey-domain-001"
+      ],
+      "finding": "Complex-survey weights, strata, PSUs and domain variance handling are source-supported, but no survey executor is active.",
+      "action": "Block iid inference when design metadata requires survey-aware analysis; implement later."
+    },
+    {
+      "method_id": "mixed_effects_models",
+      "executable": false,
+      "methodology_status": "source_supported_concept",
       "rule_ids": [
         "repeated-001",
         "repeated-002",
         "cluster-001"
       ],
-      "finding": "The need to account for correlation and the subject-specific interpretation of mixed models are source-backed; exact automatic eligibility rules need expansion.",
-      "action": "Keep non-executable and require an explicit decision about the scientific target before future activation."
+      "finding": "Correlation-aware subject-specific modelling is source-supported conceptually.",
+      "action": "Keep non-executable until model-specific eligibility/diagnostics and numerical implementation are added."
     },
     {
-      "method_id": "gee_logistic_regression",
-      "registry_maturity": "supported",
+      "method_id": "gee",
       "executable": false,
-      "computational_status": "not_in_runtime",
-      "methodology_status": "source_backed_concept",
-      "evidence_sources": [
-        "src-029-longitudinal-and-repeated-measures-analysis-tutorial"
-      ],
+      "methodology_status": "source_supported_concept",
       "rule_ids": [
         "repeated-001",
         "repeated-002",
         "cluster-001"
       ],
-      "finding": "GEE as a marginal/population-average approach is source-backed; exact automatic eligibility and small-cluster safeguards need expansion.",
-      "action": "Keep non-executable and require the population-average versus subject-specific target to be resolved before future activation."
+      "finding": "Population-average/marginal interpretation is source-supported conceptually.",
+      "action": "Keep non-executable; resolve target estimand and small-cluster safeguards before activation."
     },
     {
       "method_id": "poisson_regression",
-      "registry_maturity": "validated",
       "executable": false,
-      "computational_status": "not_in_runtime",
-      "methodology_status": "partial",
-      "evidence_sources": [
-        "src-013-penn-state-stat-501-regression-methods"
-      ],
+      "methodology_status": "deferred",
       "rule_ids": [
-        "poisson-regression-001"
+        "poisson-regression-001",
+        "count-overdispersion-001"
       ],
-      "finding": "The corpus directly supports routing Poisson count responses away from ordinary linear regression toward Poisson regression, but the automated dispersion and adequacy checks are not yet fully source-backed.",
-      "action": "Keep non-executable. Retain Poisson as a future count-model candidate, but do not activate automatic recommendation until dispersion and model-adequacy guidance is completed and benchmarked."
+      "finding": "Count routing and mean-variance/overdispersion principles are source-supported, but operational dispersion remediation and advanced count-model routing are deferred.",
+      "action": "Do not autonomously execute/recommend in v1."
     },
     {
       "method_id": "negative_binomial_regression",
-      "registry_maturity": "validated",
       "executable": false,
-      "computational_status": "not_in_runtime",
-      "methodology_status": "gap",
-      "evidence_sources": [],
-      "rule_ids": [],
-      "finding": "No sufficient source-backed negative-binomial selection rule has been extracted; the relevant major categorical-data text in the corpus is scanned and not text-extractable without selective manual inspection.",
-      "action": "Keep non-executable and do not present automatic negative-binomial recommendation as methodology-validated until the source gap is closed."
+      "methodology_status": "deferred",
+      "rule_ids": [
+        "count-overdispersion-001"
+      ],
+      "finding": "The corpus explicitly rejects automatic overdispersion→negative-binomial switching; detailed selection is deferred.",
+      "action": "Do not autonomously execute/recommend in v1."
+    },
+    {
+      "method_id": "diagnostic_accuracy",
+      "executable": false,
+      "methodology_status": "source_supported_concept",
+      "rule_ids": [
+        "diagnostic-accuracy-001"
+      ],
+      "finding": "Sensitivity, specificity, predictive values, likelihood ratios and threshold behaviour are source-supported.",
+      "action": "Recognize and plan the workflow, but keep numerical diagnostic pipeline outside v1 runtime."
+    },
+    {
+      "method_id": "competing_risks",
+      "executable": false,
+      "methodology_status": "source_supported_concept",
+      "rule_ids": [
+        "survival-001",
+        "competing-risks-001"
+      ],
+      "finding": "Competing events must not be treated as ordinary noninformative censoring; target estimand determines cause-specific versus subdistribution family.",
+      "action": "Block ordinary survival-only routing when competing risks are present."
+    },
+    {
+      "method_id": "causal_estimators",
+      "executable": false,
+      "methodology_status": "source_supported_concept",
+      "rule_ids": [
+        "causal-gate-001",
+        "did-001"
+      ],
+      "finding": "Causal identification assumptions and difference-in-differences parallel-trend logic are source-supported, but estimator-specific autonomous execution is outside v1.",
+      "action": "Use the causal gate to prevent adjusted association models from being mislabeled causal."
+    },
+    {
+      "method_id": "psychometric_workflows",
+      "executable": false,
+      "methodology_status": "source_supported_concept",
+      "rule_ids": [
+        "psychometric-model-001",
+        "psychometric-internal-consistency-001",
+        "psychometric-reliability-error-001"
+      ],
+      "finding": "Reflective/formative structure, structural validity before internal consistency, and reliability versus measurement error are source-supported.",
+      "action": "Recognize and safeguard psychometric questions; full factor/reliability/invariance execution remains future work."
+    },
+    {
+      "method_id": "interrupted_time_series",
+      "executable": false,
+      "methodology_status": "source_supported_concept",
+      "rule_ids": [
+        "interrupted-time-series-001"
+      ],
+      "finding": "Pretrend, level/slope change and autocorrelation requirements are source-supported.",
+      "action": "Block simple pre/post substitution; executor deferred."
     }
   ]
 }
