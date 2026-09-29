@@ -913,19 +913,6 @@ function mappingDecisions(readiness: ProjectReadiness): OrchestratorDecision[] {
           kind: "confirm_study_design",
           prompt: blocker.message,
           questionId: blocker.questionId,
-          ...(blocker.concept ? { concept: blocker.concept } : {}),
-          ...(blocker.role ? { role: blocker.role } : {}),
-          ...(variable?.datasetVariable
-            ? {
-                options: [
-                  {
-                    id: variable.datasetVariable,
-                    label: variable.datasetVariable,
-                    detail: "Methodome's current evidence-backed suggestion."
-                  }
-                ]
-              }
-            : {}),
           blocking: true
         });
         continue;
@@ -949,6 +936,19 @@ function mappingDecisions(readiness: ProjectReadiness): OrchestratorDecision[] {
             ? `Methodome matched “${blocker.concept}” to dataset field “${variable.datasetVariable}”, but the evidence is not strong enough to accept silently. Confirm or change this one mapping.`
             : `Methodome could not resolve “${blocker.concept}” from the available dataset metadata and research instruments. Choose the field only if you can identify it, or leave the concept unresolved.`,
           questionId: blocker.questionId,
+          ...(blocker.concept ? { concept: blocker.concept } : {}),
+          ...(blocker.role ? { role: blocker.role } : {}),
+          ...(variable?.datasetVariable
+            ? {
+                options: [
+                  {
+                    id: variable.datasetVariable,
+                    label: variable.datasetVariable,
+                    detail: "Methodome's current evidence-backed suggestion."
+                  }
+                ]
+              }
+            : {}),
           blocking: true
         });
         continue;
