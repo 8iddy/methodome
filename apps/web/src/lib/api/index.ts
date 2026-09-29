@@ -972,6 +972,21 @@ export async function getProjectOrchestrator(projectId: string) {
   }>(`/projects/${projectId}/orchestrator`);
 }
 
+export async function askProjectAssistant(
+  projectId: string,
+  message: string,
+  history: Array<{ role: "user" | "assistant"; content: string }> = []
+) {
+  return request<{
+    reply: string;
+    grounded: boolean;
+    modelUsed: boolean;
+  }>(`/projects/${projectId}/assistant`, {
+    method: "POST",
+    body: JSON.stringify({ message, history })
+  });
+}
+
 export async function advanceProjectOrchestrator(
   projectId: string,
   action?: OrchestratorAutomaticAction
