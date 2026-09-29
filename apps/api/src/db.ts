@@ -1217,8 +1217,8 @@ export async function createQualitativeAnalysis(
         .prepare(
           `INSERT INTO qualitative_segments
            (id, analysis_id, project_id, file_id, segment_index, text,
-            start_char, end_char, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            start_char, end_char, coding_state, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(
           segment.id,
@@ -1229,6 +1229,7 @@ export async function createQualitativeAnalysis(
           segment.text,
           segment.startChar,
           segment.endChar,
+          segment.codingState,
           segment.createdAt
         )
     );
@@ -1323,7 +1324,7 @@ export async function listQualitativeSegments(
   const result = await db
     .prepare(
       `SELECT id, analysis_id, project_id, file_id, segment_index,
-              text, start_char, end_char, created_at
+              text, start_char, end_char, coding_state, created_at
        FROM qualitative_segments
        WHERE analysis_id = ?
        ORDER BY file_id ASC, segment_index ASC`
@@ -1340,6 +1341,7 @@ export async function listQualitativeSegments(
     text: String(row.text),
     startChar: Number(row.start_char),
     endChar: Number(row.end_char),
+    codingState: String(row.coding_state) as "uncoded" | "proposed" | "reviewed",
     createdAt: String(row.created_at)
   }));
 }
@@ -1530,4 +1532,24 @@ export async function listQualitativeThemeVersions(
     createdBy: String(row.created_by),
     createdAt: String(row.created_at)
   }));
+}
+
+
+export async function updateQualitativeSegmentCodingState(
+  db: D1Database,
+  analysisId: string,
+  segmentIds: string[],
+  codingState: "uncoded" | "proposed" | "reviewed"
+): Promise<void> {
+  if (segmentIds.length === 0) return;
+  const statements = segmentIds.map((segmentId) =>
+    db
+      .prepare(
+        `UPDATE qualitative_segments
+         SET coding_state = ?
+         WHERE analysis_id = ? AND id = ?`
+      )
+      .bind(codingState, analysisId, segmentId)
+  );
+  await db.batch(statements);
 }
