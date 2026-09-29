@@ -282,10 +282,24 @@ export function validateThemeReferences(
       .map((coding) => `${coding.segmentId}\u0000${coding.codeId}`)
   );
 
+  const themeIds = new Set<string>();
   for (const theme of themeSet.themes) {
+    if (themeIds.has(theme.id)) {
+      throw new Error(`Theme set repeats theme id ${theme.id}.`);
+    }
+    themeIds.add(theme.id);
+
     for (const codeId of theme.codeIds) {
       if (!allowedCodes.has(codeId)) {
         throw new Error(`Theme ${theme.id} references unknown code ${codeId}.`);
+      }
+      const codeHasEvidence = theme.evidenceSegmentIds.some((segmentId) =>
+        confirmedPairs.has(`${segmentId}\u0000${codeId}`)
+      );
+      if (!codeHasEvidence) {
+        throw new Error(
+          `Theme ${theme.id} includes code ${codeId} without confirmed evidence among its cited segments.`
+        );
       }
     }
     for (const segmentId of theme.evidenceSegmentIds) {
