@@ -34,6 +34,8 @@ CREATE TABLE qualitative_segments (
   text TEXT NOT NULL,
   start_char INTEGER NOT NULL,
   end_char INTEGER NOT NULL,
+  coding_state TEXT NOT NULL DEFAULT 'uncoded'
+    CHECK (coding_state IN ('uncoded','proposed','reviewed')),
   created_at TEXT NOT NULL,
   UNIQUE (analysis_id, file_id, segment_index),
   FOREIGN KEY (analysis_id) REFERENCES qualitative_analyses(id) ON DELETE CASCADE,
