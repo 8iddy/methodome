@@ -61,6 +61,51 @@
       "validation_status": "draft"
     },
     {
+      "rule_id": "fisher-exact-001",
+      "topic": "fisher_exact",
+      "decision": "Use Fisher's exact test as the exact 2x2 alternative when comparing two independent groups with binary classifications and the ordinary large-sample approximation is unsuitable.",
+      "conditions": [
+        "Two independent groups or samples",
+        "Each observation falls into one of two mutually exclusive outcome classes",
+        "Data form a 2x2 contingency table",
+        "Counts are small or sparse enough that the ordinary asymptotic approximation should not be relied on"
+      ],
+      "action": "Use Fisher's exact test for the 2x2 table rather than forcing the ordinary large-sample approximation.",
+      "assumptions": [
+        "Independent samples or groups",
+        "Frequency/count data in a 2x2 table",
+        "Mutually exclusive outcome classes"
+      ],
+      "diagnostics": [
+        "Contingency-table dimensions",
+        "Observed and expected cell counts",
+        "Independence of observations"
+      ],
+      "warnings": [
+        "Do not use an arbitrary total-sample threshold such as n < 30 as a universal Fisher rule.",
+        "For tables larger than 2x2, use a method explicitly supported for that structure rather than silently extending this rule.",
+        "Paired or matched binary data require a different method because the independence condition does not hold."
+      ],
+      "exceptions": [
+        "If the ordinary approximation is adequate, the chi-square or large-sample two-proportion procedure may remain appropriate within its own rule boundary."
+      ],
+      "source_evidence": [
+        {
+          "source_id": "src-002-nistsematech-e-handbook-of-statistical-methods",
+          "support": "NIST describes Fisher's exact probability test as an exact nonparametric choice for small independent samples with two mutually exclusive classes represented in a 2x2 contingency table.",
+          "section": "7.3.3, Case 2: An Exact Test for Small Samples",
+          "page": null
+        },
+        {
+          "source_id": "src-068-penn-state-stat-200-elementary-statistics",
+          "support": "Penn State states that Fisher's exact method may be used for two independent proportions when the large-sample normal-approximation condition is not met.",
+          "section": "Lesson 9.1: Two Independent Proportions",
+          "page": "2 of 27"
+        }
+      ],
+      "validation_status": "draft"
+    },
+    {
       "rule_id": "pearson-001",
       "topic": "pearson_correlation",
       "decision": "Use Pearson correlation for a linear relationship between two quantitative variables when its conditions are appropriate.",
