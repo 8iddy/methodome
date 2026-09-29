@@ -52,6 +52,10 @@ import {
   suggestMappingsWithAi
 } from "./protocol-extraction";
 import {
+  answerProjectAssistant,
+  PROJECT_ASSISTANT_MODEL
+} from "./project-assistant";
+import {
   modelProvenance as qualitativeModelProvenance,
   proposeQualitativeCodebook,
   proposeQualitativeCodings,
@@ -2277,6 +2281,167 @@ app.get("/projects/:projectId/orchestrator", async (c) => {
       ? { datasetVersionId: state.resolvedDatasetVersionId }
       : {})
   });
+});
+
+const projectAssistantSchema = z.object({
+  message: z.string().trim().min(1).max(4000),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().trim().min(1).max(4000)
+      })
+    )
+    .max(8)
+    .default([])
+});
+
+app.post("/projects/:projectId/assistant", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const parsed = projectAssistantSchema.safeParse(
+    await c.req.json().catch(() => null)
+  );
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_PROJECT_ASSISTANT_MESSAGE",
+          message: "Write a short message about this research project.",
+          details: parsed.error.flatten()
+        }
+      },
+      400
+    );
+  }
+
+  const state = await computeProjectReadiness(c, projectId);
+  const orchestrator = buildOrchestratorView(state.readiness, state.plan);
+  const policy = await getProjectPolicy(c.env.DB, projectId);
+
+  const fallback = [
+    orchestrator.summary,
+    orchestrator.nextAction.requiresResearcher
+      ? orchestrator.nextAction.detail
+      : `Methodome can handle the next step automatically: ${orchestrator.nextAction.label}.`
+  ].join(" ");
+
+  if (!c.env.AI) {
+    return c.json({
+      reply: fallback,
+      grounded: true,
+      modelUsed: false
+    });
+  }
+
+  if (policy) {
+    try {
+      assertModelRequestAllowed(policy, {
+        processorId: "workers-ai",
+        providerKind: "internal",
+        payloadKind: "metadata",
+        containsIdentifiers: policy.containsIdentifiableData
+      });
+    } catch {
+      return c.json({
+        reply: fallback,
+        grounded: true,
+        modelUsed: false
+      });
+    }
+  }
+
+  const context = {
+    project: {
+      name: access.project.name,
+      description: access.project.description ?? null,
+      researchType: access.project.researchType
+    },
+    workflow: {
+      status: orchestrator.status,
+      summary: orchestrator.summary,
+      nextAction: orchestrator.nextAction,
+      decisions: orchestrator.decisions.map((decision) => ({
+        kind: decision.kind,
+        prompt: decision.prompt,
+        questionId: decision.questionId ?? null,
+        options: decision.options ?? []
+      }))
+    },
+    mappingSummary: state.readiness.mappingSummary,
+    researchQuestions: state.readiness.questions.map((question) => ({
+      id: question.questionId,
+      text: question.text,
+      mode: question.mode,
+      objectiveType: question.objectiveType,
+      status: question.status,
+      variables: question.variables.map((variable) => ({
+        concept: variable.concept,
+        role: variable.role,
+        datasetVariable: variable.datasetVariable ?? null,
+        mappingStatus: variable.mappingStatus ?? null,
+        confirmed: variable.confirmed
+      })),
+      blockers: question.blockers.map((blocker) => blocker.message),
+      warnings: question.warnings,
+      candidates: question.candidates
+        .filter((candidate) => candidate.executable)
+        .map((candidate) => ({
+          methodId: candidate.methodId,
+          displayName: candidate.displayName,
+          rationale: candidate.rationale,
+          decisionRequired: candidate.decisionRequired ?? null
+        }))
+    })),
+    plan: state.plan
+      ? {
+          locked: Boolean(state.plan.lockedAt),
+          analyses: state.plan.analyses.map((analysis) => ({
+            researchQuestionId: analysis.researchQuestionId,
+            selectedMethodId: analysis.selectedMethodId ?? null,
+            candidateMethodIds: analysis.candidateMethodIds,
+            outcome: analysis.outcome,
+            predictors: analysis.predictors,
+            covariates: analysis.covariates,
+            warnings: analysis.warnings
+          }))
+        }
+      : null
+  };
+
+  try {
+    const reply = await answerProjectAssistant({
+      env: c.env,
+      message: parsed.data.message,
+      history: parsed.data.history,
+      context
+    });
+    await addAudit(c, {
+      projectId,
+      action: "project_assistant_consulted",
+      objectType: "project_assistant",
+      objectId: makeId("assistant"),
+      modelId: PROJECT_ASSISTANT_MODEL,
+      after: {
+        messageLength: parsed.data.message.length,
+        workflowStatus: orchestrator.status,
+        nextAction: orchestrator.nextAction.code
+      }
+    });
+    return c.json({
+      reply,
+      grounded: true,
+      modelUsed: true
+    });
+  } catch {
+    return c.json({
+      reply: fallback,
+      grounded: true,
+      modelUsed: false
+    });
+  }
 });
 
 app.post("/projects/:projectId/orchestrator/advance", async (c) => {
