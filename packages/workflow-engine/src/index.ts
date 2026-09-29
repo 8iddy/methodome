@@ -836,8 +836,7 @@ export function buildOrchestratorView(
     const automatic = new Map<WorkflowActionCode, OrchestratorAutomaticAction>([
       ["extract_protocol", "extract_protocol"],
       ["build_analysis_plan", "create_draft_plan"],
-      ["run_analyses", "run_analyses"],
-      ["prepare_qualitative_analysis", "prepare_qualitative_analysis"]
+      ["run_analyses", "run_analyses"]
     ]);
     automaticAction = automatic.get(readiness.nextAction.code);
     status = automaticAction ? "ready_to_execute" : "blocked";
