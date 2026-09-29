@@ -1,6 +1,6 @@
 {
   "batch_id": "specialized-methodology-batch-1",
-  "status": "draft",
+  "status": "supported",
   "extracted_date": "2026-09-29",
   "records": [
     {
@@ -55,6 +55,24 @@
       "source_id": "src-033-survival-analysis-in-the-presence-of-competing-risks",
       "section": "Abstract and Introduction",
       "page": null,
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-psychometric-003",
+      "topic": "psychometrics",
+      "statement": "Internal consistency is the interrelatedness of items and is only clearly interpretable when the items form a unidimensional reflective scale; structural validity evidence should therefore be considered before interpreting alpha, omega, or related internal-consistency statistics.",
+      "source_id": "src-036-cosmin-manual-v20",
+      "section": "6.3 Internal consistency",
+      "page": "167 onward",
+      "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-psychometric-004",
+      "topic": "psychometrics",
+      "statement": "Reliability and measurement error are distinct properties: reliability concerns the proportion of total variance attributable to true differences between people, whereas measurement error concerns systematic and random error in an individual's score not attributable to true change.",
+      "source_id": "src-036-cosmin-manual-v20",
+      "section": "6.5 Reliability and 6.6 Measurement error",
+      "page": "179-186",
       "support_type": "direct"
     }
   ]
