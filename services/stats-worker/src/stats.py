@@ -7,7 +7,7 @@ import statistics
 import sys
 from typing import Any
 
-ENGINE_VERSION = "python-worker-0.2.0"
+ENGINE_VERSION = "python-worker-0.3.0"
 PACKAGE_VERSION = sys.version.split()[0]
 _NORMAL_975 = 1.959963984540054
 _EPS = 1e-14
@@ -153,7 +153,7 @@ def _regularized_beta(x: float, a: float, b: float) -> float:
     return 1.0 - bt * _betacf(b, a, 1.0 - x) / b
 
 
-def _student_t_cdf(t: float, df: int) -> float:
+def _student_t_cdf(t: float, df: float) -> float:
     if df <= 0:
         raise ValueError(
             "Student t distribution requires positive degrees of freedom."
@@ -168,14 +168,14 @@ def _student_t_cdf(t: float, df: int) -> float:
     return 0.5 * ib
 
 
-def _student_t_two_sided_p(t: float, df: int) -> float:
+def _student_t_two_sided_p(t: float, df: float) -> float:
     if math.isinf(t):
         return 0.0
     cdf = _student_t_cdf(t, df)
     return min(1.0, max(0.0, 2.0 * min(cdf, 1.0 - cdf)))
 
 
-def _student_t_ppf(probability: float, df: int) -> float:
+def _student_t_ppf(probability: float, df: float) -> float:
     if not 0.0 < probability < 1.0:
         raise ValueError("Probability must be between zero and one.")
     if probability == 0.5:
@@ -471,6 +471,608 @@ def correlation(
                 "status": "passed",
                 "value": len(pairs),
             }
+        ],
+    )
+
+
+
+def _f_sf(value: float, df_num: int, df_den: int) -> float:
+    if value < 0.0 or df_num <= 0 or df_den <= 0:
+        raise ValueError("F statistic and degrees of freedom are invalid.")
+    if math.isinf(value):
+        return 0.0
+    x = (df_num * value) / (df_num * value + df_den)
+    cdf = _regularized_beta(x, df_num / 2.0, df_den / 2.0)
+    return min(1.0, max(0.0, 1.0 - cdf))
+
+
+def _grouped_numeric(
+    rows: list[dict[str, str]],
+    outcome: str,
+    group: str,
+) -> dict[str, list[float]]:
+    grouped: dict[str, list[float]] = {}
+    for row in rows:
+        raw_group = row.get(group)
+        if _missing(raw_group):
+            continue
+        try:
+            value = _float(row.get(outcome))
+        except (ValueError, TypeError):
+            continue
+        level = str(raw_group).strip()
+        grouped.setdefault(level, []).append(value)
+    return grouped
+
+
+def _paired_numeric(
+    rows: list[dict[str, str]],
+    first: str,
+    second: str,
+) -> list[tuple[float, float]]:
+    pairs: list[tuple[float, float]] = []
+    for row in rows:
+        try:
+            pairs.append((_float(row.get(first)), _float(row.get(second))))
+        except (ValueError, TypeError):
+            continue
+    return pairs
+
+
+def independent_two_sample_t(
+    rows: list[dict[str, str]],
+    outcome: str,
+    group: str,
+) -> dict[str, Any]:
+    grouped = _grouped_numeric(rows, outcome, group)
+    levels = sorted(grouped)
+    if len(levels) != 2:
+        raise ValueError(
+            "Independent two-sample t-test requires exactly two observed groups."
+        )
+    first = grouped[levels[0]]
+    second = grouped[levels[1]]
+    if len(first) < 2 or len(second) < 2:
+        raise ValueError(
+            "Independent two-sample t-test requires at least two complete observations in each group."
+        )
+
+    n1, n2 = len(first), len(second)
+    mean1, mean2 = statistics.fmean(first), statistics.fmean(second)
+    var1, var2 = statistics.variance(first), statistics.variance(second)
+    difference = mean1 - mean2
+    se2 = var1 / n1 + var2 / n2
+    se = math.sqrt(max(0.0, se2))
+
+    if se <= 0.0:
+        t_stat = 0.0 if abs(difference) <= _EPS else math.copysign(math.inf, difference)
+        df = float(n1 + n2 - 2)
+        p_value = 1.0 if t_stat == 0.0 else 0.0
+        lower = upper = difference
+    else:
+        numerator = se2 * se2
+        denominator = (
+            (var1 / n1) ** 2 / (n1 - 1)
+            + (var2 / n2) ** 2 / (n2 - 1)
+        )
+        df = numerator / denominator if denominator > 0 else float(n1 + n2 - 2)
+        t_stat = difference / se
+        p_value = _student_t_two_sided_p(t_stat, df)
+        crit = _student_t_ppf(0.975, df)
+        lower = difference - crit * se
+        upper = difference + crit * se
+
+    return _result(
+        "independent_two_sample_t",
+        n1 + n2,
+        [
+            {
+                "term": f"{outcome}: {levels[0]} - {levels[1]}",
+                "estimate": difference,
+                "standardError": se,
+                "statistic": t_stat,
+                "pValue": p_value,
+                "confidenceInterval": {
+                    "level": 0.95,
+                    "lower": lower,
+                    "upper": upper,
+                },
+            }
+        ],
+        [
+            {
+                "id": "group_count",
+                "label": "Observed groups",
+                "status": "passed",
+                "value": 2,
+            },
+            {
+                "id": "group_sizes",
+                "label": "Complete observations by group",
+                "status": "passed",
+                "value": f"{levels[0]}={n1}; {levels[1]}={n2}",
+            },
+            {
+                "id": "welch_degrees_of_freedom",
+                "label": "Welch-Satterthwaite degrees of freedom",
+                "status": "passed",
+                "value": df,
+            },
+            {
+                "id": "distribution_review",
+                "label": "Group distribution and outlier review",
+                "status": "review",
+                "message": (
+                    "Inspect group distributions and influential outliers. "
+                    "Methodome does not use a universal sample-size or normality-test cutoff."
+                ),
+            },
+        ],
+    )
+
+
+def paired_t(
+    rows: list[dict[str, str]],
+    first: str,
+    second: str,
+) -> dict[str, Any]:
+    pairs = _paired_numeric(rows, first, second)
+    if len(pairs) < 2:
+        raise ValueError("Paired t-test requires at least two complete pairs.")
+    differences = [a - b for a, b in pairs]
+    n = len(differences)
+    mean_difference = statistics.fmean(differences)
+    sd = statistics.stdev(differences)
+    se = sd / math.sqrt(n)
+
+    if se <= 0.0:
+        t_stat = 0.0 if abs(mean_difference) <= _EPS else math.copysign(math.inf, mean_difference)
+        p_value = 1.0 if t_stat == 0.0 else 0.0
+        lower = upper = mean_difference
+    else:
+        t_stat = mean_difference / se
+        p_value = _student_t_two_sided_p(t_stat, n - 1)
+        crit = _student_t_ppf(0.975, n - 1)
+        lower = mean_difference - crit * se
+        upper = mean_difference + crit * se
+
+    return _result(
+        "paired_t",
+        n,
+        [
+            {
+                "term": f"{first} - {second}",
+                "estimate": mean_difference,
+                "standardError": se,
+                "statistic": t_stat,
+                "pValue": p_value,
+                "confidenceInterval": {
+                    "level": 0.95,
+                    "lower": lower,
+                    "upper": upper,
+                },
+            }
+        ],
+        [
+            {
+                "id": "complete_pairs",
+                "label": "Complete matched pairs",
+                "status": "passed",
+                "value": n,
+            },
+            {
+                "id": "difference_distribution",
+                "label": "Within-pair difference distribution",
+                "status": "review",
+                "message": (
+                    "Inspect the distribution and influential values of the within-pair differences, "
+                    "not only the marginal distributions of the two measurements."
+                ),
+            },
+        ],
+    )
+
+
+def one_way_anova(
+    rows: list[dict[str, str]],
+    outcome: str,
+    group: str,
+) -> dict[str, Any]:
+    grouped = _grouped_numeric(rows, outcome, group)
+    levels = sorted(grouped)
+    if len(levels) < 3:
+        raise ValueError("One-way ANOVA requires at least three observed groups.")
+    values = [value for level in levels for value in grouped[level]]
+    n = len(values)
+    k = len(levels)
+    if n <= k:
+        raise ValueError(
+            "One-way ANOVA requires positive residual degrees of freedom."
+        )
+
+    grand_mean = statistics.fmean(values)
+    ss_between = sum(
+        len(grouped[level])
+        * (statistics.fmean(grouped[level]) - grand_mean) ** 2
+        for level in levels
+    )
+    ss_within = sum(
+        sum(
+            (value - statistics.fmean(grouped[level])) ** 2
+            for value in grouped[level]
+        )
+        for level in levels
+    )
+    df_between = k - 1
+    df_within = n - k
+    ms_between = ss_between / df_between
+    ms_within = ss_within / df_within
+
+    if ms_within <= 0.0:
+        f_stat = 0.0 if ms_between <= _EPS else math.inf
+        p_value = 1.0 if f_stat == 0.0 else 0.0
+    else:
+        f_stat = ms_between / ms_within
+        p_value = _f_sf(f_stat, df_between, df_within)
+
+    group_sizes = "; ".join(f"{level}={len(grouped[level])}" for level in levels)
+
+    return _result(
+        "one_way_anova",
+        n,
+        [
+            {
+                "term": f"{outcome} by {group}",
+                "estimate": f_stat,
+                "statistic": f_stat,
+                "pValue": p_value,
+            }
+        ],
+        [
+            {
+                "id": "group_count",
+                "label": "Observed groups",
+                "status": "passed",
+                "value": k,
+            },
+            {
+                "id": "group_sizes",
+                "label": "Complete observations by group",
+                "status": "passed",
+                "value": group_sizes,
+            },
+            {
+                "id": "residual_degrees_of_freedom",
+                "label": "Residual degrees of freedom",
+                "status": "passed",
+                "value": df_within,
+            },
+            {
+                "id": "anova_residual_review",
+                "label": "ANOVA residual and variance review",
+                "status": "review",
+                "message": (
+                    "Review residual shape, group variance pattern, outliers and order-related dependence "
+                    "before treating ordinary ANOVA inference as adequate."
+                ),
+            },
+        ],
+    )
+
+
+def _tie_sizes(values: list[float]) -> list[int]:
+    counts: dict[float, int] = {}
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    return [count for count in counts.values() if count > 1]
+
+
+def _mann_whitney_exact_two_sided(n1: int, n2: int, observed_u: int) -> float:
+    total_n = n1 + n2
+    dp: list[dict[int, int]] = [dict() for _ in range(n1 + 1)]
+    dp[0][0] = 1
+
+    for rank in range(1, total_n + 1):
+        for chosen in range(min(rank, n1), 0, -1):
+            for rank_sum, count in list(dp[chosen - 1].items()):
+                new_sum = rank_sum + rank
+                dp[chosen][new_sum] = dp[chosen].get(new_sum, 0) + count
+
+    offset = n1 * (n1 + 1) // 2
+    total = math.comb(total_n, n1)
+    lower = sum(
+        count
+        for rank_sum, count in dp[n1].items()
+        if rank_sum - offset <= observed_u
+    ) / total
+    return min(1.0, 2.0 * lower)
+
+
+def mann_whitney(
+    rows: list[dict[str, str]],
+    outcome: str,
+    group: str,
+) -> dict[str, Any]:
+    grouped = _grouped_numeric(rows, outcome, group)
+    levels = sorted(grouped)
+    if len(levels) != 2:
+        raise ValueError("Mann-Whitney U test requires exactly two observed groups.")
+    first = grouped[levels[0]]
+    second = grouped[levels[1]]
+    if not first or not second:
+        raise ValueError("Mann-Whitney U test requires observations in both groups.")
+
+    combined = first + second
+    ranks = _ranks(combined)
+    n1, n2 = len(first), len(second)
+    rank_sum_first = sum(ranks[:n1])
+    u1 = rank_sum_first - n1 * (n1 + 1) / 2.0
+    u2 = n1 * n2 - u1
+    u_stat = min(u1, u2)
+    ties = _tie_sizes(combined)
+    exact = not ties and len(combined) <= 30
+
+    if exact:
+        p_value = _mann_whitney_exact_two_sided(n1, n2, int(round(u_stat)))
+    else:
+        total_n = n1 + n2
+        tie_term = sum(t ** 3 - t for t in ties)
+        variance = (
+            n1
+            * n2
+            / 12.0
+            * (
+                (total_n + 1)
+                - tie_term / (total_n * (total_n - 1))
+            )
+        )
+        if variance <= 0.0:
+            raise ValueError("Mann-Whitney variance is zero after tie correction.")
+        mean_u = n1 * n2 / 2.0
+        z = max(0.0, abs(u1 - mean_u) - 0.5) / math.sqrt(variance)
+        p_value = _normal_two_sided_p(z)
+
+    warnings = [
+        "Mann-Whitney is a rank/distribution test and is not automatically a test of equal medians."
+    ]
+    if not exact:
+        warnings.append(
+            "The reported p-value uses a large-sample normal approximation with tie correction where applicable."
+        )
+
+    return _result(
+        "mann_whitney",
+        n1 + n2,
+        [
+            {
+                "term": f"{outcome} by {group}",
+                "estimate": u_stat,
+                "statistic": u_stat,
+                "pValue": p_value,
+            }
+        ],
+        [
+            {
+                "id": "group_sizes",
+                "label": "Complete observations by group",
+                "status": "passed",
+                "value": f"{levels[0]}={n1}; {levels[1]}={n2}",
+            },
+            {
+                "id": "rank_ties",
+                "label": "Tied outcome values",
+                "status": "review" if ties else "passed",
+                "value": sum(ties),
+            },
+            {
+                "id": "exact_inference",
+                "label": "Exact p-value used",
+                "status": "passed" if exact else "not_applicable",
+                "value": exact,
+            },
+            {
+                "id": "distribution_interpretation",
+                "label": "Distribution/location interpretation",
+                "status": "review",
+                "message": (
+                    "Inspect group shapes and spreads before attaching a median or pure location-shift interpretation."
+                ),
+            },
+        ],
+        warnings,
+    )
+
+
+def _wilcoxon_exact_two_sided(n: int, observed_w: int) -> float:
+    dp: dict[int, int] = {0: 1}
+    for rank in range(1, n + 1):
+        updated = dict(dp)
+        for current, count in dp.items():
+            updated[current + rank] = updated.get(current + rank, 0) + count
+        dp = updated
+    total = 2 ** n
+    lower = sum(count for value, count in dp.items() if value <= observed_w) / total
+    return min(1.0, 2.0 * lower)
+
+
+def wilcoxon_signed_rank(
+    rows: list[dict[str, str]],
+    first: str,
+    second: str,
+) -> dict[str, Any]:
+    pairs = _paired_numeric(rows, first, second)
+    if not pairs:
+        raise ValueError("Wilcoxon signed-rank test requires complete pairs.")
+    differences = [a - b for a, b in pairs]
+    nonzero = [value for value in differences if abs(value) > _EPS]
+    zero_count = len(differences) - len(nonzero)
+    if not nonzero:
+        raise ValueError("Wilcoxon signed-rank test has no nonzero pair differences.")
+
+    absolute = [abs(value) for value in nonzero]
+    ranks = _ranks(absolute)
+    w_plus = sum(rank for rank, diff in zip(ranks, nonzero) if diff > 0)
+    w_minus = sum(rank for rank, diff in zip(ranks, nonzero) if diff < 0)
+    statistic_value = min(w_plus, w_minus)
+    ties = _tie_sizes(absolute)
+    n = len(nonzero)
+    exact = not ties and n <= 30
+
+    if exact:
+        p_value = _wilcoxon_exact_two_sided(n, int(round(statistic_value)))
+    else:
+        mean_w = sum(ranks) / 2.0
+        variance = 0.25 * sum(rank * rank for rank in ranks)
+        if variance <= 0.0:
+            raise ValueError("Wilcoxon signed-rank variance is zero.")
+        z = max(0.0, abs(w_plus - mean_w) - 0.5) / math.sqrt(variance)
+        p_value = _normal_two_sided_p(z)
+
+    warnings = [
+        "Wilcoxon signed-rank requires a scientifically meaningful paired difference and symmetry for the usual signed-rank shift interpretation."
+    ]
+    if not exact:
+        warnings.append(
+            "The reported p-value uses a normal approximation because ties are present or the exact enumeration boundary was exceeded."
+        )
+
+    return _result(
+        "wilcoxon_signed_rank",
+        len(pairs),
+        [
+            {
+                "term": f"{first} - {second}",
+                "estimate": statistic_value,
+                "statistic": statistic_value,
+                "pValue": p_value,
+            }
+        ],
+        [
+            {
+                "id": "complete_pairs",
+                "label": "Complete matched pairs",
+                "status": "passed",
+                "value": len(pairs),
+            },
+            {
+                "id": "nonzero_differences",
+                "label": "Nonzero differences used",
+                "status": "passed",
+                "value": n,
+            },
+            {
+                "id": "zero_differences",
+                "label": "Zero differences removed",
+                "status": "review" if zero_count else "passed",
+                "value": zero_count,
+            },
+            {
+                "id": "difference_symmetry",
+                "label": "Difference-score symmetry",
+                "status": "review",
+                "message": (
+                    "Review the distribution of within-pair differences; Methodome does not use a normality-test p-value as an automatic switch."
+                ),
+            },
+            {
+                "id": "exact_inference",
+                "label": "Exact p-value used",
+                "status": "passed" if exact else "not_applicable",
+                "value": exact,
+            },
+        ],
+        warnings,
+    )
+
+
+def kruskal_wallis(
+    rows: list[dict[str, str]],
+    outcome: str,
+    group: str,
+) -> dict[str, Any]:
+    grouped = _grouped_numeric(rows, outcome, group)
+    levels = sorted(grouped)
+    if len(levels) < 3:
+        raise ValueError("Kruskal-Wallis test requires at least three observed groups.")
+
+    combined: list[float] = []
+    membership: list[str] = []
+    for level in levels:
+        for value in grouped[level]:
+            combined.append(value)
+            membership.append(level)
+    if len(combined) <= len(levels):
+        raise ValueError("Kruskal-Wallis test requires observations beyond the group count.")
+
+    ranks = _ranks(combined)
+    rank_sums = {level: 0.0 for level in levels}
+    for rank, level in zip(ranks, membership):
+        rank_sums[level] += rank
+
+    n = len(combined)
+    h = (
+        12.0
+        / (n * (n + 1))
+        * sum(
+            rank_sums[level] ** 2 / len(grouped[level])
+            for level in levels
+        )
+        - 3.0 * (n + 1)
+    )
+    ties = _tie_sizes(combined)
+    tie_correction = 1.0 - (
+        sum(t ** 3 - t for t in ties)
+        / (n ** 3 - n)
+    )
+    if tie_correction <= 0.0:
+        raise ValueError("Kruskal-Wallis tie correction is undefined.")
+    h /= tie_correction
+    df = len(levels) - 1
+    p_value = _chi_square_sf(max(0.0, h), df)
+
+    return _result(
+        "kruskal_wallis",
+        n,
+        [
+            {
+                "term": f"{outcome} by {group}",
+                "estimate": h,
+                "statistic": h,
+                "pValue": p_value,
+            }
+        ],
+        [
+            {
+                "id": "group_count",
+                "label": "Observed groups",
+                "status": "passed",
+                "value": len(levels),
+            },
+            {
+                "id": "group_sizes",
+                "label": "Complete observations by group",
+                "status": "passed",
+                "value": "; ".join(
+                    f"{level}={len(grouped[level])}" for level in levels
+                ),
+            },
+            {
+                "id": "rank_ties",
+                "label": "Tied outcome values",
+                "status": "review" if ties else "passed",
+                "value": sum(ties),
+            },
+            {
+                "id": "distribution_interpretation",
+                "label": "Distribution/location interpretation",
+                "status": "review",
+                "message": (
+                    "Inspect group shapes and spreads before describing this as a median or pure location comparison."
+                ),
+            },
+        ],
+        [
+            "A significant Kruskal-Wallis result does not identify which groups differ."
         ],
     )
 
@@ -1308,6 +1910,33 @@ def run_analysis(
             predictors[0],
             method,
         )
+
+    if method in {
+        "independent_two_sample_t",
+        "one_way_anova",
+        "mann_whitney",
+        "kruskal_wallis",
+    }:
+        if not outcome or len(predictors) != 1 or covariates:
+            raise ValueError(
+                "Group-comparison methods require one outcome, exactly one grouping predictor, and no covariates."
+            )
+        if method == "independent_two_sample_t":
+            return independent_two_sample_t(rows, outcome, predictors[0])
+        if method == "one_way_anova":
+            return one_way_anova(rows, outcome, predictors[0])
+        if method == "mann_whitney":
+            return mann_whitney(rows, outcome, predictors[0])
+        return kruskal_wallis(rows, outcome, predictors[0])
+
+    if method in {"paired_t", "wilcoxon_signed_rank"}:
+        if not outcome or len(predictors) != 1 or covariates:
+            raise ValueError(
+                "Paired comparison methods require two matched numeric columns: outcome plus one paired measurement, with no covariates."
+            )
+        if method == "paired_t":
+            return paired_t(rows, outcome, predictors[0])
+        return wilcoxon_signed_rank(rows, outcome, predictors[0])
 
     if method == "linear_regression":
         if not outcome or not model_variables:
