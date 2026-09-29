@@ -31,13 +31,13 @@
     },
     {
       "domain": "descriptive_analysis",
-      "status": "extracted",
-      "notes": "Foundational sources registered and partially extracted; variable-type-specific summaries still need rule expansion."
+      "status": "ruled",
+      "notes": "Categorical count/proportion summaries and quantitative mean-versus-median decisions by shape/outliers are represented; count/rate and date/time summaries can expand later."
     },
     {
       "domain": "two_group_mean_comparisons",
-      "status": "registered",
-      "notes": "Independent and paired inference sources present; formal t-test rules not yet encoded."
+      "status": "ruled",
+      "notes": "Independent two-sample t, separate-variance handling, paired t, Wilcoxon rank-sum and Wilcoxon signed-rank decision rules are represented."
     },
     {
       "domain": "anova",
