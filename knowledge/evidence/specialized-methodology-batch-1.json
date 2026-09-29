@@ -65,6 +65,15 @@
       "section": "Step 6: Evaluate the nine measurement properties",
       "page": "45 onward",
       "support_type": "direct"
+    },
+    {
+      "evidence_id": "ev-competing-risk-001",
+      "topic": "competing_risks",
+      "statement": "When a competing event can prevent observation of the event of interest, conventional survival analysis can be biased; the source identifies cause-specific hazard and subdistribution hazard approaches as alternatives for competing-risk analysis.",
+      "source_id": "src-033-survival-analysis-in-the-presence-of-competing-risks",
+      "section": "Abstract and Introduction",
+      "page": null,
+      "support_type": "direct"
     }
   ]
 }
