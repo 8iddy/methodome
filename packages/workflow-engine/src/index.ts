@@ -1,6 +1,7 @@
 import type { AnalysisPlan } from "@methodome/analysis-contracts";
 import type { CandidateSelection } from "@methodome/method-registry";
 import type { ResearchQuestion, StudySpecification, VariableConcept } from "@methodome/study-spec";
+import type { QualitativeAnalysisStatus } from "@methodome/qualitative-analysis";
 
 export type WorkflowSection =
   | "overview"
@@ -32,7 +33,13 @@ export type QuestionReadinessStatus =
   | "needs_intent"
   | "method_blocked"
   | "qualitative_ready"
-  | "qualitative_source_required";
+  | "qualitative_source_required"
+  | "qualitative_codebook_review"
+  | "qualitative_coding"
+  | "qualitative_coding_review"
+  | "qualitative_theme_ready"
+  | "qualitative_theme_review"
+  | "qualitative_complete";
 
 export type WorkflowActionCode =
   | "add_protocol"
@@ -46,6 +53,12 @@ export type WorkflowActionCode =
   | "run_analyses"
   | "review_results"
   | "prepare_qualitative_analysis"
+  | "propose_qualitative_codebook"
+  | "review_qualitative_codebook"
+  | "propose_qualitative_codings"
+  | "review_qualitative_codings"
+  | "propose_qualitative_themes"
+  | "review_qualitative_themes"
   | "review_project";
 
 export interface VariableMappingSnapshot {
@@ -88,6 +101,7 @@ export interface QuestionReadiness {
   blockers: WorkflowBlocker[];
   candidates: CandidateSelection["candidates"];
   warnings: string[];
+  qualitativeWorkstream?: QualitativeWorkstreamSnapshot;
 }
 
 export interface MappingStageSummary {
@@ -97,6 +111,12 @@ export interface MappingStageSummary {
   representedCount: number;
   gapCount: number;
   unreviewedCount: number;
+}
+
+export interface QualitativeWorkstreamSnapshot {
+  id: string;
+  researchQuestionId: string;
+  status: QualitativeAnalysisStatus;
 }
 
 export interface ProjectWorkflowSnapshot {
@@ -110,6 +130,7 @@ export interface ProjectWorkflowSnapshot {
   selections: CandidateSelection[];
   plan: AnalysisPlan | null;
   completedAnalysisCount: number;
+  qualitativeWorkstreams: QualitativeWorkstreamSnapshot[];
 }
 
 export interface WorkflowAction {
@@ -219,7 +240,8 @@ function questionReadiness(
   question: ResearchQuestion,
   mappings: Map<string, VariableMappingSnapshot>,
   selection: CandidateSelection | undefined,
-  transcriptCount: number
+  transcriptCount: number,
+  qualitativeWorkstream: QualitativeWorkstreamSnapshot | undefined
 ): QuestionReadiness {
   if (!question.objectiveType) {
     return {
@@ -259,16 +281,47 @@ function questionReadiness(
             }
           ];
 
+    let status: QuestionReadinessStatus =
+      transcriptCount > 0 ? "qualitative_ready" : "qualitative_source_required";
+
+    if (qualitativeWorkstream) {
+      switch (qualitativeWorkstream.status) {
+        case "prepared":
+          status = "qualitative_ready";
+          break;
+        case "codebook_review":
+          status = "qualitative_codebook_review";
+          break;
+        case "codebook_confirmed":
+        case "coding_in_progress":
+          status = "qualitative_coding";
+          break;
+        case "coding_review":
+          status = "qualitative_coding_review";
+          break;
+        case "coding_confirmed":
+          status = "qualitative_theme_ready";
+          break;
+        case "theme_review":
+          status = "qualitative_theme_review";
+          break;
+        case "complete":
+          status = "qualitative_complete";
+          break;
+      }
+    }
+
     return {
       questionId: question.id,
       text: question.text,
       objectiveType: question.objectiveType,
       mode: "qualitative",
-      status: transcriptCount > 0 ? "qualitative_ready" : "qualitative_source_required",
+      status,
       variables: [],
       blockers: sourceBlocker,
       candidates: selection?.candidates ?? [],
-      warnings: selection?.warnings ?? []
+      warnings: selection?.warnings ?? [],
+      ...(qualitativeWorkstream ? { qualitativeWorkstream } : {})
     };
   }
 
@@ -581,7 +634,10 @@ export function assessProjectReadiness(
           snapshot.mappings.map((item) => [normalize(item.researchConcept), item])
         ),
         selectionByQuestion.get(question.id),
-        snapshot.transcriptCount
+        snapshot.transcriptCount,
+        snapshot.qualitativeWorkstreams.find(
+          (workstream) => workstream.researchQuestionId === question.id
+        )
       )
     ) ?? [];
 
