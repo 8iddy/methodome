@@ -1,163 +1,179 @@
 {
   "coverage_id": "methodome-methodology-coverage-v0.1",
   "updated_date": "2026-09-29",
+  "release_boundary": "v1 source-supported methodology layer. 'ruled' means an operational source-backed rule exists. It does not mean expert-benchmark validation or runtime execution is complete.",
   "statuses": {
     "registered": "Relevant source family is present in the corpus.",
-    "extracted": "Source-grounded evidence has been extracted.",
-    "ruled": "At least one operational Methodome rule exists.",
-    "gap": "Source support is insufficient for a defensible rule.",
-    "deferred": "Intentionally outside the first knowledge release."
+    "extracted": "Source-grounded evidence has been extracted but the operational rule is incomplete.",
+    "ruled": "At least one source-supported operational Methodome rule exists.",
+    "deferred": "Intentionally outside the v1 autonomous recommendation/execution boundary.",
+    "gap": "Insufficient source support for even a conservative v1 rule."
   },
   "domains": [
     {
       "domain": "research_question_intent",
       "status": "ruled",
-      "notes": "Description, association/explanation, prediction and causal distinctions represented; diagnostic/prognostic need deeper domain rules."
+      "notes": "Description, association/explanation, prediction, causal, diagnostic, prognostic/ time-to-event, qualitative and exploratory routing are represented at the intent/gating layer."
     },
     {
       "domain": "study_design",
       "status": "ruled",
-      "notes": "Cross-sectional/cohort/case-control recognition plus mixed-method separation."
+      "notes": "Cross-sectional, cohort, case-control, randomized experiment, longitudinal/repeated, cluster-aware, interrupted time-series and mixed-method design gates are represented. Ecological-study-specific inference remains an expansion item."
     },
     {
       "domain": "sampling_and_survey_design",
       "status": "ruled",
-      "notes": "Strata, PSU/cluster, multistage, weights and finite-population correction represented."
+      "notes": "Simple random, systematic, stratified, cluster, multistage, PPS-oriented design metadata, census/complete enumeration, probability versus non-probability sampling, weights, strata, PSU and domain analysis are represented. Purposive sampling is treated under the non-probability boundary rather than design-based survey inference."
     },
     {
       "domain": "variable_types",
       "status": "ruled",
-      "notes": "Categorical versus quantitative minimum represented; ordinal/count/time-to-event refinements continue."
+      "notes": "Binary, nominal, ordinal, quantitative, count and time-to-event roles are represented sufficiently for v1 routing."
     },
     {
       "domain": "descriptive_analysis",
       "status": "ruled",
-      "notes": "Categorical count/proportion summaries and quantitative mean-versus-median decisions by shape/outliers are represented; count/rate and date/time summaries can expand later."
+      "notes": "Categorical count/proportion summaries and quantitative centre/spread choices by shape and outliers are represented."
     },
     {
       "domain": "two_group_mean_comparisons",
       "status": "ruled",
-      "notes": "Independent two-sample t, separate-variance handling, paired t, Wilcoxon rank-sum and Wilcoxon signed-rank decision rules are represented."
+      "notes": "Independent/Welch and paired t routing is represented without a universal n>=30 threshold."
+    },
+    {
+      "domain": "nonparametric_comparisons",
+      "status": "ruled",
+      "notes": "Wilcoxon signed-rank, Mann-Whitney/Wilcoxon rank-sum interpretation, and Kruskal-Wallis routing are represented with explicit anti-shortcut safeguards."
     },
     {
       "domain": "anova",
       "status": "ruled",
-      "notes": "One-way ANOVA and Kruskal-Wallis draft rules added."
+      "notes": "Design-aware one-way fixed-effect ANOVA routing and residual diagnostics are represented; repeated/random/clustered structures are blocked from ordinary ANOVA."
     },
     {
       "domain": "chi_square",
       "status": "ruled",
-      "notes": "Expected-count checks represented."
+      "notes": "Categorical eligibility and expected-count approximation checks are represented."
     },
     {
       "domain": "fisher_exact",
       "status": "ruled",
-      "notes": "NIST and STAT 200 provide direct small-sample support."
+      "notes": "Exact independent 2x2 routing for sparse tables is source-backed without an arbitrary total-sample threshold."
     },
     {
       "domain": "pearson_correlation",
       "status": "ruled",
-      "notes": "Linear quantitative association rule and diagnostics represented."
+      "notes": "Linear quantitative association and graphical/outlier diagnostics are represented."
     },
     {
       "domain": "spearman_correlation",
-      "status": "gap",
-      "notes": "Corpus mentions Spearman but current extraction does not yet support a general ordinal/monotonic decision rule."
+      "status": "ruled",
+      "notes": "Ordinal/ranked and monotonic rank-association routing is source-backed; no automatic normality-test switch is allowed."
     },
     {
       "domain": "linear_regression",
       "status": "ruled",
-      "notes": "LINE assumptions, residual diagnostics and multicollinearity represented."
+      "notes": "Outcome eligibility, LINE assumptions, residual diagnostics and multicollinearity checks are represented."
     },
     {
       "domain": "binary_logistic_regression",
       "status": "ruled",
-      "notes": "Binary-response eligibility plus structure-aware goodness-of-fit and residual diagnostics are represented; complete separation, sparse-event bias, and influence safeguards still need direct source extraction."
+      "notes": "Binary-response eligibility, fit/residual diagnostics, separation safeguards and sparse-event safeguards are represented; Firth remains non-executable."
     },
     {
       "domain": "multinomial_ordinal_logistic",
       "status": "ruled",
-      "notes": "Nominal versus ordinal response-scale routing is now source-backed with draft rules. Model-specific assumptions and diagnostics, including ordinal-model assumptions, remain pending before autonomous recommendation."
+      "notes": "Nominal versus ordinal response routing is source-backed. Model-specific assumptions/diagnostics remain outside autonomous execution."
     },
     {
       "domain": "poisson_negative_binomial",
-      "status": "extracted",
-      "notes": "Poisson count routing is source-backed and has a conservative draft rule. Dispersion/zero diagnostics and negative-binomial selection remain open source gaps."
+      "status": "deferred",
+      "notes": "Count-response and overdispersion principles are source-backed, including the prohibition on automatic overdispersion→negative-binomial switching. Detailed NB/zero-inflated/hurdle automation is deferred and non-executable."
     },
     {
       "domain": "repeated_measures_longitudinal",
       "status": "ruled",
-      "notes": "Correlation-aware analysis and GEE versus mixed-model interpretation represented."
+      "notes": "Within-unit dependence is a hard gate; marginal GEE versus subject-specific mixed-model interpretation is represented conceptually."
     },
     {
       "domain": "clustered_data",
       "status": "ruled",
-      "notes": "Clustering gate represented; small-cluster corrections and model-specific rules still need expansion."
+      "notes": "Clustering changes inference and blocks iid methods; exact small-cluster corrections and future executors remain expansion work."
+    },
+    {
+      "domain": "complex_survey_analysis",
+      "status": "ruled",
+      "notes": "Weights, strata and PSU/cluster design must travel together into variance estimation; domain/subpopulation analysis preserves design context."
     },
     {
       "domain": "missing_data",
       "status": "ruled",
-      "notes": "No automatic complete-case default and sensitivity-analysis gate represented."
+      "notes": "No automatic complete-case default, no percentage-missing threshold for MI, missingness-mechanism review, sensitivity analysis, MICE model/pooling/diagnostic safeguards and multilevel-imputation structure are represented."
     },
     {
       "domain": "causal_inference",
       "status": "ruled",
-      "notes": "Identification gate and difference-in-differences rule represented; World Bank and Hernán/Robins sources are registered for IV, RDD, matching, standardization and IPW, but method-specific rules remain pending."
+      "notes": "Causal identification gate requires intervention/exposure, estimand, exchangeability, positivity and consistency; difference-in-differences parallel-trends logic is represented. Advanced estimator-specific routing remains expansion work."
+    },
+    {
+      "domain": "interrupted_time_series",
+      "status": "ruled",
+      "notes": "Pretrend, interruption timing, level/slope changes and autocorrelation are represented; simple pre/post analysis is blocked."
     },
     {
       "domain": "survival_time_to_event",
       "status": "ruled",
-      "notes": "Censoring recognition, ordinary survival routing, and a competing-risk gate are represented; recurrent-event and frailty rules remain to be extracted."
+      "notes": "Censoring-aware survival routing and competing-risk gating are represented; recurrent-event/frailty workflows remain future expansion."
     },
     {
       "domain": "diagnostic_accuracy",
       "status": "ruled",
-      "notes": "Diagnostic question routing plus sensitivity, specificity, predictive-value and threshold/ROC behaviour are represented; executable diagnostic workflow is still outside the current runtime."
+      "notes": "Reference-standard 2x2 structure, sensitivity, specificity, predictive values, likelihood ratios and threshold/ROC behaviour are represented; runtime execution remains outside v1."
     },
     {
       "domain": "prediction_prognosis",
       "status": "ruled",
-      "notes": "Prediction/explanation distinction plus calibration, discrimination and overfitting represented; prognostic-specific workflow needs expansion."
+      "notes": "Prediction versus explanation, discrimination, calibration, overfitting and validation are represented; full prognostic modelling workflow remains expansion work."
     },
     {
       "domain": "psychometrics",
       "status": "ruled",
-      "notes": "COSMIN-backed reflective-versus-formative gate and measurement-property checks are represented; full reliability, validity, factor-analysis and invariance workflows remain to be expanded."
+      "notes": "Reflective versus formative gate, structural validity before internal consistency, and reliability versus measurement-error separation are represented. Full factor/invariance executors are deferred."
     },
     {
       "domain": "qualitative_analysis",
-      "status": "registered",
-      "notes": "Mixed-methods source describes qualitative evidence but dedicated coding/thematic-analysis guidance is not yet sufficient."
+      "status": "deferred",
+      "notes": "Qualitative objectives are recognized and blocked from inappropriate quantitative routing, but autonomous coding/thematic-analysis rules are outside v1."
     },
     {
       "domain": "mixed_methods",
       "status": "ruled",
-      "notes": "Convergent and sequential integration designs represented without forcing qualitative questions into statistics."
+      "notes": "Convergent and sequential integration designs are represented separately from the quantitative statistical design."
     },
     {
       "domain": "statistical_analysis_plans",
       "status": "ruled",
-      "notes": "Prespecification and SAP component rules represented."
+      "notes": "Prespecification, primary-variable definition, analysis sets, missing-data plan, multiplicity, covariates/subgroups and sensitivity analyses are represented for SAP construction/locking."
     },
     {
       "domain": "model_diagnostics",
       "status": "ruled",
-      "notes": "Linear regression and multicollinearity diagnostics represented; method-specific diagnostic catalogue continues."
+      "notes": "Method-specific diagnostics are represented for current simple methods plus ANOVA, logistic separation/sparsity and MICE safeguards; future executors add their own diagnostics."
     },
     {
       "domain": "reporting_standards",
       "status": "ruled",
-      "notes": "Draft source-backed reporting rules now cover observational studies (STROBE), randomized trials (CONSORT 2025), diagnostic accuracy (STARD 2015), and prediction models (TRIPOD+AI). Reporting rules remain separate from method-selection validation."
+      "notes": "Source-backed reporting rules cover observational studies, randomized trials, diagnostic accuracy and prediction models; reporting guidance is kept separate from method selection."
     },
     {
       "domain": "bayesian_methods",
       "status": "deferred",
-      "notes": "Not part of the first executable knowledge release."
+      "notes": "Outside the v1 autonomous analysis boundary."
     },
     {
       "domain": "sem_psychometric_models",
       "status": "deferred",
-      "notes": "Not part of the first executable knowledge release."
+      "notes": "Advanced SEM/CFA/IRT execution is outside v1 despite psychometric routing safeguards."
     }
   ]
 }
