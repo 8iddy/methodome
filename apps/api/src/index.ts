@@ -2425,6 +2425,138 @@ async function executeAutomaticOrchestratorAction(
   return { action, ...(await orchestratorProposeQualitativeThemes(c, projectId, state)) };
 }
 
+function formatNumber(value: number): string {
+  if (!Number.isFinite(value)) return String(value);
+  const absolute = Math.abs(value);
+  if ((absolute > 0 && absolute < 0.001) || absolute >= 100000) {
+    return value.toExponential(3);
+  }
+  return Number(value.toPrecision(5)).toString();
+}
+
+function deterministicResultSummary(
+  methodId: string,
+  result: NonNullable<Awaited<ReturnType<typeof getAnalysisResult>>>
+): string {
+  const methodName = methodRegistry[methodId]?.displayName ?? methodId.replaceAll("_", " ");
+  const estimates = result.result.estimates
+    .slice(0, 8)
+    .map((estimate) => {
+      const pieces = [
+        `${estimate.term}: ${formatNumber(estimate.estimate)}`
+      ];
+      if (estimate.confidenceInterval) {
+        pieces.push(
+          `${Math.round(estimate.confidenceInterval.level * 100)}% CI ${formatNumber(
+            estimate.confidenceInterval.lower
+          )} to ${formatNumber(estimate.confidenceInterval.upper)}`
+        );
+      }
+      if (typeof estimate.pValue === "number") {
+        pieces.push(`p=${formatNumber(estimate.pValue)}`);
+      }
+      return pieces.join(", ");
+    });
+  const diagnosticReview = result.result.diagnostics.filter(
+    (item) => item.status === "review" || item.status === "failed"
+  );
+
+  return [
+    `${methodName} (n=${result.result.n})`,
+    estimates.length > 0
+      ? estimates.join("; ")
+      : "The method returned no coefficient-level estimates.",
+    ...(diagnosticReview.length > 0
+      ? [
+          `Diagnostics needing review: ${diagnosticReview
+            .map((item) => item.label)
+            .join(", ")}.`
+        ]
+      : [])
+  ].join(". ");
+}
+
+async function completedConversationResult(
+  c: ApiContext,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+): Promise<{
+  content: string;
+  analysisJobIds: string[];
+  methodologyRuleIds: string[];
+  evidenceIds: string[];
+  sourceIds: string[];
+}> {
+  if (!state.plan) {
+    return {
+      content: "The currently supported research work is complete and ready for review.",
+      analysisJobIds: [],
+      methodologyRuleIds: [],
+      evidenceIds: [],
+      sourceIds: []
+    };
+  }
+
+  const jobs = await listAnalysisJobsForPlan(
+    c.env.DB,
+    state.plan.projectId,
+    state.plan.id
+  );
+  const completed = jobs.filter((item) => item.state === "complete");
+  const results = (
+    await Promise.all(
+      completed.map(({ job }) =>
+        getAnalysisResult(c.env.DB, job.jobId, getUserId(c))
+      )
+    )
+  ).filter(
+    (
+      result
+    ): result is NonNullable<Awaited<ReturnType<typeof getAnalysisResult>>> =>
+      Boolean(result)
+  );
+
+  const studyDesign = state.resolvedSpecification?.studyDesign;
+  const objectiveTypes =
+    state.resolvedSpecification?.researchQuestions
+      .map((question) => question.objectiveType)
+      .filter(Boolean) ?? [];
+  const reportingQuery =
+    objectiveTypes.includes("diagnostic")
+      ? "diagnostic accuracy reporting results precision missing indeterminate"
+      : objectiveTypes.some(
+            (value) => value === "prediction" || value === "prognostic"
+          )
+        ? "prediction model reporting validation calibration discrimination"
+        : studyDesign === "trial"
+          ? "randomized trial reporting analysis population protocol SAP estimates precision"
+          : "observational reporting confounding missing data adjusted estimates precision";
+
+  const guidance = retrieveMethodologyGuidance({
+    query: reportingQuery,
+    limit: 6
+  });
+
+  const summaries = completed.flatMap(({ job }) => {
+    const found = results.find((result) => result.jobId === job.jobId);
+    return found ? [deterministicResultSummary(job.methodId, found)] : [];
+  });
+
+  return {
+    content:
+      summaries.length > 0
+        ? [
+            "The approved analyses are complete.",
+            ...summaries,
+            "These values come from Methodome's deterministic statistical runner. Open the result details for full diagnostics and provenance."
+          ].join("\n\n")
+        : "The approved analyses are complete and the structured outputs are ready for review.",
+    analysisJobIds: completed.map(({ job }) => job.jobId),
+    methodologyRuleIds: guidance.rules.map((rule) => rule.ruleId),
+    evidenceIds: guidance.evidenceIds,
+    sourceIds: guidance.sourceIds
+  };
+}
+
 async function runConversationOrchestrator(
   env: Env,
   message: OrchestrationQueueMessage
@@ -2459,14 +2591,28 @@ async function runConversationOrchestrator(
 
       if (!view.automaticAction) {
         const waiting = view.status === "waiting_for_researcher";
+        const completedResult =
+          view.status === "complete"
+            ? await completedConversationResult(c, state)
+            : null;
         await appendProjectMessage(env.DB, {
           id: makeId("msg"), threadId, projectId: message.projectId,
           role: "methodome", messageKind: waiting ? "checkpoint" : view.status === "complete" ? "result" : "message",
-          content: waiting && view.decisions[0] ? view.decisions[0].prompt : view.summary,
+          content:
+            completedResult?.content ??
+            (waiting && view.decisions[0] ? view.decisions[0].prompt : view.summary),
           metadata: {
             workflowStatus: view.status,
             decisions: view.decisions,
-            methodologyKnowledgeVersion
+            methodologyKnowledgeVersion,
+            ...(completedResult
+              ? {
+                  analysisJobIds: completedResult.analysisJobIds,
+                  methodologyRuleIds: completedResult.methodologyRuleIds,
+                  evidenceIds: completedResult.evidenceIds,
+                  sourceIds: completedResult.sourceIds
+                }
+              : {})
           },
           attachmentFileIds: [], createdAt: new Date().toISOString(),
           deduplicationKey: `${message.runId}:stop:${view.status}:${view.decisions[0]?.id ?? "none"}`
