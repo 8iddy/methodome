@@ -110,6 +110,14 @@ export interface OrchestratorDecision {
   role?: "outcome" | "predictor" | "covariate";
   options?: Array<{ id: string; label: string; detail?: string }>;
   confirmsStudyInterpretation?: boolean;
+  studyInterpretation?: {
+    version: string;
+    researcherConfirmed: boolean;
+    studyDesign: string;
+    unitOfAnalysis: string;
+    researchQuestionCount: number;
+    researchQuestions: string[];
+  };
   blocking: boolean;
 }
 

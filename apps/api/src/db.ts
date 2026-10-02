@@ -908,6 +908,41 @@ export async function getCurrentStudySpecificationRecord(
     : null;
 }
 
+export async function getStudySpecificationRecordByVersion(
+  db: D1Database,
+  projectId: string,
+  version: string
+): Promise<{
+  id: string;
+  version: string;
+  confirmedBy: string | null;
+  specificationJson: string;
+} | null> {
+  const row = await db
+    .prepare(
+      `SELECT id, version, confirmed_by, specification_json
+       FROM study_specifications
+       WHERE project_id = ? AND version = ?
+       LIMIT 1`
+    )
+    .bind(projectId, version)
+    .first<{
+      id: string;
+      version: string;
+      confirmed_by: string | null;
+      specification_json: string;
+    }>();
+
+  return row
+    ? {
+        id: row.id,
+        version: row.version,
+        confirmedBy: row.confirmed_by ?? null,
+        specificationJson: row.specification_json
+      }
+    : null;
+}
+
 /**
  * Records researcher confirmation on a study specification that Methodome
  * interpreted from the protocol. Returns false when the record was already

@@ -145,10 +145,30 @@ export interface ProjectWorkflowSnapshot {
 }
 
 export interface StudyInterpretationSummary {
+  /** Immutable version of the study specification this summary describes. */
+  version: string;
   researcherConfirmed: boolean;
   studyDesign: StudySpecification["studyDesign"];
   unitOfAnalysis: string;
   researchQuestionCount: number;
+  researchQuestions: string[];
+}
+
+/**
+ * A draft plan is stale when the study specification changed after the plan
+ * was constructed. A stale draft must be rebuilt, never approved: approval
+ * confirms the exact specification version the plan was built from.
+ */
+export function isDraftPlanStale(
+  plan: AnalysisPlan | null,
+  specificationVersion: string | null | undefined
+): boolean {
+  return Boolean(
+    plan &&
+      !plan.lockedAt &&
+      specificationVersion &&
+      plan.studySpecificationVersion !== specificationVersion
+  );
 }
 
 export interface WorkflowAction {
@@ -697,6 +717,28 @@ function chooseNextAction(
     );
   }
 
+  if (isDraftPlanStale(snapshot.plan, snapshot.specification?.version)) {
+    const readyQuantitative = questions.some(
+      (question) =>
+        question.mode === "quantitative" && question.status === "ready"
+    );
+    return readyQuantitative
+      ? action(
+          "build_analysis_plan",
+          "Rebuild the analysis plan",
+          "The study specification changed after the draft plan was constructed, so Methodome must rebuild the plan from the current specification.",
+          "analysis-plan",
+          false
+        )
+      : action(
+          "review_project",
+          "Resolve analysis blockers",
+          "The study specification changed after the draft plan was constructed and no research question is currently ready for an executable plan. Review the question-level blockers before continuing.",
+          "overview",
+          true
+        );
+  }
+
   if (!snapshot.plan.lockedAt) {
     return action(
       "lock_analysis_plan",
@@ -815,11 +857,15 @@ export function assessProjectReadiness(
     questions,
     studyInterpretation: snapshot.specification
       ? {
+          version: snapshot.specification.version,
           researcherConfirmed:
             snapshot.specificationConfirmedByResearcher !== false,
           studyDesign: snapshot.specification.studyDesign,
           unitOfAnalysis: snapshot.specification.unitOfAnalysis,
-          researchQuestionCount: snapshot.specification.researchQuestions.length
+          researchQuestionCount: snapshot.specification.researchQuestions.length,
+          researchQuestions: snapshot.specification.researchQuestions.map(
+            (question) => question.text
+          )
         }
       : null,
     nextAction,
@@ -880,6 +926,8 @@ export interface OrchestratorDecision {
    * records the researcher's confirmation of that interpretation.
    */
   confirmsStudyInterpretation?: boolean;
+  /** The interpretation that approval would confirm, for explicit display. */
+  studyInterpretation?: StudyInterpretationSummary;
   blocking: boolean;
 }
 
@@ -1110,7 +1158,11 @@ export function buildOrchestratorView(
     });
   }
 
-  if (plan && !plan.lockedAt) {
+  if (
+    plan &&
+    !plan.lockedAt &&
+    !isDraftPlanStale(plan, readiness.studyInterpretation?.version)
+  ) {
     for (const analysis of plan.analyses) {
       if (analysis.selectedMethodId) continue;
       const question = readiness.questions.find(
@@ -1156,7 +1208,10 @@ export function buildOrchestratorView(
             }. Approving confirms that interpretation and locks the plan before the planned analysis runs.`
           : "The executable plan is fully specified. Review it and approve locking before planned analysis runs.",
         ...(unconfirmedInterpretation
-          ? { confirmsStudyInterpretation: true }
+          ? {
+              confirmsStudyInterpretation: true,
+              studyInterpretation: unconfirmedInterpretation
+            }
           : {}),
         blocking: true
       });

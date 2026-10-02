@@ -404,6 +404,32 @@ async function main() {
         )}`
       );
     }
+    const confirmedAfter = interpretationConfirmation.after;
+    if (
+      typeof confirmedAfter.specificationId !== "string" ||
+      typeof confirmedAfter.specificationVersion !== "string" ||
+      !/^[0-9a-f]{64}$/.test(confirmedAfter.specificationHash ?? "")
+    ) {
+      throw new Error(
+        `Study interpretation confirmation is not bound to an immutable specification version: ${JSON.stringify(
+          confirmedAfter
+        )}`
+      );
+    }
+    const planApproval = audit.payload.events.find(
+      (event) => event.action === "conversation_analysis_plan_approved"
+    );
+    if (
+      confirmedAfter.confirmedVia === "analysis_plan_approval" &&
+      confirmedAfter.analysisPlanId !== planApproval?.objectId
+    ) {
+      throw new Error(
+        `Study interpretation was confirmed against plan ${confirmedAfter.analysisPlanId}, but the approved plan is ${planApproval?.objectId}.`
+      );
+    }
+    console.log(
+      `PASS study interpretation confirmed via ${confirmedAfter.confirmedVia} for specification ${confirmedAfter.specificationVersion}`
+    );
     console.log("PASS conversation methodology and execution provenance");
 
     await request(

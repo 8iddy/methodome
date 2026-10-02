@@ -8,8 +8,10 @@ import {
   selectCandidateMethods
 } from "@methodome/method-registry";
 import {
+  canonicalJson,
   hashAuditEvent,
   sha256BytesHex,
+  sha256Hex,
   type AuditEventPayload
 } from "@methodome/provenance";
 import type { AnalysisJob, AnalysisPlan, PlannedAnalysis } from "@methodome/analysis-contracts";
@@ -86,6 +88,7 @@ import {
   getAuditHeadHash,
   getCurrentStudySpecificationRecord,
   confirmStudySpecificationRecord,
+  getStudySpecificationRecordByVersion,
   getDatasetVersionRecord,
   getFileForDatasetRegistration,
   getFileRecord,
@@ -644,18 +647,35 @@ function studySpecificationFromProtocolExtraction(
  * When the study specification was interpreted by Methodome from the protocol
  * and never confirmed, approving the plan records that confirmation explicitly
  * so no analysis executes on an interpretation without researcher provenance.
+ *
+ * The confirmation is bound to the exact specification version the plan was
+ * constructed from. If the current specification is a different version the
+ * plan is stale: nothing is confirmed and the caller must refuse approval.
  */
 async function confirmStudyInterpretationAtPlanApproval(
   c: import("hono").Context<AppBindings>,
   projectId: string,
+  plan: AnalysisPlan,
   input: {
     action: string;
-    planId: string;
     decisionId?: string;
   }
-): Promise<boolean> {
-  const record = await getCurrentStudySpecificationRecord(c.env.DB, projectId);
-  if (!record || record.confirmedBy) return false;
+): Promise<{ stale: boolean; confirmed: boolean }> {
+  const current = await getCurrentStudySpecificationRecord(c.env.DB, projectId);
+  if (!current) return { stale: false, confirmed: false };
+  if (current.version !== plan.studySpecificationVersion) {
+    return { stale: true, confirmed: false };
+  }
+  if (current.confirmedBy) return { stale: false, confirmed: false };
+
+  const record = await getStudySpecificationRecordByVersion(
+    c.env.DB,
+    projectId,
+    plan.studySpecificationVersion
+  );
+  if (!record || record.id !== current.id) {
+    return { stale: true, confirmed: false };
+  }
 
   const confirmed = await confirmStudySpecificationRecord(
     c.env.DB,
@@ -663,9 +683,11 @@ async function confirmStudyInterpretationAtPlanApproval(
     record.id,
     getUserId(c)
   );
-  if (!confirmed) return false;
+  if (!confirmed) return { stale: false, confirmed: false };
 
-  const specification = await getStudySpecification(c.env.DB, projectId);
+  const specification = JSON.parse(
+    record.specificationJson
+  ) as StudySpecification;
   await addAudit(c, {
     projectId,
     action: input.action,
@@ -675,16 +697,19 @@ async function confirmStudyInterpretationAtPlanApproval(
     after: {
       ...(input.decisionId ? { decisionId: input.decisionId } : {}),
       confirmedVia: "analysis_plan_approval",
-      analysisPlanId: input.planId,
+      analysisPlanId: plan.id,
+      analysisPlanVersionId: plan.versionId,
+      specificationId: record.id,
       specificationVersion: record.version,
-      studyDesign: specification?.studyDesign ?? null,
-      unitOfAnalysis: specification?.unitOfAnalysis ?? null,
-      researchQuestionCount: specification?.researchQuestions.length ?? null,
+      specificationHash: await sha256Hex(canonicalJson(specification)),
+      studyDesign: specification.studyDesign,
+      unitOfAnalysis: specification.unitOfAnalysis,
+      researchQuestionCount: specification.researchQuestions.length,
       researcherConfirmed: true,
       methodologyKnowledgeVersion
     }
   });
-  return true;
+  return { stale: false, confirmed: true };
 }
 
 async function runProtocolExtractionForProject(
@@ -3411,11 +3436,27 @@ app.post(
           400
         );
       }
-      await confirmStudyInterpretationAtPlanApproval(c, projectId, {
-        action: "conversation_study_interpretation_confirmed",
-        planId: state.plan.id,
-        decisionId
-      });
+      const interpretation = await confirmStudyInterpretationAtPlanApproval(
+        c,
+        projectId,
+        state.plan,
+        {
+          action: "conversation_study_interpretation_confirmed",
+          decisionId
+        }
+      );
+      if (interpretation.stale && !state.plan.lockedAt) {
+        return c.json(
+          {
+            error: {
+              code: "ANALYSIS_PLAN_STUDY_SPECIFICATION_CHANGED",
+              message:
+                "The study specification changed after this analysis plan was constructed. Methodome must rebuild the plan from the current specification before it can be approved."
+            }
+          },
+          409
+        );
+      }
       if (!state.plan.lockedAt || !state.plan.lockHash) {
         const locked = await lockAnalysisPlan(
           state.plan,
@@ -3574,6 +3615,8 @@ app.post(
         ? `“${concept}” is not represented in the selected dataset.`
         : `Use “${datasetVariable}” for “${concept}”.`;
     } else if (decision.kind === "confirm_study_design") {
+      const confirmedSpecificationId = makeId("spec");
+      let confirmedSpecification: StudySpecification;
       if (decision.questionId && response.choiceId && state.specification) {
         const allowedObjectiveTypes = new Set([
           "descriptive",
@@ -3608,11 +3651,12 @@ app.post(
         });
         await saveStudySpecification(
           c.env.DB,
-          makeId("spec"),
+          confirmedSpecificationId,
           projectId,
           updatedSpecification,
           getUserId(c)
         );
+        confirmedSpecification = updatedSpecification;
         responseSummary = "Use that analytical interpretation for this research question.";
       } else {
         if (response.approved !== true || !state.extraction) {
@@ -3645,9 +3689,10 @@ app.post(
             409
           );
         }
+        confirmedSpecification = specification;
         await saveStudySpecification(
           c.env.DB,
-          makeId("spec"),
+          confirmedSpecificationId,
           projectId,
           specification,
           getUserId(c),
@@ -3664,12 +3709,18 @@ app.post(
         projectId,
         action: "conversation_study_interpretation_confirmed",
         objectType: "study_specification",
-        objectId: decision.questionId ?? "study",
+        objectId: confirmedSpecificationId,
         after: {
           decisionId,
+          questionId: decision.questionId ?? null,
           choiceId: response.choiceId ?? null,
           approved: response.approved ?? null,
           confirmedVia: "study_design_checkpoint",
+          specificationId: confirmedSpecificationId,
+          specificationVersion: confirmedSpecification.version,
+          specificationHash: await sha256Hex(
+            canonicalJson(confirmedSpecification)
+          ),
           methodologyKnowledgeVersion
         }
       });
@@ -6062,10 +6113,24 @@ app.post("/projects/:projectId/analysis-plan/:planId/lock", async (c) => {
       409
     );
   }
-  await confirmStudyInterpretationAtPlanApproval(c, projectId, {
-    action: "study_interpretation_confirmed",
-    planId: locked.id
-  });
+  const interpretation = await confirmStudyInterpretationAtPlanApproval(
+    c,
+    projectId,
+    plan,
+    { action: "study_interpretation_confirmed" }
+  );
+  if (interpretation.stale) {
+    return c.json(
+      {
+        error: {
+          code: "ANALYSIS_PLAN_STUDY_SPECIFICATION_CHANGED",
+          message:
+            "The study specification changed after this analysis plan was constructed. Methodome must rebuild the plan from the current specification before it can be approved."
+        }
+      },
+      409
+    );
+  }
   await updateStoredAnalysisPlan(c.env.DB, locked);
   await addAudit(c, {
     projectId,
