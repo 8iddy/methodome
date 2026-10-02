@@ -928,6 +928,14 @@ export interface OrchestratorDecision {
   confirmsStudyInterpretation?: boolean;
   /** The interpretation that approval would confirm, for explicit display. */
   studyInterpretation?: StudyInterpretationSummary;
+  /** What plan approval would execute, so approval is never given blind. */
+  plannedAnalyses?: Array<{
+    researchQuestion: string;
+    method: string;
+    outcome: string;
+    predictors: string[];
+    covariates: string[];
+  }>;
   blocking: boolean;
 }
 
@@ -1213,6 +1221,23 @@ export function buildOrchestratorView(
               studyInterpretation: unconfirmedInterpretation
             }
           : {}),
+        plannedAnalyses: plan.analyses.map((analysis) => {
+          const question = readiness.questions.find(
+            (item) => item.questionId === analysis.researchQuestionId
+          );
+          const candidate = question?.candidates.find(
+            (item) => item.methodId === analysis.selectedMethodId
+          );
+          return {
+            researchQuestion: question?.text ?? analysis.researchQuestionId,
+            method:
+              candidate?.displayName ??
+              (analysis.selectedMethodId ?? "").replaceAll("_", " "),
+            outcome: analysis.outcome,
+            predictors: analysis.predictors,
+            covariates: analysis.covariates
+          };
+        }),
         blocking: true
       });
     }
