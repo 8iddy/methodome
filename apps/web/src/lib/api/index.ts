@@ -1005,7 +1005,7 @@ export async function getProjectConversation(projectId: string) {
   return request<{
     messages: ProjectConversationMessage[];
     orchestrator: OrchestratorView;
-    activity?: "idle" | "working" | "running_analysis";
+    activity?: "idle" | "working" | "running_analysis" | "stopped";
     datasetVariables?: Array<{ name: string; label?: string }>;
     methodologyKnowledgeVersion: string;
   }>(`/projects/${projectId}/conversation`);
@@ -1311,7 +1311,7 @@ export interface ResearchOutputs {
   } | null;
   quantitative: QuantitativeOutput[];
   qualitative: QualitativeOutput[];
-  activity?: "idle" | "working" | "running_analysis";
+  activity?: "idle" | "working" | "running_analysis" | "stopped";
   nextAction: WorkflowAction;
   methodologyKnowledgeVersion: string;
 }

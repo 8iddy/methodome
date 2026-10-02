@@ -126,6 +126,7 @@ import {
   appendProjectMessage,
   completeWaitingOrchestrationRuns,
   hasActiveOrchestrationRun,
+  latestOrchestrationRunFailed,
   projectHasResearcherConversation,
   createOrchestrationRun,
   ensureProjectThread,
@@ -2794,6 +2795,17 @@ async function completedConversationResult(
   };
 }
 
+/**
+ * Rewrites infrastructure errors the researcher cannot act on as stated into
+ * what happened and what to do. Anything unrecognised is passed through.
+ */
+function researcherFacingError(message: string): string {
+  if (/\b4006\b|daily free allocation|neurons/i.test(message)) {
+    return "I could not continue because today's language-model allowance for this Methodome deployment is used up. Nothing was changed. Reading protocols, proposing mappings and qualitative coding need the model; statistical computation does not. The allowance resets at 00:00 UTC. Send a message then and I will pick up where I stopped.";
+  }
+  return message;
+}
+
 async function runConversationOrchestrator(
   env: Env,
   message: OrchestrationQueueMessage
@@ -2903,7 +2915,8 @@ async function runConversationOrchestrator(
       stopReason: "safe_iteration_limit"
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Methodome could not continue safely.";
+    const rawMessage = error instanceof Error ? error.message : "Methodome could not continue safely.";
+    const errorMessage = researcherFacingError(rawMessage);
     await appendProjectMessage(env.DB, {
       id: makeId("msg"), threadId, projectId: message.projectId,
       role: "methodome", messageKind: "error", content: errorMessage,
@@ -2911,7 +2924,7 @@ async function runConversationOrchestrator(
       createdAt: new Date().toISOString(), deduplicationKey: `${message.runId}:error`
     });
     await updateOrchestrationRun(env.DB, message.runId, {
-      status: "failed", iterationCount: iterations, stopReason: "unrecoverable_error", errorMessage
+      status: "failed", iterationCount: iterations, stopReason: "unrecoverable_error", errorMessage: rawMessage
     });
     throw error;
   }
@@ -3103,7 +3116,7 @@ async function projectActivity(
   c: import("hono").Context<AppBindings>,
   projectId: string,
   plan: AnalysisPlan | null
-): Promise<"idle" | "working" | "running_analysis"> {
+): Promise<"idle" | "working" | "running_analysis" | "stopped"> {
   if (await hasActiveOrchestrationRun(c.env.DB, projectId)) return "working";
   if (plan?.lockedAt) {
     const planJobs = await listAnalysisJobsForPlan(c.env.DB, projectId, plan.id);
@@ -3115,6 +3128,9 @@ async function projectActivity(
       return "running_analysis";
     }
   }
+  // The most recent run ended in an error and nothing has replaced it, so
+  // Methodome is neither working nor waiting on a research decision.
+  if (await latestOrchestrationRunFailed(c.env.DB, projectId)) return "stopped";
   return "idle";
 }
 
