@@ -1477,6 +1477,7 @@ html[data-theme="dark"] .auth-theme .theme-toggle{border-color:var(--line);color
   .workflow-steps{grid-template-columns:repeat(4,1fr)}
 }
 @media(max-width:720px){
+  .app-shell{display:block}
   .sidebar{
     position:static;
     width:100%;
@@ -1966,8 +1967,20 @@ html[data-theme="dark"] .auth-theme .theme-toggle{border-color:var(--line);color
 .conversation-result summary{cursor:pointer;font-weight:600}
 .conversation-result details ul{
   margin:6px 0 2px;
-  padding-left:18px;
+  padding:0;
   color:var(--ink);
+  list-style:none;
+}
+.conversation-result details li{
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  padding:3px 0;
+}
+.conversation-result details li span{
+  color:var(--muted);
+  font-family:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+  font-size:12px;
 }
 .conversation-thread-end{scroll-margin-bottom:190px}
 .conversation-attachments{
@@ -1981,18 +1994,16 @@ html[data-theme="dark"] .auth-theme .theme-toggle{border-color:var(--line);color
 .conversation-attachments li{
   display:grid;
   gap:1px;
-  max-width:240px;
+  max-width:100%;
   padding:5px 9px 6px;
   border:1px solid var(--line);
   border-radius:3px;
   background:var(--surface-elevated);
 }
 .conversation-attachments strong{
-  overflow:hidden;
   font-size:12px;
   font-weight:600;
-  text-overflow:ellipsis;
-  white-space:nowrap;
+  overflow-wrap:anywhere;
 }
 .conversation-attachments span,
 .conversation-attachment-count{
@@ -2208,10 +2219,8 @@ html[data-theme="dark"] .auth-theme .theme-toggle{border-color:var(--line);color
   font-size:12px;
 }
 .composer-files strong{
-  overflow:hidden;
   font-weight:600;
-  text-overflow:ellipsis;
-  white-space:nowrap;
+  overflow-wrap:anywhere;
 }
 .composer-files span{color:var(--muted)}
 .composer-files span:empty{display:none}
