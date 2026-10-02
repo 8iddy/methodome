@@ -141,6 +141,25 @@ type AppBindings = { Bindings: Env; Variables: Variables };
 
 const app = new Hono<AppBindings>().basePath("/api");
 
+// A request that changes project state must finish once it has started. If
+// the browser navigates away or drops the connection, the runtime would
+// otherwise stop the handler part-way: for example a plan locked without its
+// approval audit event or the continuation that runs it. Registering the
+// handler with waitUntil lets it complete after the client has gone.
+app.use("*", async (c, next) => {
+  if (c.req.method === "GET" || c.req.method === "OPTIONS") {
+    await next();
+    return;
+  }
+  const work = next();
+  try {
+    c.executionCtx.waitUntil(work.catch(() => undefined));
+  } catch {
+    // No execution context outside the Workers runtime (for example tests).
+  }
+  await work;
+});
+
 function allowedOrigins(env: Env): string[] {
   return (env.ALLOWED_ORIGINS ?? "")
     .split(",")
@@ -3075,6 +3094,30 @@ async function ensureConversationDatasetRegistered(
   return datasetVersionId;
 }
 
+/**
+ * Whether Methodome is working right now is server state: an orchestration
+ * run in progress, or approved analyses still executing. Clients show and
+ * poll on this rather than guessing from their own request lifecycle.
+ */
+async function projectActivity(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  plan: AnalysisPlan | null
+): Promise<"idle" | "working" | "running_analysis"> {
+  if (await hasActiveOrchestrationRun(c.env.DB, projectId)) return "working";
+  if (plan?.lockedAt) {
+    const planJobs = await listAnalysisJobsForPlan(c.env.DB, projectId, plan.id);
+    if (
+      planJobs.some(
+        (item) => !["complete", "failed", "cancelled"].includes(item.state)
+      )
+    ) {
+      return "running_analysis";
+    }
+  }
+  return "idle";
+}
+
 app.get("/projects/:projectId/conversation", async (c) => {
   const projectId = c.req.param("projectId");
   const access = await requireProject(c, projectId);
@@ -3090,25 +3133,26 @@ app.get("/projects/:projectId/conversation", async (c) => {
     now
   );
 
-  // Whether Methodome is working right now is server state: an orchestration
-  // run in progress, or approved analyses still executing. The client shows
-  // and polls on this rather than guessing from its own request lifecycle.
-  let activity: "idle" | "working" | "running_analysis" = "idle";
-  if (await hasActiveOrchestrationRun(c.env.DB, projectId)) {
-    activity = "working";
-  } else if (state.plan?.lockedAt) {
-    const planJobs = await listAnalysisJobsForPlan(
-      c.env.DB,
+  let activity = await projectActivity(c, projectId, state.plan);
+
+  // A locked plan with no job and nothing in flight means an approval was
+  // recorded but its continuation never started (for example a request cut
+  // off before this safeguard existed). Resume it rather than leave the
+  // project waiting for the researcher to notice.
+  if (
+    activity === "idle" &&
+    assessed.automaticAction === "run_analyses" &&
+    state.plan?.lockedAt &&
+    (await listAnalysisJobsForPlan(c.env.DB, projectId, state.plan.id))
+      .length === 0
+  ) {
+    await queueConversationContinuation(
+      c,
       projectId,
-      state.plan.id
+      undefined,
+      "approved_plan_resumed"
     );
-    if (
-      planJobs.some(
-        (item) => !["complete", "failed", "cancelled"].includes(item.state)
-      )
-    ) {
-      activity = "running_analysis";
-    }
+    activity = "working";
   }
 
   // While an orchestration run is in progress the project is between steps:
@@ -3454,13 +3498,10 @@ const conversationDecisionResponseSchema = z.object({
 async function queueConversationContinuation(
   c: import("hono").Context<AppBindings>,
   projectId: string,
-  triggerMessageId?: string
+  triggerMessageId?: string,
+  reason = "researcher_response_received"
 ) {
-  await completeWaitingOrchestrationRuns(
-    c.env.DB,
-    projectId,
-    "researcher_response_received"
-  );
+  await completeWaitingOrchestrationRuns(c.env.DB, projectId, reason);
   const now = new Date().toISOString();
   const runId = makeId("run");
   const queued = await createOrchestrationRun(c.env.DB, {
@@ -4749,6 +4790,7 @@ app.get("/projects/:projectId/research-outputs", async (c) => {
       : null,
     quantitative,
     qualitative,
+    activity: await projectActivity(c, projectId, plan),
     nextAction: state.readiness.nextAction,
     methodologyKnowledgeVersion
   });
