@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActivitySpinner, Badge, Button, PageHeader, ThemeToggle } from "@/components/ui";
-import { ProjectPage as PrototypeProjectPage } from "@/components/workspace";
 import { ResearchAnalysisSurface, ResearchSectionContext } from "@/components/research-workspace";
 import { ConversationWorkspace } from "@/components/conversation-workspace";
 import {
@@ -38,7 +37,6 @@ import {
   saveStudySpecification,
   saveVariableMappings,
   signIn,
-  signOut,
   signUp,
   updateProjectPolicy,
   uploadFile,
@@ -462,7 +460,7 @@ export function LiveProjectPage({
     "study-design": ["Study design", "Research questions and design facts that constrain analysis."],
     variables: ["Variable mapping", "Evidence linking research concepts to observed dataset fields."],
     "analysis-plan": ["Analysis plan", "Candidate methods, selected methods and plan lock."],
-    analysis: ["Analysis", "Quantitative execution and source-linked qualitative review."],
+    analysis: ["Analysis", "Statistical execution, and qualitative codebook, coding and theme review."],
     results: ["Results", "Estimates, diagnostics, warnings and execution records."],
     reports: ["Reports", "Research outputs and reproducibility files."],
     "audit-trail": ["Audit record", "Versioned project actions and research decisions."],
@@ -502,393 +500,7 @@ export function LiveProjectPage({
       {section === "reports" && <LiveReports projectId={projectId} />}
       {section === "audit-trail" && <LiveAudit projectId={projectId} />}
       {section === "settings" && <LiveProjectSettings projectId={projectId} />}
-      {![
-        "protocol",
-        "instruments",
-        "data",
-        "data-preparation",
-        "study-design",
-        "variables",
-        "analysis-plan",
-        "analysis",
-        "results",
-        "reports",
-        "audit-trail",
-        "settings"
-      ].includes(section) && <PrototypeProjectPage section={section} />}
     </main>
-  );
-}
-
-function LiveProjectStage({ projectId }: { projectId: string }) {
-  const [state, setState] = useState({
-    protocol: false,
-    data: false,
-    design: false,
-    mappings: false,
-    plan: false,
-    analysis: false
-  });
-
-  useEffect(() => {
-    let active = true;
-    Promise.all([
-      getProjectFiles(projectId),
-      getDatasets(projectId),
-      getStudySpecification(projectId),
-      getVariableMappings(projectId),
-      getAnalysisPlan(projectId),
-      getAnalysisHistory()
-    ])
-      .then(([files, datasets, specification, mappings, plan, history]) => {
-        if (!active) return;
-        setState({
-          protocol: files.some((file) => file.fileKind === "protocol"),
-          data: datasets.length > 0,
-          design: Boolean(specification),
-          mappings:
-            mappings.length > 0 &&
-            mappings.every((mapping) => Boolean(mapping.confirmedBy)),
-          plan: Boolean(plan?.lockedAt),
-          analysis: history.some(
-            (item) =>
-              String(item.projectId ?? "") === projectId &&
-              String(item.state ?? "") === "complete"
-          )
-        });
-      })
-      .catch(() => undefined);
-
-    return () => {
-      active = false;
-    };
-  }, [projectId]);
-
-  const stages = [
-    ["Protocol", state.protocol],
-    ["Data", state.data],
-    ["Design", state.design],
-    ["Mappings", state.mappings],
-    ["Plan", state.plan],
-    ["Analysis", state.analysis]
-  ] as const;
-
-  const firstIncomplete = stages.findIndex(([, complete]) => !complete);
-
-  return (
-    <div className="stage" aria-label="Project stage">
-      {stages.map(([label, complete], index) => (
-        <span
-          key={label}
-          className={complete ? "done" : index === firstIncomplete ? "active" : ""}
-        >
-          {complete ? "✓ " : ""}{label}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function LiveWorkflowGuide({ projectId }: { projectId: string }) {
-  const [next, setNext] = useState<{
-    label: string;
-    detail: string;
-    href: string;
-    secondaryLabel?: string;
-    secondaryHref?: string;
-  }>({
-    label: "Loading project guidance",
-    detail: "Checking the research records in this project.",
-    href: ""
-  });
-
-  useEffect(() => {
-    Promise.all([
-      getProjectFiles(projectId),
-      getDatasets(projectId),
-      getStudySpecification(projectId),
-      getVariableMappings(projectId),
-      getAnalysisPlan(projectId),
-      getAnalysisHistory(),
-      getProtocolExtraction(projectId)
-    ])
-      .then(([files, datasets, specification, mappings, plan, history, extraction]) => {
-        const base = `/app/projects/${projectId}`;
-        if (!files.some((file) => file.fileKind === "protocol")) {
-          return setNext({
-            label: "Add a protocol",
-            detail: "Upload the research protocol so Methodome can extract and retain the study logic.",
-            href: `${base}/protocol`
-          });
-        }
-        if (!specification && !extraction) {
-          return setNext({
-            label: "Extract study information",
-            detail: "The protocol is uploaded. Extract its research questions and design before confirming the study specification.",
-            href: `${base}/protocol`
-          });
-        }
-        if (
-          !files.some(
-            (file) => file.fileKind === "instrument" || file.fileKind === "codebook"
-          )
-        ) {
-          return setNext({
-            label: "Add an instrument or codebook",
-            detail: "Recommended next: add the questionnaire, XLSForm or codebook so Methodome has stronger evidence for later variable mapping. You can skip this step if you do not have one.",
-            href: `${base}/instruments`,
-            secondaryLabel: datasets.length > 0 ? "Skip to study design" : "Skip to data",
-            secondaryHref: datasets.length > 0
-              ? `${base}/study-design`
-              : `${base}/data`
-          });
-        }
-        if (datasets.length === 0) {
-          return setNext({
-            label: "Upload a dataset",
-            detail: "Upload a CSV dataset before Methodome can profile variables or map study concepts.",
-            href: `${base}/data`
-          });
-        }
-        if (!specification) {
-          return setNext({
-            label: "Review extracted study information",
-            detail: "Confirm the research questions and study design extracted from the protocol.",
-            href: `${base}/study-design`
-          });
-        }
-        if (
-          mappings.length === 0 ||
-          mappings.some((mapping) => !mapping.confirmedBy)
-        ) {
-          return setNext({
-            label: "Review variable mappings",
-            detail: "Confirm evidence-backed links between research concepts and dataset variables.",
-            href: `${base}/variables`
-          });
-        }
-        if (!plan) {
-          return setNext({
-            label: "Build an analysis plan",
-            detail: "Review deterministic method candidates for each research question that is ready.",
-            href: `${base}/analysis-plan`
-          });
-        }
-        if (!plan.lockedAt) {
-          return setNext({
-            label: "Approve and lock the plan",
-            detail: "Locking records the plan and its SHA-256 hash before planned analysis.",
-            href: `${base}/analysis-plan`
-          });
-        }
-
-        const complete = history.some(
-          (item) =>
-            String(item.projectId ?? "") === projectId &&
-            String(item.state ?? "") === "complete"
-        );
-        if (!complete) {
-          return setNext({
-            label: "Run approved analyses",
-            detail: "The locked plan is ready for deterministic statistical execution.",
-            href: `${base}/analysis`
-          });
-        }
-
-        return setNext({
-          label: "Review results",
-          detail: "At least one analysis is complete. Review estimates, diagnostics and execution details.",
-          href: `${base}/results`
-        });
-      })
-      .catch(() =>
-        setNext({
-          label: "Review project records",
-          detail: "Methodome could not determine the next step. Review the available project records.",
-          href: `/app/projects/${projectId}/overview`
-        })
-      );
-  }, [projectId]);
-
-  return (
-    <section className="panel workflow-guide">
-      <p className="eyebrow">NEXT RECOMMENDED ACTION</p>
-      <h2>{next.label}</h2>
-      <p>{next.detail}</p>
-      <div className="action-row">
-        {next.href && <Button href={next.href}>Continue</Button>}
-        {next.secondaryHref && next.secondaryLabel && (
-          <Button href={next.secondaryHref} variant="quiet">
-            {next.secondaryLabel}
-          </Button>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function LiveOverview({
-  projectId,
-  project
-}: {
-  projectId: string;
-  project: BackendProject | null;
-}) {
-  const [files, setFiles] = useState<ProjectFile[]>([]);
-  const [datasets, setDatasets] = useState<DatasetVersion[]>([]);
-  const [specification, setSpecification] = useState<StudySpecification | null>(null);
-  const [mappings, setMappings] = useState<VariableMapping[]>([]);
-  const [plan, setPlan] = useState<AnalysisPlan | null>(null);
-  const [history, setHistory] = useState<Array<Record<string, unknown>>>([]);
-  const [extraction, setExtraction] = useState<ProtocolExtraction | null>(null);
-  const [status, setStatus] = useState("");
-
-  useEffect(() => {
-    void Promise.all([
-      getProjectFiles(projectId),
-      getDatasets(projectId),
-      getStudySpecification(projectId),
-      getVariableMappings(projectId),
-      getAnalysisPlan(projectId),
-      getAnalysisHistory(),
-      getProtocolExtraction(projectId)
-    ])
-      .then(([sourceFiles, dataVersions, spec, savedMappings, savedPlan, analyses, extracted]) => {
-        setFiles(sourceFiles);
-        setDatasets(dataVersions);
-        setSpecification(spec);
-        setMappings(savedMappings);
-        setPlan(savedPlan);
-        setHistory(
-          analyses.filter((item) => String(item.projectId ?? "") === projectId)
-        );
-        setExtraction(extracted);
-      })
-      .catch((err) => setStatus(message(err)));
-  }, [projectId]);
-
-  const hasProtocol = files.some((file) => file.fileKind === "protocol");
-  const instrumentCount = files.filter(
-    (file) => file.fileKind === "instrument" || file.fileKind === "codebook"
-  ).length;
-  const confirmedMappings =
-    mappings.length > 0 && mappings.every((mapping) => Boolean(mapping.confirmedBy));
-  const completedAnalyses = history.filter(
-    (item) => String(item.state ?? "") === "complete"
-  ).length;
-
-  const items: Array<{
-    title: string;
-    detail: string;
-    status: string;
-    kind: "success" | "warning" | "blue" | "neutral";
-    href: string;
-  }> = [
-    {
-      title: "Protocol",
-      detail: hasProtocol
-        ? extraction
-          ? `${extraction.researchQuestions.length} research question${extraction.researchQuestions.length === 1 ? "" : "s"} extracted for review`
-          : "Uploaded; study extraction has not been completed"
-        : "No protocol uploaded",
-      status: hasProtocol ? (extraction ? "Extracted" : "Uploaded") : "Required",
-      kind: hasProtocol ? (extraction ? "success" : "blue") : "warning",
-      href: `/app/projects/${projectId}/protocol`
-    },
-    {
-      title: "Instruments",
-      detail:
-        instrumentCount > 0
-          ? `${instrumentCount} instrument or codebook file${instrumentCount === 1 ? "" : "s"}`
-          : "Optional supporting metadata has not been added",
-      status: instrumentCount > 0 ? "Available" : "Optional",
-      kind: instrumentCount > 0 ? "success" : "neutral",
-      href: `/app/projects/${projectId}/instruments`
-    },
-    {
-      title: "Data",
-      detail:
-        datasets.length > 0
-          ? `${datasets.length} dataset version${datasets.length === 1 ? "" : "s"} registered`
-          : "No dataset uploaded",
-      status: datasets.length > 0 ? "Available" : "Required",
-      kind: datasets.length > 0 ? "success" : "warning",
-      href: `/app/projects/${projectId}/data`
-    },
-    {
-      title: "Study specification",
-      detail: specification
-        ? `${specification.researchQuestions.length} research question${specification.researchQuestions.length === 1 ? "" : "s"} confirmed`
-        : "Research design has not been confirmed",
-      status: specification ? "Confirmed" : "Required",
-      kind: specification ? "success" : "warning",
-      href: `/app/projects/${projectId}/study-design`
-    },
-    {
-      title: "Variable mapping",
-      detail:
-        mappings.length === 0
-          ? "No research concepts have been mapped"
-          : `${mappings.filter((mapping) => mapping.confirmedBy).length} of ${mappings.length} mappings confirmed`,
-      status: confirmedMappings ? "Confirmed" : mappings.length ? "Review" : "Required",
-      kind: confirmedMappings ? "success" : "warning",
-      href: `/app/projects/${projectId}/variables`
-    },
-    {
-      title: "Analysis plan",
-      detail: plan
-        ? `${plan.analyses.length} planned analysis${plan.analyses.length === 1 ? "" : "es"}`
-        : "No analysis plan created",
-      status: plan?.lockedAt ? "Locked" : plan ? "Draft" : "Required",
-      kind: plan?.lockedAt ? "success" : plan ? "blue" : "warning",
-      href: `/app/projects/${projectId}/analysis-plan`
-    },
-    {
-      title: "Analysis",
-      detail:
-        completedAnalyses > 0
-          ? `${completedAnalyses} completed analysis run${completedAnalyses === 1 ? "" : "s"}`
-          : "No completed analysis runs",
-      status: completedAnalyses > 0 ? "Results available" : "Not complete",
-      kind: completedAnalyses > 0 ? "success" : "neutral",
-      href:
-        completedAnalyses > 0
-          ? `/app/projects/${projectId}/results`
-          : `/app/projects/${projectId}/analysis`
-    }
-  ];
-
-  return (
-    <>
-      <section className="panel overview-intro">
-        <div>
-          <p className="eyebrow">PROJECT CONTROL</p>
-          <h2>{project?.name ?? "Research project"}</h2>
-          <p>
-            {project?.description ||
-              "Review source material, research decisions and analysis progress from one place."}
-          </p>
-        </div>
-        <div className="overview-meta">
-          <span>Research type</span>
-          <strong>{project?.researchType.replaceAll("_", " ") ?? "Loading"}</strong>
-        </div>
-      </section>
-
-      <div className="overview-status-grid">
-        {items.map((item) => (
-          <a className="overview-status-card" href={item.href} key={item.title}>
-            <div className="panel-heading">
-              <h2>{item.title}</h2>
-              <Badge kind={item.kind}>{item.status}</Badge>
-            </div>
-            <p>{item.detail}</p>
-            <span className="text-button">Open</span>
-          </a>
-        ))}
-      </div>
-      {status && <p className="confirmation" role="alert">{status}</p>}
-    </>
   );
 }
 
@@ -1156,7 +768,7 @@ function LiveProjectFiles({
             ))}
           </ol>
           <p className="muted">
-            Extraction is a proposal from the research layer. Confirm or correct it on Study Design before it becomes the project study specification.
+            This is Methodome’s reading of the protocol. Correct anything that is wrong in the study design; approving the analysis plan confirms the interpretation it is built on.
           </p>
           <div className="action-row">
             <Button href={`/app/projects/${projectId}/instruments`}>
@@ -1675,7 +1287,7 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
           );
 
         if (extractionNeedsMethodologyRefresh) {
-          setStatus("Interpreting the protocol with Methodome's research-methodology layer…");
+          setStatus("Reading the protocol…");
           try {
             activeExtraction = await extractProtocol(projectId, latestProtocol.id);
             setStatus(
@@ -2700,8 +2312,8 @@ function LiveAnalysis({ projectId }: { projectId: string }) {
     return (
       <section className="panel">
         <h2>No analysis plan yet</h2>
-        <p>Build and lock an analysis plan before running guided analyses.</p>
-        <Button href={`/app/projects/${projectId}/analysis-plan`}>Build analysis plan</Button>
+        <p>Methodome builds the analysis plan once the study design and variables are resolved, then asks you to approve it in the conversation.</p>
+        <Button href={`/app/projects/${projectId}/overview`}>Return to the conversation</Button>
         {status && <p className="confirmation" role="status">{status}</p>}
       </section>
     );
@@ -2719,7 +2331,7 @@ function LiveAnalysis({ projectId }: { projectId: string }) {
         </Badge>
       </div>
       <p>
-        Each analysis below comes from the current analysis plan. Statistical values are calculated by the statistical Worker, not by the language model.
+        Each analysis below comes from the current analysis plan. Statistical values are computed deterministically in Python, never by a language model.
       </p>
 
       <div className="method-list">
@@ -2802,7 +2414,7 @@ function LiveResults({ projectId }: { projectId: string }) {
         );
         if (completeJobs.length === 0) {
           setResults([]);
-          setStatus("No completed analyses are available for this project.");
+          setStatus("No completed statistical analyses yet. Qualitative codebooks, coding and themes are reviewed in the analysis workbench.");
           return;
         }
         const loaded = await Promise.all(
@@ -3092,10 +2704,6 @@ function LiveAudit({ projectId }: { projectId: string }) {
   );
 }
 
-export async function performSignOut() {
-  await signOut();
-  window.location.href = "/sign-in";
-}
 
 
 export function LiveMethodsPage() {

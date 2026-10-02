@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { getProject, signOut } from "@/lib/api";
-import type { Maturity } from "@/lib/types";
 
 export function ThemeToggle() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -106,14 +105,6 @@ export function Badge({
   return <span className={`badge ${kind}`}>{children}</span>;
 }
 
-export function MethodBadge({ maturity }: { maturity: Maturity }) {
-  return (
-    <Badge kind={maturity === "Validated" ? "success" : maturity === "Supported" ? "blue" : "warning"}>
-      {maturity}
-    </Badge>
-  );
-}
-
 export function PageHeader({
   eyebrow,
   title,
@@ -133,15 +124,6 @@ export function PageHeader({
         {description && <p className="lead">{description}</p>}
       </div>
       {actions && <div className="header-actions">{actions}</div>}
-    </div>
-  );
-}
-
-export function Stage({ compact = false }: { compact?: boolean }) {
-  const labels = ["Protocol", "Data", "Design", "Mappings", "Plan", "Analysis"];
-  return (
-    <div className={`stage ${compact ? "compact" : ""}`} aria-label="Project record">
-      {labels.map((label) => <span key={label}>{label}</span>)}
     </div>
   );
 }
