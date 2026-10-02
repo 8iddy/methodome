@@ -3081,7 +3081,7 @@ app.get("/projects/:projectId/conversation", async (c) => {
   if ("response" in access) return access.response;
 
   const state = await computeProjectReadiness(c, projectId);
-  const orchestrator = buildOrchestratorView(state.readiness, state.plan);
+  const assessed = buildOrchestratorView(state.readiness, state.plan);
   const now = new Date().toISOString();
   const threadId = await ensureProjectThread(
     c.env.DB,
@@ -3090,25 +3090,57 @@ app.get("/projects/:projectId/conversation", async (c) => {
     now
   );
 
-  await syncConversationDecisions(c.env.DB, {
-    projectId,
-    threadId,
-    decisions: orchestrator.decisions
-      .filter((decision) => decision.blocking)
-      .map((decision) => ({
-        id: decision.id,
-        kind: decision.kind,
-        prompt: decision.prompt,
-        ...(decision.options ? { options: decision.options } : {}),
-        context: {
-          questionId: decision.questionId ?? null,
-          analysisId: decision.analysisId ?? null,
-          concept: decision.concept ?? null,
-          role: decision.role ?? null
-        }
-      })),
-    now
-  });
+  // Whether Methodome is working right now is server state: an orchestration
+  // run in progress, or approved analyses still executing. The client shows
+  // and polls on this rather than guessing from its own request lifecycle.
+  let activity: "idle" | "working" | "running_analysis" = "idle";
+  if (await hasActiveOrchestrationRun(c.env.DB, projectId)) {
+    activity = "working";
+  } else if (state.plan?.lockedAt) {
+    const planJobs = await listAnalysisJobsForPlan(
+      c.env.DB,
+      projectId,
+      state.plan.id
+    );
+    if (
+      planJobs.some(
+        (item) => !["complete", "failed", "cancelled"].includes(item.state)
+      )
+    ) {
+      activity = "running_analysis";
+    }
+  }
+
+  // While an orchestration run is in progress the project is between steps:
+  // a decision assessed from that half-finished state (for example, protocol
+  // extracted but study model not yet saved) may disappear seconds later.
+  // Only a settled project offers decisions, and only those are persisted.
+  const orchestrator =
+    activity === "working"
+      ? { ...assessed, status: "working" as const, decisions: [] }
+      : assessed;
+
+  if (activity !== "working") {
+    await syncConversationDecisions(c.env.DB, {
+      projectId,
+      threadId,
+      decisions: orchestrator.decisions
+        .filter((decision) => decision.blocking)
+        .map((decision) => ({
+          id: decision.id,
+          kind: decision.kind,
+          prompt: decision.prompt,
+          ...(decision.options ? { options: decision.options } : {}),
+          context: {
+            questionId: decision.questionId ?? null,
+            analysisId: decision.analysisId ?? null,
+            concept: decision.concept ?? null,
+            role: decision.role ?? null
+          }
+        })),
+      now
+    });
+  }
 
   // Mapping checkpoints offer the profiled dataset fields so the researcher
   // chooses from what exists instead of typing a field name from memory.
@@ -3133,27 +3165,6 @@ app.get("/projects/:projectId/conversation", async (c) => {
       }));
     } catch {
       // The decision still accepts a typed field name if profiling fails.
-    }
-  }
-
-  // Whether Methodome is working right now is server state: an orchestration
-  // run in progress, or approved analyses still executing. The client shows
-  // and polls on this rather than guessing from its own request lifecycle.
-  let activity: "idle" | "working" | "running_analysis" = "idle";
-  if (await hasActiveOrchestrationRun(c.env.DB, projectId)) {
-    activity = "working";
-  } else if (state.plan?.lockedAt) {
-    const planJobs = await listAnalysisJobsForPlan(
-      c.env.DB,
-      projectId,
-      state.plan.id
-    );
-    if (
-      planJobs.some(
-        (item) => !["complete", "failed", "cancelled"].includes(item.state)
-      )
-    ) {
-      activity = "running_analysis";
     }
   }
 
