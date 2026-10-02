@@ -126,6 +126,7 @@ import {
   appendProjectMessage,
   completeWaitingOrchestrationRuns,
   hasActiveOrchestrationRun,
+  projectHasResearcherConversation,
   createOrchestrationRun,
   ensureProjectThread,
   getProjectConversationDecision,
@@ -4524,6 +4525,224 @@ async function qualitativeAnalysisDetail(
   };
 }
 
+/**
+ * One authoritative view of what the project has produced, for the Analysis,
+ * Results and Reports surfaces. Execution state is derived here from plans,
+ * jobs, stored results and qualitative records, so no screen has to work it
+ * out from its own cache or request history.
+ */
+app.get("/projects/:projectId/research-outputs", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+
+  const state = await computeProjectReadiness(c, projectId);
+  const questionText = new Map(
+    (state.specification?.researchQuestions ?? []).map((question) => [
+      question.id,
+      question.text
+    ])
+  );
+  const filename = new Map(state.files.map((file) => [file.id, file.filename]));
+
+  const plan = state.plan;
+  const planJobs = plan
+    ? await listAnalysisJobsForPlan(c.env.DB, projectId, plan.id)
+    : [];
+
+  const quantitative = await Promise.all(
+    (plan?.analyses ?? []).map(async (analysis) => {
+      const base = {
+        analysisId: analysis.id,
+        researchQuestionId: analysis.researchQuestionId,
+        researchQuestion:
+          questionText.get(analysis.researchQuestionId) ??
+          analysis.researchQuestionId,
+        methodId: analysis.selectedMethodId ?? null,
+        method: analysis.selectedMethodId
+          ? (methodRegistry[analysis.selectedMethodId]?.displayName ??
+            analysis.selectedMethodId.replaceAll("_", " "))
+          : null,
+        outcome: analysis.outcome,
+        predictors: analysis.predictors,
+        covariates: analysis.covariates,
+        exploratory: analysis.addedAfterLock
+      };
+
+      if (!analysis.selectedMethodId) {
+        return { ...base, state: "awaiting_method" as const, jobId: null, result: null };
+      }
+      if (!plan?.lockedAt) {
+        return { ...base, state: "awaiting_approval" as const, jobId: null, result: null };
+      }
+
+      const signature = analysisJobSignature({
+        methodId: analysis.selectedMethodId,
+        outcome: analysis.outcome,
+        predictors: analysis.predictors,
+        covariates: analysis.covariates
+      });
+      const matching = planJobs.filter(
+        ({ job }) => analysisJobSignature(job) === signature
+      );
+      // Prefer a completed run, then one still in progress, then the latest.
+      const chosen =
+        matching.find(({ state: jobState }) => jobState === "complete") ??
+        matching.find(
+          ({ state: jobState }) => !["failed", "cancelled"].includes(jobState)
+        ) ??
+        matching[matching.length - 1];
+
+      if (!chosen) {
+        return { ...base, state: "not_started" as const, jobId: null, result: null };
+      }
+      if (chosen.state === "complete") {
+        const stored = await getAnalysisResult(
+          c.env.DB,
+          chosen.job.jobId,
+          getUserId(c)
+        );
+        return {
+          ...base,
+          state: "complete" as const,
+          jobId: chosen.job.jobId,
+          result: stored
+            ? {
+                table: conversationResultTable(analysis.selectedMethodId, stored),
+                warnings: stored.warnings,
+                software: stored.software,
+                allDiagnostics: stored.diagnostics.map((item) => ({
+                  label: item.label,
+                  status: item.status,
+                  value:
+                    typeof item.value === "number"
+                      ? formatNumber(item.value)
+                      : item.value === undefined
+                        ? null
+                        : String(item.value),
+                  message: item.message ?? null
+                }))
+              }
+            : null
+        };
+      }
+      return {
+        ...base,
+        state: ["failed", "cancelled"].includes(chosen.state)
+          ? ("failed" as const)
+          : ("running" as const),
+        jobId: chosen.job.jobId,
+        result: null
+      };
+    })
+  );
+
+  const qualitative = (
+    await Promise.all(
+      state.qualitativeAnalyses.map(async (record) => {
+        const detail = await qualitativeAnalysisDetail(c, projectId, record.id);
+        if (!detail) return null;
+
+        const segmentById = new Map(
+          detail.segments.map((segment) => [segment.id, segment])
+        );
+        const codeLabel = new Map(
+          (detail.latestCodebook?.codebook.codes ?? []).map((code) => [
+            code.id,
+            code.label
+          ])
+        );
+        const complete = detail.analysis.status === "complete";
+
+        return {
+          analysisId: detail.analysis.id,
+          researchQuestionId: detail.analysis.researchQuestionId,
+          researchQuestion:
+            questionText.get(detail.analysis.researchQuestionId) ??
+            detail.analysis.researchQuestionId,
+          status: detail.analysis.status,
+          complete,
+          sourceFiles: detail.analysis.sourceFileIds.map((fileId) => ({
+            fileId,
+            filename: filename.get(fileId) ?? fileId
+          })),
+          segmentCount: detail.segments.length,
+          reviewedSegmentCount: detail.segments.filter(
+            (segment) => segment.codingState === "reviewed"
+          ).length,
+          codebook: detail.latestCodebook
+            ? {
+                version: detail.latestCodebook.version,
+                source: detail.latestCodebook.source,
+                codes: detail.latestCodebook.codebook.codes.map((code) => ({
+                  id: code.id,
+                  label: code.label,
+                  definition: code.definition,
+                  confirmedSegmentCount: new Set(
+                    detail.codings
+                      .filter(
+                        (coding) =>
+                          coding.codeId === code.id &&
+                          coding.status === "confirmed"
+                      )
+                      .map((coding) => coding.segmentId)
+                  ).size
+                }))
+              }
+            : null,
+          // Themes count as results only once a researcher has confirmed them.
+          themes:
+            detail.latestThemes && complete
+              ? {
+                  version: detail.latestThemes.version,
+                  synthesis: detail.latestThemes.synthesis,
+                  themes: detail.latestThemes.themes.map((theme) => ({
+                    id: theme.id,
+                    label: theme.label,
+                    summary: theme.summary,
+                    codes: theme.codeIds.map(
+                      (codeId) => codeLabel.get(codeId) ?? codeId
+                    ),
+                    evidence: theme.evidenceSegmentIds.flatMap((segmentId) => {
+                      const segment = segmentById.get(segmentId);
+                      return segment
+                        ? [
+                            {
+                              segmentId,
+                              filename:
+                                filename.get(segment.fileId) ?? segment.fileId,
+                              segmentIndex: segment.segmentIndex,
+                              text: segment.text
+                            }
+                          ]
+                        : [];
+                    })
+                  }))
+                }
+              : null
+        };
+      })
+    )
+  ).filter((item): item is NonNullable<typeof item> => item !== null);
+
+  return c.json({
+    plan: plan
+      ? {
+          id: plan.id,
+          versionId: plan.versionId,
+          lockedAt: plan.lockedAt ?? null,
+          lockHash: plan.lockHash ?? null,
+          studySpecificationVersion: plan.studySpecificationVersion,
+          datasetVersionId: plan.datasetVersionId ?? null
+        }
+      : null,
+    quantitative,
+    qualitative,
+    nextAction: state.readiness.nextAction,
+    methodologyKnowledgeVersion
+  });
+});
+
 app.get("/projects/:projectId/qualitative-analyses", async (c) => {
   const projectId = c.req.param("projectId");
   const access = await requireProject(c, projectId);
@@ -6442,6 +6661,13 @@ app.put("/projects/:projectId/variable-mappings", async (c) => {
     objectId: specificationRecord.id,
     after: parsed.data.mappings
   });
+
+  // A mapping corrected in the workbench can unblock the project. When the
+  // researcher is working through the conversation, continue on the server
+  // so they do not have to return and prompt Methodome.
+  if (await projectHasResearcherConversation(c.env.DB, projectId)) {
+    await queueConversationContinuation(c, projectId);
+  }
 
   return c.json({
     mappings: await listVariableMappings(c.env.DB, projectId)

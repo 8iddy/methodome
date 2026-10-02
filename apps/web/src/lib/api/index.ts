@@ -1218,6 +1218,107 @@ export interface DatasetProfile {
   }>;
 }
 
+export interface ResultTable {
+  jobId: string;
+  method: string;
+  n: number;
+  estimates: Array<{
+    term: string;
+    estimate: string;
+    confidenceInterval: string | null;
+    pValue: string | null;
+  }>;
+  diagnosticsNeedingReview: string[];
+  diagnostics?: Array<{ label: string; status: string; value: string | null }>;
+}
+
+export interface QuantitativeOutput {
+  analysisId: string;
+  researchQuestionId: string;
+  researchQuestion: string;
+  methodId: string | null;
+  method: string | null;
+  outcome: string;
+  predictors: string[];
+  covariates: string[];
+  exploratory: boolean;
+  state:
+    | "awaiting_method"
+    | "awaiting_approval"
+    | "not_started"
+    | "running"
+    | "complete"
+    | "failed";
+  jobId: string | null;
+  result: {
+    table: ResultTable;
+    warnings: string[];
+    software: Record<string, unknown>;
+    allDiagnostics: Array<{
+      label: string;
+      status: string;
+      value: string | null;
+      message: string | null;
+    }>;
+  } | null;
+}
+
+export interface QualitativeOutput {
+  analysisId: string;
+  researchQuestionId: string;
+  researchQuestion: string;
+  status: string;
+  complete: boolean;
+  sourceFiles: Array<{ fileId: string; filename: string }>;
+  segmentCount: number;
+  reviewedSegmentCount: number;
+  codebook: {
+    version: number;
+    source: "model" | "researcher";
+    codes: Array<{
+      id: string;
+      label: string;
+      definition: string;
+      confirmedSegmentCount: number;
+    }>;
+  } | null;
+  themes: {
+    version: number;
+    synthesis: string;
+    themes: Array<{
+      id: string;
+      label: string;
+      summary: string;
+      codes: string[];
+      evidence: Array<{
+        segmentId: string;
+        filename: string;
+        segmentIndex: number;
+        text: string;
+      }>;
+    }>;
+  } | null;
+}
+
+export interface ResearchOutputs {
+  plan: {
+    id: string;
+    versionId: string;
+    lockedAt: string | null;
+    lockHash: string | null;
+    studySpecificationVersion: string;
+    datasetVersionId: string | null;
+  } | null;
+  quantitative: QuantitativeOutput[];
+  qualitative: QualitativeOutput[];
+  nextAction: WorkflowAction;
+  methodologyKnowledgeVersion: string;
+}
+
+export async function getResearchOutputs(projectId: string) {
+  return request<ResearchOutputs>(`/projects/${projectId}/research-outputs`);
+}
+
 export async function getDatasetProfile(
   projectId: string,
   datasetVersionId: string
