@@ -409,6 +409,37 @@ describe("project orchestrator view", () => {
     ).toBe(true);
   });
 
+  it("makes plan approval cover a protocol interpretation no researcher has confirmed", () => {
+    const locked = lockedPlan();
+    const { lockedAt: _lockedAt, lockHash: _lockHash, ...draft } = locked;
+    const readiness = assessProjectReadiness(
+      snapshot({ plan: draft, specificationConfirmedByResearcher: false })
+    );
+    const approval = buildOrchestratorView(readiness, draft).decisions.find(
+      (decision) => decision.kind === "approve_plan"
+    );
+
+    expect(readiness.studyInterpretation?.researcherConfirmed).toBe(false);
+    expect(approval?.confirmsStudyInterpretation).toBe(true);
+    expect(approval?.prompt).toContain("cross sectional design");
+    expect(approval?.prompt).toContain("health facility");
+    expect(approval?.prompt).toContain("Approving confirms that interpretation");
+  });
+
+  it("does not ask plan approval to reconfirm a researcher-confirmed study model", () => {
+    const locked = lockedPlan();
+    const { lockedAt: _lockedAt, lockHash: _lockHash, ...draft } = locked;
+    const readiness = assessProjectReadiness(
+      snapshot({ plan: draft, specificationConfirmedByResearcher: true })
+    );
+    const approval = buildOrchestratorView(readiness, draft).decisions.find(
+      (decision) => decision.kind === "approve_plan"
+    );
+
+    expect(readiness.studyInterpretation?.researcherConfirmed).toBe(true);
+    expect(approval?.confirmsStudyInterpretation).toBeUndefined();
+  });
+
   it("automatically queues execution only after the plan is locked", () => {
     const plan = lockedPlan();
     const readiness = assessProjectReadiness(

@@ -891,19 +891,44 @@ export async function listVariableMappings(
 export async function getCurrentStudySpecificationRecord(
   db: D1Database,
   projectId: string
-): Promise<{ id: string; version: string } | null> {
+): Promise<{ id: string; version: string; confirmedBy: string | null } | null> {
   const row = await db
     .prepare(
-      `SELECT id, version
+      `SELECT id, version, confirmed_by
        FROM study_specifications
        WHERE project_id = ?
        ORDER BY created_at DESC
        LIMIT 1`
     )
     .bind(projectId)
-    .first<{ id: string; version: string }>();
+    .first<{ id: string; version: string; confirmed_by: string | null }>();
 
-  return row ?? null;
+  return row
+    ? { id: row.id, version: row.version, confirmedBy: row.confirmed_by ?? null }
+    : null;
+}
+
+/**
+ * Records researcher confirmation on a study specification that Methodome
+ * interpreted from the protocol. Returns false when the record was already
+ * confirmed, so callers never overwrite an earlier confirmation.
+ */
+export async function confirmStudySpecificationRecord(
+  db: D1Database,
+  projectId: string,
+  specificationId: string,
+  confirmedBy: string
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE study_specifications
+       SET confirmed_by = ?
+       WHERE id = ? AND project_id = ? AND confirmed_by IS NULL`
+    )
+    .bind(confirmedBy, specificationId, projectId)
+    .run();
+
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 export async function getDatasetVersionRecord(

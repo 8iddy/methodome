@@ -85,6 +85,7 @@ import {
   getAnalysisResult,
   getAuditHeadHash,
   getCurrentStudySpecificationRecord,
+  confirmStudySpecificationRecord,
   getDatasetVersionRecord,
   getFileForDatasetRegistration,
   getFileRecord,
@@ -477,6 +478,7 @@ async function computeProjectReadiness(
     files,
     datasets,
     specification,
+    specificationRecord,
     mappings,
     plan,
     history,
@@ -486,6 +488,7 @@ async function computeProjectReadiness(
     listProjectFiles(c.env.DB, projectId),
     listDatasetVersions(c.env.DB, projectId),
     getStudySpecification(c.env.DB, projectId),
+    getCurrentStudySpecificationRecord(c.env.DB, projectId),
     listVariableMappings(c.env.DB, projectId),
     getLatestAnalysisPlan(c.env.DB, projectId),
     listAnalysisHistory(c.env.DB, getUserId(c)),
@@ -532,6 +535,7 @@ async function computeProjectReadiness(
       datasetCount: datasets.length,
       hasDerivedDataset: datasets.some((dataset) => dataset.sourceKind === "derived"),
       specification,
+      specificationConfirmedByResearcher: Boolean(specificationRecord?.confirmedBy),
       mappings: mappings.map((mapping) => ({
         researchConcept: mapping.researchConcept,
         ...(mapping.datasetVariable
@@ -633,6 +637,54 @@ function studySpecificationFromProtocolExtraction(
     missingDataPlan: extraction.missingDataPlan?.trim() || null,
     statedAnalysisPlan: extraction.statedAnalysisPlan?.trim() || null
   });
+}
+
+/**
+ * Plan approval is the researcher's sign-off on everything the plan rests on.
+ * When the study specification was interpreted by Methodome from the protocol
+ * and never confirmed, approving the plan records that confirmation explicitly
+ * so no analysis executes on an interpretation without researcher provenance.
+ */
+async function confirmStudyInterpretationAtPlanApproval(
+  c: import("hono").Context<AppBindings>,
+  projectId: string,
+  input: {
+    action: string;
+    planId: string;
+    decisionId?: string;
+  }
+): Promise<boolean> {
+  const record = await getCurrentStudySpecificationRecord(c.env.DB, projectId);
+  if (!record || record.confirmedBy) return false;
+
+  const confirmed = await confirmStudySpecificationRecord(
+    c.env.DB,
+    projectId,
+    record.id,
+    getUserId(c)
+  );
+  if (!confirmed) return false;
+
+  const specification = await getStudySpecification(c.env.DB, projectId);
+  await addAudit(c, {
+    projectId,
+    action: input.action,
+    objectType: "study_specification",
+    objectId: record.id,
+    before: { researcherConfirmed: false },
+    after: {
+      ...(input.decisionId ? { decisionId: input.decisionId } : {}),
+      confirmedVia: "analysis_plan_approval",
+      analysisPlanId: input.planId,
+      specificationVersion: record.version,
+      studyDesign: specification?.studyDesign ?? null,
+      unitOfAnalysis: specification?.unitOfAnalysis ?? null,
+      researchQuestionCount: specification?.researchQuestions.length ?? null,
+      researcherConfirmed: true,
+      methodologyKnowledgeVersion
+    }
+  });
+  return true;
 }
 
 async function runProtocolExtractionForProject(
@@ -3359,6 +3411,11 @@ app.post(
           400
         );
       }
+      await confirmStudyInterpretationAtPlanApproval(c, projectId, {
+        action: "conversation_study_interpretation_confirmed",
+        planId: state.plan.id,
+        decisionId
+      });
       if (!state.plan.lockedAt || !state.plan.lockHash) {
         const locked = await lockAnalysisPlan(
           state.plan,
@@ -3612,6 +3669,7 @@ app.post(
           decisionId,
           choiceId: response.choiceId ?? null,
           approved: response.approved ?? null,
+          confirmedVia: "study_design_checkpoint",
           methodologyKnowledgeVersion
         }
       });
@@ -6004,6 +6062,10 @@ app.post("/projects/:projectId/analysis-plan/:planId/lock", async (c) => {
       409
     );
   }
+  await confirmStudyInterpretationAtPlanApproval(c, projectId, {
+    action: "study_interpretation_confirmed",
+    planId: locked.id
+  });
   await updateStoredAnalysisPlan(c.env.DB, locked);
   await addAudit(c, {
     projectId,

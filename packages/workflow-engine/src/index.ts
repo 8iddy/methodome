@@ -131,11 +131,24 @@ export interface ProjectWorkflowSnapshot {
   datasetCount: number;
   hasDerivedDataset: boolean;
   specification: StudySpecification | null;
+  /**
+   * False when the current study specification was interpreted by Methodome
+   * from the protocol and no researcher has confirmed it yet. Omitted or true
+   * means a researcher authored or confirmed the specification.
+   */
+  specificationConfirmedByResearcher?: boolean;
   mappings: VariableMappingSnapshot[];
   selections: CandidateSelection[];
   plan: AnalysisPlan | null;
   completedAnalysisCount: number;
   qualitativeWorkstreams: QualitativeWorkstreamSnapshot[];
+}
+
+export interface StudyInterpretationSummary {
+  researcherConfirmed: boolean;
+  studyDesign: StudySpecification["studyDesign"];
+  unitOfAnalysis: string;
+  researchQuestionCount: number;
 }
 
 export interface WorkflowAction {
@@ -157,6 +170,7 @@ export interface ProjectReadiness {
   };
   mappingSummary: MappingStageSummary;
   questions: QuestionReadiness[];
+  studyInterpretation: StudyInterpretationSummary | null;
   nextAction: WorkflowAction;
   guidance: {
     visible: boolean;
@@ -799,6 +813,15 @@ export function assessProjectReadiness(
     },
     mappingSummary: mapping,
     questions,
+    studyInterpretation: snapshot.specification
+      ? {
+          researcherConfirmed:
+            snapshot.specificationConfirmedByResearcher !== false,
+          studyDesign: snapshot.specification.studyDesign,
+          unitOfAnalysis: snapshot.specification.unitOfAnalysis,
+          researchQuestionCount: snapshot.specification.researchQuestions.length
+        }
+      : null,
     nextAction,
     guidance: {
       visible: currentSection ? nextAction.targetSection !== currentSection : true,
@@ -851,6 +874,12 @@ export interface OrchestratorDecision {
     label: string;
     detail?: string;
   }>;
+  /**
+   * Set on plan approval when the study specification was interpreted from
+   * the protocol and has not been confirmed. Approving the plan then also
+   * records the researcher's confirmation of that interpretation.
+   */
+  confirmsStudyInterpretation?: boolean;
   blocking: boolean;
 }
 
@@ -1110,11 +1139,25 @@ export function buildOrchestratorView(
     }
 
     if (plan.analyses.length > 0 && plan.analyses.every((analysis) => analysis.selectedMethodId)) {
+      const interpretation = readiness.studyInterpretation;
+      const unconfirmedInterpretation =
+        interpretation && !interpretation.researcherConfirmed
+          ? interpretation
+          : null;
       decisions.push({
         id: `decision:approve-plan:${plan.id}`,
         kind: "approve_plan",
-        prompt:
-          "The executable plan is fully specified. Review it and approve locking before planned analysis runs.",
+        prompt: unconfirmedInterpretation
+          ? `The executable plan is fully specified. It rests on my reading of the protocol: ${unconfirmedInterpretation.studyDesign.replaceAll(
+              "_",
+              " "
+            )} design, unit of analysis “${unconfirmedInterpretation.unitOfAnalysis}”, ${unconfirmedInterpretation.researchQuestionCount} research question${
+              unconfirmedInterpretation.researchQuestionCount === 1 ? "" : "s"
+            }. Approving confirms that interpretation and locks the plan before the planned analysis runs.`
+          : "The executable plan is fully specified. Review it and approve locking before planned analysis runs.",
+        ...(unconfirmedInterpretation
+          ? { confirmsStudyInterpretation: true }
+          : {}),
         blocking: true
       });
     }

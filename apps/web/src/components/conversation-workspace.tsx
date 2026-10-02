@@ -92,7 +92,9 @@ function ConversationDecisionCard({
             onClick={() => void resolve({ approved: true })}
             disabled={busy}
           >
-            Run the analysis
+            {decision.confirmsStudyInterpretation
+              ? "Confirm and run the analysis"
+              : "Run the analysis"}
           </Button>
           <Link
             className="conversation-inspect-link"
@@ -100,6 +102,14 @@ function ConversationDecisionCard({
           >
             Review details
           </Link>
+          {decision.confirmsStudyInterpretation && (
+            <Link
+              className="conversation-inspect-link"
+              href={`/app/projects/${projectId}/study-design`}
+            >
+              Check the study interpretation
+            </Link>
+          )}
         </div>
       )}
 

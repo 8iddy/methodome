@@ -386,6 +386,24 @@ async function main() {
         throw new Error(`Conversation audit is missing ${action}.`);
       }
     }
+    // The study interpretation must carry researcher provenance before any
+    // analysis runs: either from the in-thread study-design checkpoint, or
+    // recorded as part of plan approval when Methodome's protocol
+    // interpretation was complete enough to proceed without that checkpoint.
+    const interpretationConfirmation = audit.payload.events.find(
+      (event) => event.action === "conversation_study_interpretation_confirmed"
+    );
+    if (
+      !["study_design_checkpoint", "analysis_plan_approval"].includes(
+        interpretationConfirmation?.after?.confirmedVia
+      )
+    ) {
+      throw new Error(
+        `Study interpretation confirmation does not record how it was confirmed: ${JSON.stringify(
+          interpretationConfirmation
+        )}`
+      );
+    }
     console.log("PASS conversation methodology and execution provenance");
 
     await request(
