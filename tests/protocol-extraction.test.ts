@@ -347,6 +347,72 @@ describe("mapping evidence rules", () => {
     ]);
   });
 
+  it("accepts an exact match to the wording an instrument pairs with a dataset field", async () => {
+    const suggestions = await suggestMappingsWithAi({
+      env: {} as never,
+      concepts: ["number of clinical staff", "Stockout days"],
+      variables: [
+        { variableName: "staff_count", dataType: "count" },
+        { variableName: "stockout_days", dataType: "count" }
+      ],
+      instrumentText:
+        "FILE: questionnaire.csv\nvariable,question\nstaff_count,Number of clinical staff\nstockout_days,\"Days with any stockout, last quarter\"\n"
+    });
+
+    expect(
+      suggestions.find((item) => item.researchConcept === "number of clinical staff")
+    ).toMatchObject({
+      datasetVariable: "staff_count",
+      mappingStatus: "direct_match"
+    });
+    expect(
+      suggestions.find((item) => item.researchConcept === "Stockout days")
+    ).toMatchObject({ datasetVariable: "stockout_days", mappingStatus: "direct_match" });
+  });
+
+  it("does not treat instrument wording shared by two fields as an exact match", async () => {
+    const suggestions = await suggestMappingsWithAi({
+      env: {} as never,
+      concepts: ["Stockout"],
+      variables: [
+        { variableName: "q1", dataType: "binary" },
+        { variableName: "q2", dataType: "binary" }
+      ],
+      instrumentText: "q1,Stockout\nq2,Stockout\n"
+    });
+
+    expect(suggestions[0]?.mappingStatus).toBe("no_match");
+  });
+
+  it("keeps a model suggestion as a reviewable match, never a direct match", async () => {
+    const suggestions = await suggestMappingsWithAi({
+      env: {
+        AI: {
+          run: async () => ({
+            response: {
+              mappings: [
+                {
+                  researchConcept: "Stockout days in the last quarter",
+                  datasetVariable: "stockout_days",
+                  mappingStatus: "direct_match",
+                  evidence: ["Field stockout_days counts stockout days."]
+                }
+              ]
+            }
+          })
+        }
+      } as never,
+      concepts: ["stockout days in the last quarter"],
+      variables: [{ variableName: "stockout_days", dataType: "count" }]
+    });
+
+    expect(suggestions[0]).toMatchObject({
+      researchConcept: "stockout days in the last quarter",
+      datasetVariable: "stockout_days",
+      mappingStatus: "probable_match"
+    });
+  });
+
   it("keeps dataset review available when semantic mapping fails", async () => {
     const suggestions = await suggestMappingsWithAi({
       env: {

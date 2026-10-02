@@ -515,6 +515,84 @@ const mappingSuggestionsSchema = z.array(
   })
 );
 
+const mappingSuggestionsJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    mappings: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          researchConcept: { type: "string" },
+          datasetVariable: { type: ["string", "null"] },
+          mappingStatus: {
+            type: "string",
+            enum: ["probable_match", "uncertain", "no_match"]
+          },
+          evidence: { type: "array", items: { type: "string" } }
+        },
+        required: ["researchConcept", "datasetVariable", "mappingStatus", "evidence"]
+      }
+    }
+  },
+  required: ["mappings"]
+} as const;
+
+function splitDelimitedLine(line: string): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index]!;
+    if (character === '"') {
+      if (quoted && line[index + 1] === '"') {
+        current += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (!quoted && (character === "," || character === "\t" || character === ";" || character === "|")) {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += character;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+/**
+ * Reads tabular instrument or codebook text (for example a row such as
+ * `staff_count,Number of clinical staff`) and returns the wording each
+ * dataset field is explicitly paired with. Only rows that name a supplied
+ * dataset field verbatim are used, so no association is inferred.
+ */
+export function instrumentWordingByVariable(
+  instrumentText: string | undefined,
+  variableNames: string[]
+): Map<string, string[]> {
+  const wording = new Map<string, string[]>();
+  if (!instrumentText) return wording;
+
+  const byNormalizedName = new Map(
+    variableNames.map((name) => [normalize(name), name])
+  );
+  for (const line of instrumentText.split(/\r?\n/)) {
+    if (!/[,\t;|]/.test(line)) continue;
+    const cells = splitDelimitedLine(line).filter(Boolean);
+    if (cells.length < 2) continue;
+    const named = cells.filter((cell) => byNormalizedName.has(normalize(cell)));
+    if (named.length !== 1) continue;
+    const variableName = byNormalizedName.get(normalize(named[0]!))!;
+    const labels = cells.filter((cell) => cell !== named[0] && normalize(cell));
+    wording.set(variableName, [...(wording.get(variableName) ?? []), ...labels]);
+  }
+  return wording;
+}
+
 export async function suggestMappingsWithAi(input: {
   env: Env;
   concepts: string[];
@@ -533,6 +611,23 @@ export async function suggestMappingsWithAi(input: {
 
   if (uniqueConcepts.length === 0) return [];
 
+  const instrumentWording = instrumentWordingByVariable(
+    input.instrumentText,
+    input.variables.map((variable) => variable.variableName)
+  );
+  const instrumentExact = new Map<string, string>();
+  for (const concept of uniqueConcepts) {
+    const normalizedConcept = normalize(concept);
+    if (!normalizedConcept) continue;
+    const matches = Array.from(instrumentWording.entries())
+      .filter(([, labels]) =>
+        labels.some((label) => normalize(label) === normalizedConcept)
+      )
+      .map(([variableName]) => variableName);
+    // Identical wording on more than one field is ambiguous, not exact.
+    if (matches.length === 1) instrumentExact.set(concept, matches[0]!);
+  }
+
   const exact = new Map<string, string>();
   for (const variable of input.variables) {
     const normalizedName = normalize(variable.variableName);
@@ -549,17 +644,30 @@ export async function suggestMappingsWithAi(input: {
     }
   }
 
-  const unresolved = uniqueConcepts.filter((concept) => !exact.has(concept));
+  const unresolved = uniqueConcepts.filter(
+    (concept) => !exact.has(concept) && !instrumentExact.has(concept)
+  );
   const output: MappingSuggestion[] = uniqueConcepts
-    .filter((concept) => exact.has(concept))
-    .map((researchConcept) => ({
-      researchConcept,
-      datasetVariable: exact.get(researchConcept)!,
-      mappingStatus: "direct_match",
-      evidence: [
-        "Exact normalized match to a dataset variable name or dataset label."
-      ]
-    }));
+    .filter((concept) => exact.has(concept) || instrumentExact.has(concept))
+    .map((researchConcept) =>
+      exact.has(researchConcept)
+        ? {
+            researchConcept,
+            datasetVariable: exact.get(researchConcept)!,
+            mappingStatus: "direct_match" as const,
+            evidence: [
+              "Exact normalized match to a dataset variable name or dataset label."
+            ]
+          }
+        : {
+            researchConcept,
+            datasetVariable: instrumentExact.get(researchConcept)!,
+            mappingStatus: "direct_match" as const,
+            evidence: [
+              `Exact normalized match to the wording the research instrument or codebook pairs with dataset field “${instrumentExact.get(researchConcept)!}”.`
+            ]
+          }
+    );
 
   if (unresolved.length === 0) return output;
 
@@ -586,13 +694,18 @@ export async function suggestMappingsWithAi(input: {
       {
         role: "system",
         content:
-          "You resolve research concepts to the supplied dataset variables using metadata and research instruments only; never use or request row-level data. For every concept, identify the most plausible operational variable when the evidence supports one. Use instrument or codebook text to connect coded field names to questionnaire wording. Use probable_match when one supplied variable is clearly the best semantic match, uncertain when multiple supplied variables are plausible or the evidence is weak, and no_match only when no supplied variable plausibly operationalises the concept. A direct_match is forbidden here because deterministic exact matching is handled separately. Never invent a variable. Evidence must name the supplied field, label, type, response choices, or instrument wording that supports the mapping."
+          "You resolve research concepts to the supplied dataset variables using metadata and research instruments only; never use or request row-level data. For every concept, identify the most plausible operational variable when the evidence supports one. Use instrument or codebook text to connect coded field names to questionnaire wording. Use probable_match when one supplied variable is clearly the best semantic match, uncertain when multiple supplied variables are plausible or the evidence is weak, and no_match only when no supplied variable plausibly operationalises the concept. A direct_match is forbidden here because deterministic exact matching is handled separately. Never invent a variable. Evidence must name the supplied field, label, type, response choices, or instrument wording that supports the mapping. Return one JSON object of the form {\"mappings\":[{\"researchConcept\":string,\"datasetVariable\":string|null,\"mappingStatus\":\"probable_match\"|\"uncertain\"|\"no_match\",\"evidence\":string[]}]} with exactly one entry per supplied research concept, copying each researchConcept and datasetVariable verbatim."
       },
       {
         role: "user",
         content: JSON.stringify({
           researchConcepts: unresolved,
-          datasetVariables: input.variables,
+          datasetVariables: input.variables.map((variable) => ({
+            ...variable,
+            ...(instrumentWording.get(variable.variableName)?.length
+              ? { instrumentWording: instrumentWording.get(variable.variableName) }
+              : {})
+          })),
           instrumentText: input.instrumentText?.slice(0, 30000) || null
         })
       }
@@ -600,7 +713,8 @@ export async function suggestMappingsWithAi(input: {
     temperature: 0,
     max_tokens: 2048,
       response_format: {
-        type: "json_object"
+        type: "json_schema",
+        json_schema: mappingSuggestionsJsonSchema
       }
     });
   } catch {
@@ -626,16 +740,27 @@ export async function suggestMappingsWithAi(input: {
   const candidateArray =
     Array.isArray(parsed)
       ? parsed
-      : parsed && typeof parsed === "object" && Array.isArray((parsed as any).mappings)
-        ? (parsed as any).mappings
+      : parsed && typeof parsed === "object"
+        ? Array.isArray((parsed as any).mappings)
+          ? (parsed as any).mappings
+          : (Object.values(parsed as Record<string, unknown>).find((value) =>
+              Array.isArray(value)
+            ) as unknown[] | undefined) ?? []
         : [];
 
   const suggestions = mappingSuggestionsSchema.safeParse(candidateArray);
   const byConcept = new Map<string, MappingSuggestion>();
   if (suggestions.success) {
     const allowedVariables = new Set(input.variables.map((v) => v.variableName));
-    for (const suggestion of suggestions.data) {
-      if (!unresolved.includes(suggestion.researchConcept)) continue;
+    const unresolvedByNormalized = new Map(
+      unresolved.map((concept) => [normalize(concept), concept])
+    );
+    for (const raw of suggestions.data) {
+      const researchConcept = unresolvedByNormalized.get(
+        normalize(raw.researchConcept)
+      );
+      if (!researchConcept) continue;
+      const suggestion = { ...raw, researchConcept };
       const datasetVariable =
         suggestion.datasetVariable &&
         allowedVariables.has(suggestion.datasetVariable)
