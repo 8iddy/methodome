@@ -1,143 +1,88 @@
 # Methodome frontend handoff
 
-## Current state
+Current as of main after PR #34 (October 2026). Source code is the authority;
+this document describes the shape, not every detail.
 
-The frontend is integrated with the Methodome backend on the `integration` branch.
+## Architecture in one paragraph
 
-The primary quantitative research workflow no longer depends on fixture data.
+The researcher works in a persistent project conversation. The backend
+orchestrator does every safe step on the server (protocol interpretation,
+variable mapping, plan drafting, statistical execution, qualitative
+preparation and proposals) and stops only for decisions that need scientific
+judgement. Specialist screens are secondary workbenches that render canonical
+backend state and send corrections back. The frontend keeps no workflow state
+machine of its own.
 
-## Public routes
+## Where state comes from
 
-- `/`
-- `/methods`
-- `/how-it-works`
-- `/documentation`
-- `/sign-in`
-- `/sign-up`
+| Need | Endpoint | Notes |
+|---|---|---|
+| Conversation, open decisions, whether Methodome is working | `GET /projects/:id/conversation` | `activity` is `idle`, `working`, `running_analysis` or `stopped`. Decisions are only offered when no run is in progress. `datasetVariables` accompanies mapping decisions. |
+| Workflow readiness, blockers, next action, guidance visibility | `GET /projects/:id/readiness?section=…` | `guidance.visible` is false when the researcher is already on the relevant surface. |
+| Orchestrator view | `GET /projects/:id/orchestrator` | Used by the qualitative workbench. |
+| Everything the project has produced | `GET /projects/:id/research-outputs` | Plan state, each planned analysis with execution state and stored result, each qualitative workstream with codebook, coding progress and researcher-confirmed themes with source segments. Includes `activity`. |
 
-## Authenticated routes
+Rules:
 
-- `/app/projects`
-- `/app/projects/new`
-- `/app/methods`
-- `/app/history`
-- `/app/settings`
+- Never recompute readiness, "mapping complete", "plan ready" or "can run"
+  in React. Read it.
+- Never store job state in `localStorage`.
+- Numbers shown anywhere come from stored statistical output; the frontend
+  only formats what the API already formatted.
 
-Project workspace routes:
+## Components
 
-- Overview
-- Protocol
-- Instruments
-- Data
-- Data Preparation
-- Study Design
-- Variables
-- Analysis Plan
-- Analysis
-- Results
-- Reports
-- Audit Trail
-- Project Settings
+`apps/web/src/components/`
 
-## Live backend integration
+| File | Role |
+|---|---|
+| `conversation-workspace.tsx` | The primary surface: thread, decision cards (study interpretation, mapping, method, plan approval, qualitative review handoff), result tables, composer with multi-file attachment. |
+| `workbenches.tsx` | `VariablesWorkbench`, `AnalysisWorkbench`, `ResultsWorkbench`, `ReportsWorkbench`, `SourcesWorkbench`. All driven by readiness or research outputs. |
+| `research-workspace.tsx` | `ResearchSectionContext` (backend next-action card, hidden on its own surface) and `ResearchAnalysisSurface` / `QualitativeWorkbench` (codebook, coding and theme review against source segments). |
+| `live.tsx` | Auth pages, project list, project creation, the section router, and the remaining legacy specialist screens: protocol/instrument files, data (dataset registration, schema comparison, harmonisation), data preparation, study design, analysis plan, settings, audit, methods and history pages. |
+| `ui.tsx` | Shell, sidebar navigation, buttons, badges, theme toggle. |
+| `public.tsx`, `documentation.tsx` | Public site. |
 
-The browser API boundary is:
+`apps/web/src/lib/api/index.ts` is the only place that talks to the API.
 
-`apps/web/src/lib/api/index.ts`
+## Routes
 
-The production API origin defaults to:
+Public: `/`, `/methods`, `/how-it-works`, `/documentation`, `/sign-in`,
+`/sign-up`.
 
-`https://api.methodome.com/api`
+Authenticated: `/app/projects`, `/app/projects/new`, `/app/methods`,
+`/app/history`, `/app/settings`, and
+`/app/projects/:projectId/:section` with sections `overview` (the
+conversation), `protocol`, `instruments`, `data`, `data-preparation`,
+`study-design`, `variables`, `analysis-plan`, `analysis` (`?workstream=`
+opens a qualitative workstream), `results`, `reports`, `audit-trail`,
+`settings`.
 
-Requests use browser credentials so Better Auth sessions are sent to the API origin.
+## Design
 
-The frontend currently uses live endpoints for:
+Warm paper background, academic blue accent, muted teal, IBM Plex Sans for
+the application, Source Serif 4 for headings and decision prompts, IBM Plex
+Mono for statistical output. Fine rules, small radii, no cards inside cards,
+no chat bubbles. Styles live in `apps/web/src/app/globals.css`; the active
+token block is the last `:root` definition, and conversation and workbench
+styles are the final two sections.
 
-- account sign-up
-- account sign-in
-- account sign-out
-- session validation
-- project listing
-- project creation
-- project details
-- research file listing
-- protocol upload
-- instrument and codebook upload
-- dataset upload
-- dataset registration
-- dataset listing
-- dataset profiling
-- schema comparison
-- harmonised dataset append
-- study specification
-- variable mappings
-- deterministic method candidates
-- analysis plans
-- analysis plan locking
-- analysis job submission
-- analysis job status
-- structured results
-- analysis history
-- audit trail
-- project processing policy
+## Working locally
 
-## Data preparation
+`npm run web:typecheck` and `npm run web:build` from the repository root.
+The dev server (`npx next dev` in `apps/web`) talks to the production API
+by default (`NEXT_PUBLIC_METHODOME_API_URL` overrides it). Browser sessions
+are cross-site from `localhost`, so authenticated screens cannot be exercised
+locally against production; validate them on `https://methodome.com` with a
+temporary account and delete it afterwards, or run the API locally.
 
-The Data page supports the form-version workflow:
+## Known debt
 
-1. upload multiple source datasets
-2. profile both datasets
-3. compare schemas
-4. inspect direct, probable and uncertain field mappings
-5. create a harmonised append
-6. store the result as a derived dataset version
-
-The Data Preparation page shows real dataset lineage and the real dataset profile.
-
-General arbitrary cleaning and recoding rules beyond the implemented harmonisation path remain a later versioned transformation feature.
-
-## Statistical execution
-
-The Analysis screen submits a real queue job.
-
-The API Worker consumes the queue job and calls the Python statistics Worker through a service binding. The API Worker stores the structured result and provenance after Python returns the deterministic calculation.
-
-The Results screen reads the stored result.
-
-The current executable method boundary is intentionally smaller than the visible long term Methodome method catalogue.
-
-## Reports
-
-The Reports page exports the current structured result and audit record as JSON.
-
-Publication report generation for DOCX, PDF, HTML and LaTeX is not implemented in the integrated MVP and is labelled accordingly.
-
-## Prototype fallback
-
-A small number of future product surfaces may still reuse visual prototype components for capabilities outside the integrated MVP boundary.
-
-They must not be treated as evidence that the corresponding backend capability exists.
-
-The release boundary is documented in:
-
-`docs/13-release-readiness.md`
-
-## Cloudflare web deployment
-
-The web application is packaged through OpenNext for Cloudflare.
-
-The integration CI separately installs `apps/web` deployment dependencies before the Cloudflare package step to keep the standalone Next output independent of npm workspace hoisting.
-
-Target production origin:
-
-`https://methodome.com`
-
-## Release status
-
-The integrated application passed its production release gate on 28 September 2026.
-
-- integration CI passed
-- Cloudflare services deployed successfully
-- the production API health endpoint passed
-- the public site responded
-- `scripts/e2e-smoke.mjs` reported `METHODOME E2E PASS`
+- Study design, analysis plan and data-preparation screens in `live.tsx`
+  predate the workbench model and still carry local validation and
+  navigation copy.
+- Files cannot be reclassified or deleted (no API yet).
+- Formatted manuscripts (DOCX, PDF, LaTeX) are not produced; Reports exports
+  a Markdown summary and a JSON record built from stored outputs.
+- `GET /projects/:id/conversation` takes several seconds because it
+  re-profiles the dataset on each call.
