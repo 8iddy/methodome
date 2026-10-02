@@ -1761,6 +1761,21 @@ export async function createOrchestrationRun(
   return Number(result.meta.changes ?? 0) > 0;
 }
 
+export async function hasActiveOrchestrationRun(
+  db: D1Database,
+  projectId: string
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT 1 AS active FROM project_orchestration_runs
+       WHERE project_id = ? AND status IN ('queued', 'running')
+       LIMIT 1`
+    )
+    .bind(projectId)
+    .first<{ active: number }>();
+  return Boolean(row);
+}
+
 export async function updateOrchestrationRun(
   db: D1Database,
   runId: string,

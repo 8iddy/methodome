@@ -27,6 +27,7 @@ type ResultTable = {
     pValue: string | null;
   }>;
   diagnosticsNeedingReview: string[];
+  diagnostics?: Array<{ label: string; status: string; value: string | null }>;
 };
 
 function human(value: string) {
@@ -54,7 +55,7 @@ function ConversationDecisionCard({
   projectId,
   decision,
   datasetVariables,
-  busy,
+  busy: workspaceBusy,
   onResolved
 }: {
   projectId: string;
@@ -65,6 +66,8 @@ function ConversationDecisionCard({
 }) {
   const [mappingValue, setMappingValue] = useState("");
   const [error, setError] = useState("");
+  const [resolving, setResolving] = useState(false);
+  const busy = workspaceBusy || resolving;
   const fieldListId = useId();
 
   async function resolve(response: {
@@ -74,6 +77,7 @@ function ConversationDecisionCard({
     approved?: boolean;
   }) {
     setError("");
+    setResolving(true);
     try {
       await resolveProjectConversationDecision(
         projectId,
@@ -87,6 +91,8 @@ function ConversationDecisionCard({
           ? reason.message
           : "Methodome could not record that research decision."
       );
+    } finally {
+      setResolving(false);
     }
   }
 
@@ -431,8 +437,18 @@ function ResultTables({ tables }: { tables: ResultTable[] }) {
                 review before reporting
               </summary>
               <ul>
-                {table.diagnosticsNeedingReview.map((label) => (
-                  <li key={label}>{label}</li>
+                {(
+                  table.diagnostics ??
+                  table.diagnosticsNeedingReview.map((label) => ({
+                    label,
+                    status: "review",
+                    value: null
+                  }))
+                ).map((item) => (
+                  <li key={item.label}>
+                    {item.label}
+                    {item.value && <span>{item.value}</span>}
+                  </li>
                 ))}
               </ul>
             </details>
@@ -531,7 +547,13 @@ export function ConversationWorkspace({
     Record<string, "queued" | "uploading" | "uploaded">
   >({});
   const [dragging, setDragging] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // `submitting` covers only this browser's own request in flight. Whether
+  // Methodome is working is reported by the server as `activity`.
+  const [submitting, setSubmitting] = useState(false);
+  const [activity, setActivity] = useState<
+    "idle" | "working" | "running_analysis"
+  >("idle");
+  const busy = submitting || activity !== "idle";
   const [error, setError] = useState("");
   const threadEnd = useRef<HTMLDivElement>(null);
 
@@ -542,6 +564,7 @@ export function ConversationWorkspace({
       result.orchestrator.decisions.filter((decision) => decision.blocking)
     );
     setDatasetVariables(result.datasetVariables ?? []);
+    setActivity(result.activity ?? "idle");
     setStatus(result.orchestrator.status);
     setKnowledgeVersion(result.methodologyKnowledgeVersion);
     setLoaded(true);
@@ -563,25 +586,14 @@ export function ConversationWorkspace({
   }, [messages.length, decisions.length, busy]);
 
   useEffect(() => {
-    if (!busy) return;
+    if (activity === "idle") return;
     const interval = window.setInterval(() => {
-      void refresh()
-        .then((result) => {
-          if (
-            ["waiting_for_researcher", "complete", "blocked"].includes(
-              result.orchestrator.status
-            )
-          ) {
-            setBusy(false);
-          }
-        })
-        .catch(() => undefined);
+      void refresh().catch(() => undefined);
     }, 1800);
     return () => window.clearInterval(interval);
-  }, [busy, projectId]);
+  }, [activity, projectId]);
 
   async function afterDecision() {
-    setBusy(true);
     await refresh();
   }
 
@@ -616,7 +628,7 @@ export function ConversationWorkspace({
     event.preventDefault();
     const message = content.trim();
     if ((!message && files.length === 0) || busy) return;
-    setBusy(true);
+    setSubmitting(true);
     setError("");
 
     try {
@@ -639,7 +651,7 @@ export function ConversationWorkspace({
         setFileStates((current) => ({ ...current, [key]: "uploaded" }));
       }
 
-      const sent = await sendProjectConversationMessage(
+      await sendProjectConversationMessage(
         projectId,
         message ||
           `I attached ${files.length} research file${files.length === 1 ? "" : "s"}.`,
@@ -649,14 +661,14 @@ export function ConversationWorkspace({
       setFiles([]);
       setFileStates({});
       await refresh();
-      if (!sent.queued) setBusy(false);
     } catch (reason) {
-      setBusy(false);
       setError(
         reason instanceof Error
           ? reason.message
           : "Methodome could not send that message."
       );
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -727,7 +739,11 @@ export function ConversationWorkspace({
         {busy && (
           <p className="conversation-activity working">
             <ActivitySpinner label="Methodome is working" />
-            Methodome is working…
+            {submitting
+              ? "Sending…"
+              : activity === "running_analysis"
+                ? "Running the approved analysis…"
+                : "Methodome is working…"}
           </p>
         )}
         <div ref={threadEnd} className="conversation-thread-end" />

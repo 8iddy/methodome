@@ -1005,6 +1005,7 @@ export async function getProjectConversation(projectId: string) {
   return request<{
     messages: ProjectConversationMessage[];
     orchestrator: OrchestratorView;
+    activity?: "idle" | "working" | "running_analysis";
     datasetVariables?: Array<{ name: string; label?: string }>;
     methodologyKnowledgeVersion: string;
   }>(`/projects/${projectId}/conversation`);

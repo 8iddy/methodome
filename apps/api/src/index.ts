@@ -125,6 +125,7 @@ import {
   userOwnsProjects,
   appendProjectMessage,
   completeWaitingOrchestrationRuns,
+  hasActiveOrchestrationRun,
   createOrchestrationRun,
   ensureProjectThread,
   getProjectConversationDecision,
@@ -2644,6 +2645,7 @@ interface ConversationResultTable {
     pValue: string | null;
   }>;
   diagnosticsNeedingReview: string[];
+  diagnostics: Array<{ label: string; status: string; value: string | null }>;
 }
 
 /**
@@ -2674,7 +2676,14 @@ function conversationResultTable(
     })),
     diagnosticsNeedingReview: result.diagnostics
       .filter((item) => item.status === "review" || item.status === "failed")
-      .map((item) => item.label)
+      .map((item) => item.label),
+    diagnostics: result.diagnostics
+      .filter((item) => item.status === "review" || item.status === "failed")
+      .map((item) => ({
+        label: item.label,
+        status: item.status,
+        value: typeof item.value === "number" ? formatNumber(item.value) : null
+      }))
   };
 }
 
@@ -3112,9 +3121,31 @@ app.get("/projects/:projectId/conversation", async (c) => {
     }
   }
 
+  // Whether Methodome is working right now is server state: an orchestration
+  // run in progress, or approved analyses still executing. The client shows
+  // and polls on this rather than guessing from its own request lifecycle.
+  let activity: "idle" | "working" | "running_analysis" = "idle";
+  if (await hasActiveOrchestrationRun(c.env.DB, projectId)) {
+    activity = "working";
+  } else if (state.plan?.lockedAt) {
+    const planJobs = await listAnalysisJobsForPlan(
+      c.env.DB,
+      projectId,
+      state.plan.id
+    );
+    if (
+      planJobs.some(
+        (item) => !["complete", "failed", "cancelled"].includes(item.state)
+      )
+    ) {
+      activity = "running_analysis";
+    }
+  }
+
   return c.json({
     messages: await listProjectMessages(c.env.DB, projectId),
     orchestrator,
+    activity,
     datasetVariables,
     methodologyKnowledgeVersion
   });
