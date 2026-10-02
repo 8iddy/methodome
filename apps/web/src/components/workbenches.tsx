@@ -64,8 +64,8 @@ function useResearchOutputs(projectId: string) {
     void load();
   }, [load]);
 
-  // Keep the view current while the server reports analyses still running.
-  const running = outputs?.quantitative.some((item) => item.state === "running");
+  // Keep the view current for as long as the server reports work in flight.
+  const running = Boolean(outputs?.activity && outputs.activity !== "idle");
   useEffect(() => {
     if (!running) return;
     const interval = window.setInterval(() => void load(), 2500);

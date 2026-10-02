@@ -1311,6 +1311,7 @@ export interface ResearchOutputs {
   } | null;
   quantitative: QuantitativeOutput[];
   qualitative: QualitativeOutput[];
+  activity?: "idle" | "working" | "running_analysis";
   nextAction: WorkflowAction;
   methodologyKnowledgeVersion: string;
 }
