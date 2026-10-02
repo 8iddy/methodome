@@ -354,6 +354,35 @@ async function main() {
     }
     console.log("PASS conversation result backed by Python");
 
+    // The specialist workbenches read one backend view of project outputs.
+    // It must agree with the stored result rather than be derived client-side.
+    const outputs = await request(
+      `/projects/${projectId}/research-outputs`,
+      {},
+      [200]
+    );
+    const planned = outputs.payload.quantitative?.[0];
+    if (
+      !outputs.payload.plan?.lockedAt ||
+      planned?.state !== "complete" ||
+      planned?.jobId !== analysisJobId
+    ) {
+      throw new Error(
+        `Research outputs do not report the completed planned analysis: ${JSON.stringify(
+          { plan: outputs.payload.plan, planned }
+        )}`
+      );
+    }
+    const slopeRow = planned.result?.table?.estimates?.find(
+      (row) => row.term === "x"
+    );
+    if (Number(slopeRow?.estimate) !== Number(slope.toPrecision(5))) {
+      throw new Error(
+        `Research outputs show ${slopeRow?.estimate} for the slope, but the stored result is ${slope}.`
+      );
+    }
+    console.log("PASS research outputs agree with the stored result");
+
     const reloaded = await request(
       `/projects/${projectId}/conversation`,
       {},

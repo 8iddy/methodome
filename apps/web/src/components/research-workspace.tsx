@@ -83,22 +83,15 @@ export function ResearchAnalysisSurface({
     getProjectOrchestrator(projectId).then(setPayload).catch(() => setPayload(null));
   }, [projectId]);
 
+  // A workstream opens when the researcher asked for one, or when the backend
+  // has an open qualitative review decision. Otherwise the analysis overview
+  // (the fallback) lists every workstream and its state.
   const qualitativeDecision = payload?.orchestrator.decisions.find((decision) =>
     decision.kind.startsWith("review_qualitative_")
   );
-  const qualitativeQuestion = payload?.readiness.questions.find((question) =>
-    Boolean(question.qualitativeWorkstream)
-  );
-  const analysisId =
-    requested ??
-    qualitativeDecision?.analysisId ??
-    qualitativeQuestion?.qualitativeWorkstream?.id ??
-    null;
+  const analysisId = requested ?? qualitativeDecision?.analysisId ?? null;
 
-  const nextCode = payload?.orchestrator.nextAction.code ?? "";
-  const qualitativeNext = nextCode.includes("qualitative");
-
-  if (!analysisId && !qualitativeNext) return <>{fallback}</>;
+  if (!analysisId) return <>{fallback}</>;
 
   return (
     <QualitativeWorkbench

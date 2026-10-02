@@ -2248,3 +2248,255 @@ html[data-theme="dark"] .auth-theme .theme-toggle{border-color:var(--line);color
   .conversation-facts>div{grid-template-columns:1fr;gap:2px}
   .conversation-decision{padding:14px}
 }
+
+/* Workbenches
+   Secondary inspection surfaces around the conversation. Working tables and
+   lists with fine rules; no cards inside cards. */
+.wb{
+  display:grid;
+  gap:16px;
+  max-width:980px;
+  margin-bottom:28px;
+}
+.wb-heading{
+  margin:8px 0 0;
+  font-size:20px;
+}
+.wb-summary{
+  max-width:72ch;
+  margin:0;
+  font-size:14px;
+  line-height:1.55;
+}
+.wb-note{
+  max-width:72ch;
+  margin:0;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.55;
+}
+.wb a{
+  color:var(--blue);
+  text-decoration:underline;
+  text-underline-offset:2px;
+}
+.wb-muted{color:var(--muted)}
+.wb code{
+  padding:1px 4px;
+  border:1px solid var(--line);
+  border-radius:2px;
+  background:var(--surface);
+  font-family:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+  font-size:12px;
+  overflow-wrap:anywhere;
+}
+.wb-state{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:12.5px;
+  font-weight:600;
+  white-space:nowrap;
+}
+.wb-state::before{
+  content:"";
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--line-strong);
+}
+.wb-state.done{color:var(--green)}
+.wb-state.done::before{background:var(--green)}
+.wb-state.attention{color:var(--amber)}
+.wb-state.attention::before{background:var(--amber)}
+.wb-state.progress{color:var(--blue)}
+.wb-state.progress::before{background:var(--blue)}
+.wb-state.problem{color:var(--red)}
+.wb-state.problem::before{background:var(--red)}
+.wb-state.quiet{color:var(--muted)}
+.wb-tag{
+  margin-left:8px;
+  padding:1px 6px;
+  border:1px solid var(--line-strong);
+  border-radius:2px;
+  color:var(--muted);
+  font-family:"IBM Plex Sans",sans-serif;
+  font-size:11px;
+  font-weight:600;
+  vertical-align:middle;
+}
+.wb-table-scroll{overflow-x:auto}
+.wb-table{
+  width:100%;
+  border-collapse:collapse;
+  border-top:1px solid var(--line-strong);
+  font-size:13.5px;
+}
+.wb-table caption{
+  padding:0 0 6px;
+  color:var(--muted);
+  font-family:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+  font-size:12px;
+  text-align:right;
+  caption-side:top;
+}
+.wb-table thead th{
+  padding:8px 12px 8px 0;
+  border-bottom:1px solid var(--line-strong);
+  background:transparent;
+  color:var(--muted);
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:.04em;
+  text-align:left;
+  text-transform:uppercase;
+}
+.wb-table td,
+.wb-table tbody th{
+  padding:10px 12px 10px 0;
+  border-bottom:1px solid var(--line);
+  background:transparent;
+  color:var(--ink);
+  font-size:13.5px;
+  font-weight:400;
+  letter-spacing:0;
+  line-height:1.5;
+  text-align:left;
+  text-transform:none;
+  vertical-align:top;
+  white-space:normal;
+}
+.wb-table tbody tr:last-child td{border-bottom:1px solid var(--line)}
+.wb-table tbody th{font-weight:600}
+.wb-table tbody th small{
+  display:block;
+  margin-top:2px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:400;
+}
+.wb-table.numeric td,
+.wb-table.numeric thead th:not(:first-child){
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+}
+.wb-table.numeric td,
+.wb-table.numeric tbody th{
+  font-family:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+  font-size:12.5px;
+  white-space:nowrap;
+}
+.wb-table select{min-width:220px;font-size:13px}
+.wb-actions{white-space:nowrap}
+.wb-actions .button{min-height:32px;margin:0 6px 4px 0;padding:5px 11px;font-size:12.5px}
+.wb details{font-size:13px}
+.wb details>summary{
+  width:max-content;
+  max-width:100%;
+  margin-top:4px;
+  color:var(--blue);
+  font-size:12.5px;
+  font-weight:600;
+  cursor:pointer;
+}
+.wb details ul{margin:6px 0 0;padding-left:18px;color:var(--muted);font-weight:400}
+.wb-list{
+  display:grid;
+  margin:0;
+  padding:0;
+  border-top:1px solid var(--line-strong);
+  list-style:none;
+}
+.wb-list>li{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:20px;
+  padding:12px 0;
+  border-bottom:1px solid var(--line);
+}
+.wb-list>li>div:first-child{display:grid;gap:3px;min-width:0}
+.wb-list small{color:var(--muted);font-size:12.5px}
+.wb-list strong{font-size:14.5px;font-weight:600;overflow-wrap:anywhere}
+.wb-variables{color:var(--muted);font-size:12.5px;line-height:1.6}
+.wb-variables code{margin-right:4px}
+.wb-list-side{
+  display:grid;
+  flex:none;
+  justify-items:end;
+  gap:5px;
+  font-size:12.5px;
+}
+.wb-result{
+  display:grid;
+  gap:12px;
+  padding:18px 0 22px;
+  border-top:2px solid var(--navy);
+}
+.wb-result header{display:grid;gap:3px}
+.wb-result header small{color:var(--muted);font-size:13px}
+.wb-result h3{margin:0;font-size:21px}
+.wb-warnings{
+  margin:0;
+  padding:9px 12px 9px 28px;
+  border-left:2px solid var(--amber);
+  background:var(--amber-bg);
+  color:var(--ink);
+  font-size:13px;
+  line-height:1.5;
+}
+.wb-facts{margin:8px 0 0}
+.wb-facts>div{
+  display:grid;
+  grid-template-columns:150px minmax(0,1fr);
+  gap:12px;
+  padding:6px 0;
+  border-bottom:1px solid var(--line);
+  font-size:13px;
+}
+.wb-facts dt{color:var(--muted)}
+.wb-facts dd{margin:0}
+.wb-synthesis{
+  max-width:70ch;
+  margin:0;
+  font-family:"Source Serif 4","Iowan Old Style",Georgia,serif;
+  font-size:17px;
+  line-height:1.6;
+}
+.wb-theme{
+  display:grid;
+  gap:5px;
+  padding-top:12px;
+  border-top:1px solid var(--line);
+}
+.wb-theme h4{margin:0;font-size:15.5px;font-weight:600}
+.wb-theme p{max-width:70ch;margin:0;font-size:14px;line-height:1.55}
+.wb-theme blockquote{
+  margin:9px 0 0;
+  padding:2px 0 2px 13px;
+  border-left:2px solid var(--line-strong);
+  font-family:"Source Serif 4","Iowan Old Style",Georgia,serif;
+  font-size:14.5px;
+  line-height:1.55;
+}
+.wb-theme cite{
+  display:block;
+  margin-top:3px;
+  color:var(--muted);
+  font-family:"IBM Plex Sans",sans-serif;
+  font-size:12px;
+  font-style:normal;
+}
+.wb-source-group h3{
+  margin:10px 0 6px;
+  font-family:"IBM Plex Sans",sans-serif;
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.02em;
+}
+.wb-source-group h3 span{margin-left:8px;color:var(--muted);font-weight:400}
+@media (max-width:720px){
+  .wb-list>li{flex-direction:column;gap:8px}
+  .wb-list-side{justify-items:start}
+  .wb-facts>div{grid-template-columns:1fr;gap:2px}
+}
