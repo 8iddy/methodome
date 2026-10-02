@@ -2782,6 +2782,7 @@ async function runConversationOrchestrator(
   const now = new Date().toISOString();
   const threadId = await ensureProjectThread(env.DB, message.projectId, `thread_${message.projectId}`, now);
   let iterations = 0;
+  let previousAutomaticAction: string | null = null;
   await updateOrchestrationRun(env.DB, message.runId, { status: "running", iterationCount: 0 });
 
   try {
@@ -2842,6 +2843,19 @@ async function runConversationOrchestrator(
         });
         return;
       }
+
+      // Each automatic step must change project state so that the next
+      // assessment asks for something else. Only qualitative coding, which
+      // works through segments in batches, may legitimately repeat.
+      if (
+        view.automaticAction === previousAutomaticAction &&
+        view.automaticAction !== "propose_qualitative_codings"
+      ) {
+        throw new Error(
+          `Methodome repeated “${view.nextAction.label}” without making progress, so it stopped rather than continue. Nothing further was changed.`
+        );
+      }
+      previousAutomaticAction = view.automaticAction;
 
       const mutation = await executeAutomaticOrchestratorAction(
         c, message.projectId, state, view.automaticAction
@@ -3770,7 +3784,7 @@ app.post(
               | "uncertain")
           : "uncertain";
 
-      await saveVariableMappings(c.env.DB, {
+      const [savedMappingId] = await saveVariableMappings(c.env.DB, {
         projectId,
         studySpecificationId: specificationRecord.id,
         mappings: [
@@ -3793,7 +3807,7 @@ app.post(
         projectId,
         action: "conversation_variable_mapping_resolved",
         objectType: "variable_mapping",
-        objectId: existing?.id ?? stableMappingId(concept),
+        objectId: savedMappingId ?? existing?.id ?? stableMappingId(concept),
         after: {
           decisionId,
           concept,
