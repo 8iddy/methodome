@@ -386,6 +386,50 @@ async function main() {
         throw new Error(`Conversation audit is missing ${action}.`);
       }
     }
+    // The study interpretation must carry researcher provenance before any
+    // analysis runs: either from the in-thread study-design checkpoint, or
+    // recorded as part of plan approval when Methodome's protocol
+    // interpretation was complete enough to proceed without that checkpoint.
+    const interpretationConfirmation = audit.payload.events.find(
+      (event) => event.action === "conversation_study_interpretation_confirmed"
+    );
+    if (
+      !["study_design_checkpoint", "analysis_plan_approval"].includes(
+        interpretationConfirmation?.after?.confirmedVia
+      )
+    ) {
+      throw new Error(
+        `Study interpretation confirmation does not record how it was confirmed: ${JSON.stringify(
+          interpretationConfirmation
+        )}`
+      );
+    }
+    const confirmedAfter = interpretationConfirmation.after;
+    if (
+      typeof confirmedAfter.specificationId !== "string" ||
+      typeof confirmedAfter.specificationVersion !== "string" ||
+      !/^[0-9a-f]{64}$/.test(confirmedAfter.specificationHash ?? "")
+    ) {
+      throw new Error(
+        `Study interpretation confirmation is not bound to an immutable specification version: ${JSON.stringify(
+          confirmedAfter
+        )}`
+      );
+    }
+    const planApproval = audit.payload.events.find(
+      (event) => event.action === "conversation_analysis_plan_approved"
+    );
+    if (
+      confirmedAfter.confirmedVia === "analysis_plan_approval" &&
+      confirmedAfter.analysisPlanId !== planApproval?.objectId
+    ) {
+      throw new Error(
+        `Study interpretation was confirmed against plan ${confirmedAfter.analysisPlanId}, but the approved plan is ${planApproval?.objectId}.`
+      );
+    }
+    console.log(
+      `PASS study interpretation confirmed via ${confirmedAfter.confirmedVia} for specification ${confirmedAfter.specificationVersion}`
+    );
     console.log("PASS conversation methodology and execution provenance");
 
     await request(

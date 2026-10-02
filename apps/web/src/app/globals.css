@@ -1973,6 +1973,39 @@ html[data-theme="dark"] .auth-theme .theme-toggle{border-color:var(--line);color
   font-size:9px;
   line-height:1.45;
 }
+.conversation-interpretation{
+  display:grid;
+  gap:0;
+  max-width:720px;
+  margin:0 0 13px;
+  border-top:1px solid var(--line);
+}
+.conversation-interpretation>div{
+  display:grid;
+  grid-template-columns:132px 1fr;
+  gap:12px;
+  padding:7px 0;
+  border-bottom:1px solid var(--line);
+}
+.conversation-interpretation dt{
+  color:var(--muted);
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+.conversation-interpretation dd{
+  margin:0;
+  font-size:11px;
+  line-height:1.5;
+}
+.conversation-interpretation ol{
+  margin:0;
+  padding-left:16px;
+}
+@media (max-width:560px){
+  .conversation-interpretation>div{grid-template-columns:1fr;gap:2px}
+}
 .conversation-decision-actions{
   display:flex;
   flex-wrap:wrap;

@@ -86,13 +86,40 @@ function ConversationDecisionCard({
         </div>
       )}
 
+      {decision.kind === "approve_plan" && decision.studyInterpretation && (
+        <dl className="conversation-interpretation">
+          <div>
+            <dt>Study design</dt>
+            <dd>{decision.studyInterpretation.studyDesign.replaceAll("_", " ")}</dd>
+          </div>
+          <div>
+            <dt>Unit of analysis</dt>
+            <dd>{decision.studyInterpretation.unitOfAnalysis}</dd>
+          </div>
+          <div>
+            <dt>Research questions</dt>
+            <dd>
+              <ol>
+                {decision.studyInterpretation.researchQuestions.map(
+                  (question, index) => (
+                    <li key={index}>{question}</li>
+                  )
+                )}
+              </ol>
+            </dd>
+          </div>
+        </dl>
+      )}
+
       {decision.kind === "approve_plan" && (
         <div className="conversation-decision-actions">
           <Button
             onClick={() => void resolve({ approved: true })}
             disabled={busy}
           >
-            Run the analysis
+            {decision.confirmsStudyInterpretation
+              ? "Confirm and run the analysis"
+              : "Run the analysis"}
           </Button>
           <Link
             className="conversation-inspect-link"
@@ -100,6 +127,14 @@ function ConversationDecisionCard({
           >
             Review details
           </Link>
+          {decision.confirmsStudyInterpretation && (
+            <Link
+              className="conversation-inspect-link"
+              href={`/app/projects/${projectId}/study-design`}
+            >
+              Inspect or correct the study design
+            </Link>
+          )}
         </div>
       )}
 

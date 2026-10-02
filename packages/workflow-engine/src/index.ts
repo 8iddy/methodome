@@ -131,11 +131,44 @@ export interface ProjectWorkflowSnapshot {
   datasetCount: number;
   hasDerivedDataset: boolean;
   specification: StudySpecification | null;
+  /**
+   * False when the current study specification was interpreted by Methodome
+   * from the protocol and no researcher has confirmed it yet. Omitted or true
+   * means a researcher authored or confirmed the specification.
+   */
+  specificationConfirmedByResearcher?: boolean;
   mappings: VariableMappingSnapshot[];
   selections: CandidateSelection[];
   plan: AnalysisPlan | null;
   completedAnalysisCount: number;
   qualitativeWorkstreams: QualitativeWorkstreamSnapshot[];
+}
+
+export interface StudyInterpretationSummary {
+  /** Immutable version of the study specification this summary describes. */
+  version: string;
+  researcherConfirmed: boolean;
+  studyDesign: StudySpecification["studyDesign"];
+  unitOfAnalysis: string;
+  researchQuestionCount: number;
+  researchQuestions: string[];
+}
+
+/**
+ * A draft plan is stale when the study specification changed after the plan
+ * was constructed. A stale draft must be rebuilt, never approved: approval
+ * confirms the exact specification version the plan was built from.
+ */
+export function isDraftPlanStale(
+  plan: AnalysisPlan | null,
+  specificationVersion: string | null | undefined
+): boolean {
+  return Boolean(
+    plan &&
+      !plan.lockedAt &&
+      specificationVersion &&
+      plan.studySpecificationVersion !== specificationVersion
+  );
 }
 
 export interface WorkflowAction {
@@ -157,6 +190,7 @@ export interface ProjectReadiness {
   };
   mappingSummary: MappingStageSummary;
   questions: QuestionReadiness[];
+  studyInterpretation: StudyInterpretationSummary | null;
   nextAction: WorkflowAction;
   guidance: {
     visible: boolean;
@@ -683,6 +717,28 @@ function chooseNextAction(
     );
   }
 
+  if (isDraftPlanStale(snapshot.plan, snapshot.specification?.version)) {
+    const readyQuantitative = questions.some(
+      (question) =>
+        question.mode === "quantitative" && question.status === "ready"
+    );
+    return readyQuantitative
+      ? action(
+          "build_analysis_plan",
+          "Rebuild the analysis plan",
+          "The study specification changed after the draft plan was constructed, so Methodome must rebuild the plan from the current specification.",
+          "analysis-plan",
+          false
+        )
+      : action(
+          "review_project",
+          "Resolve analysis blockers",
+          "The study specification changed after the draft plan was constructed and no research question is currently ready for an executable plan. Review the question-level blockers before continuing.",
+          "overview",
+          true
+        );
+  }
+
   if (!snapshot.plan.lockedAt) {
     return action(
       "lock_analysis_plan",
@@ -799,6 +855,19 @@ export function assessProjectReadiness(
     },
     mappingSummary: mapping,
     questions,
+    studyInterpretation: snapshot.specification
+      ? {
+          version: snapshot.specification.version,
+          researcherConfirmed:
+            snapshot.specificationConfirmedByResearcher !== false,
+          studyDesign: snapshot.specification.studyDesign,
+          unitOfAnalysis: snapshot.specification.unitOfAnalysis,
+          researchQuestionCount: snapshot.specification.researchQuestions.length,
+          researchQuestions: snapshot.specification.researchQuestions.map(
+            (question) => question.text
+          )
+        }
+      : null,
     nextAction,
     guidance: {
       visible: currentSection ? nextAction.targetSection !== currentSection : true,
@@ -851,6 +920,14 @@ export interface OrchestratorDecision {
     label: string;
     detail?: string;
   }>;
+  /**
+   * Set on plan approval when the study specification was interpreted from
+   * the protocol and has not been confirmed. Approving the plan then also
+   * records the researcher's confirmation of that interpretation.
+   */
+  confirmsStudyInterpretation?: boolean;
+  /** The interpretation that approval would confirm, for explicit display. */
+  studyInterpretation?: StudyInterpretationSummary;
   blocking: boolean;
 }
 
@@ -1081,7 +1158,11 @@ export function buildOrchestratorView(
     });
   }
 
-  if (plan && !plan.lockedAt) {
+  if (
+    plan &&
+    !plan.lockedAt &&
+    !isDraftPlanStale(plan, readiness.studyInterpretation?.version)
+  ) {
     for (const analysis of plan.analyses) {
       if (analysis.selectedMethodId) continue;
       const question = readiness.questions.find(
@@ -1110,11 +1191,28 @@ export function buildOrchestratorView(
     }
 
     if (plan.analyses.length > 0 && plan.analyses.every((analysis) => analysis.selectedMethodId)) {
+      const interpretation = readiness.studyInterpretation;
+      const unconfirmedInterpretation =
+        interpretation && !interpretation.researcherConfirmed
+          ? interpretation
+          : null;
       decisions.push({
         id: `decision:approve-plan:${plan.id}`,
         kind: "approve_plan",
-        prompt:
-          "The executable plan is fully specified. Review it and approve locking before planned analysis runs.",
+        prompt: unconfirmedInterpretation
+          ? `The executable plan is fully specified. It rests on my reading of the protocol: ${unconfirmedInterpretation.studyDesign.replaceAll(
+              "_",
+              " "
+            )} design, unit of analysis “${unconfirmedInterpretation.unitOfAnalysis}”, ${unconfirmedInterpretation.researchQuestionCount} research question${
+              unconfirmedInterpretation.researchQuestionCount === 1 ? "" : "s"
+            }. Approving confirms that interpretation and locks the plan before the planned analysis runs.`
+          : "The executable plan is fully specified. Review it and approve locking before planned analysis runs.",
+        ...(unconfirmedInterpretation
+          ? {
+              confirmsStudyInterpretation: true,
+              studyInterpretation: unconfirmedInterpretation
+            }
+          : {}),
         blocking: true
       });
     }

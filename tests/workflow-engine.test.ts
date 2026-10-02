@@ -409,6 +409,76 @@ describe("project orchestrator view", () => {
     ).toBe(true);
   });
 
+  it("makes plan approval cover a protocol interpretation no researcher has confirmed", () => {
+    const locked = lockedPlan();
+    const { lockedAt: _lockedAt, lockHash: _lockHash, ...draft } = locked;
+    const readiness = assessProjectReadiness(
+      snapshot({ plan: draft, specificationConfirmedByResearcher: false })
+    );
+    const approval = buildOrchestratorView(readiness, draft).decisions.find(
+      (decision) => decision.kind === "approve_plan"
+    );
+
+    expect(readiness.studyInterpretation?.researcherConfirmed).toBe(false);
+    expect(approval?.confirmsStudyInterpretation).toBe(true);
+    expect(approval?.prompt).toContain("cross sectional design");
+    expect(approval?.prompt).toContain("health facility");
+    expect(approval?.prompt).toContain("Approving confirms that interpretation");
+    expect(approval?.studyInterpretation?.version).toBe("1.0");
+    expect(approval?.studyInterpretation?.researchQuestions).toEqual([
+      "Is stockout frequency associated with routine data use?"
+    ]);
+  });
+
+  it("rebuilds a draft plan instead of offering approval when the study specification changed", () => {
+    const locked = lockedPlan();
+    const { lockedAt: _lockedAt, lockHash: _lockHash, ...draft } = locked;
+    const changed = { ...specification(), version: "2.0" };
+    const readiness = assessProjectReadiness(
+      snapshot({
+        plan: draft,
+        specification: changed,
+        specificationConfirmedByResearcher: false
+      })
+    );
+    const orchestrator = buildOrchestratorView(readiness, draft);
+
+    expect(readiness.nextAction.code).toBe("build_analysis_plan");
+    expect(orchestrator.automaticAction).toBe("create_draft_plan");
+    expect(
+      orchestrator.decisions.some(
+        (decision) =>
+          decision.kind === "approve_plan" || decision.kind === "select_method"
+      )
+    ).toBe(false);
+  });
+
+  it("never rebuilds a locked plan when the study specification changes later", () => {
+    const plan = lockedPlan();
+    const readiness = assessProjectReadiness(
+      snapshot({
+        plan,
+        specification: { ...specification(), version: "2.0" }
+      })
+    );
+
+    expect(readiness.nextAction.code).toBe("run_analyses");
+  });
+
+  it("does not ask plan approval to reconfirm a researcher-confirmed study model", () => {
+    const locked = lockedPlan();
+    const { lockedAt: _lockedAt, lockHash: _lockHash, ...draft } = locked;
+    const readiness = assessProjectReadiness(
+      snapshot({ plan: draft, specificationConfirmedByResearcher: true })
+    );
+    const approval = buildOrchestratorView(readiness, draft).decisions.find(
+      (decision) => decision.kind === "approve_plan"
+    );
+
+    expect(readiness.studyInterpretation?.researcherConfirmed).toBe(true);
+    expect(approval?.confirmsStudyInterpretation).toBeUndefined();
+  });
+
   it("automatically queues execution only after the plan is locked", () => {
     const plan = lockedPlan();
     const readiness = assessProjectReadiness(
