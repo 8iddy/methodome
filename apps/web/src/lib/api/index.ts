@@ -118,6 +118,13 @@ export interface OrchestratorDecision {
     researchQuestionCount: number;
     researchQuestions: string[];
   };
+  plannedAnalyses?: Array<{
+    researchQuestion: string;
+    method: string;
+    outcome: string;
+    predictors: string[];
+    covariates: string[];
+  }>;
   blocking: boolean;
 }
 
@@ -998,6 +1005,7 @@ export async function getProjectConversation(projectId: string) {
   return request<{
     messages: ProjectConversationMessage[];
     orchestrator: OrchestratorView;
+    datasetVariables?: Array<{ name: string; label?: string }>;
     methodologyKnowledgeVersion: string;
   }>(`/projects/${projectId}/conversation`);
 }

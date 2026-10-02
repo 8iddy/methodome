@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ActivitySpinner, Badge, Button } from "@/components/ui";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { ActivitySpinner, Button } from "@/components/ui";
 import {
   createUpload,
   getProjectConversation,
@@ -14,27 +14,58 @@ import {
   type ProjectConversationMessage
 } from "@/lib/api";
 
+type DatasetVariable = { name: string; label?: string };
+
+type ResultTable = {
+  jobId: string;
+  method: string;
+  n: number;
+  estimates: Array<{
+    term: string;
+    estimate: string;
+    confidenceInterval: string | null;
+    pValue: string | null;
+  }>;
+  diagnosticsNeedingReview: string[];
+};
+
 function human(value: string) {
   return value
     .replaceAll("_", " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  waiting_for_researcher: "Needs your decision",
+  working: "Working",
+  ready_to_execute: "Working",
+  complete: "Analysis complete",
+  blocked: "Blocked"
+};
+
+function decisionLabel(kind: OrchestratorDecision["kind"]) {
+  if (kind === "approve_plan") return "Approval needed";
+  if (kind === "provide_input") return "Missing material";
+  if (kind.startsWith("review_qualitative")) return "Review needed";
+  return "Decision needed";
+}
+
 function ConversationDecisionCard({
   projectId,
   decision,
+  datasetVariables,
   busy,
   onResolved
 }: {
   projectId: string;
   decision: OrchestratorDecision;
+  datasetVariables: DatasetVariable[];
   busy: boolean;
   onResolved: () => Promise<void>;
 }) {
-  const [mappingValue, setMappingValue] = useState(
-    decision.options?.[0]?.id ?? ""
-  );
+  const [mappingValue, setMappingValue] = useState("");
   const [error, setError] = useState("");
+  const fieldListId = useId();
 
   async function resolve(response: {
     choiceId?: string;
@@ -66,8 +97,8 @@ function ConversationDecisionCard({
 
   return (
     <article className="conversation-decision">
-      <small>METHODOME NEEDS YOUR INPUT</small>
-      <p>{decision.prompt}</p>
+      <small>{decisionLabel(decision.kind)}</small>
+      <p className="conversation-decision-prompt">{decision.prompt}</p>
 
       {decision.kind === "select_method" && decision.options && (
         <div className="conversation-choice-list">
@@ -86,30 +117,74 @@ function ConversationDecisionCard({
         </div>
       )}
 
-      {decision.kind === "approve_plan" && decision.studyInterpretation && (
-        <dl className="conversation-interpretation">
-          <div>
-            <dt>Study design</dt>
-            <dd>{decision.studyInterpretation.studyDesign.replaceAll("_", " ")}</dd>
-          </div>
-          <div>
-            <dt>Unit of analysis</dt>
-            <dd>{decision.studyInterpretation.unitOfAnalysis}</dd>
-          </div>
-          <div>
-            <dt>Research questions</dt>
-            <dd>
-              <ol>
-                {decision.studyInterpretation.researchQuestions.map(
-                  (question, index) => (
-                    <li key={index}>{question}</li>
-                  )
-                )}
-              </ol>
-            </dd>
-          </div>
-        </dl>
-      )}
+      {decision.kind === "approve_plan" &&
+        (decision.studyInterpretation || decision.plannedAnalyses?.length) && (
+          <dl className="conversation-facts">
+            {decision.studyInterpretation && (
+              <>
+                <div>
+                  <dt>Study design</dt>
+                  <dd>
+                    {decision.studyInterpretation.studyDesign.replaceAll("_", " ")}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Unit of analysis</dt>
+                  <dd>{decision.studyInterpretation.unitOfAnalysis}</dd>
+                </div>
+              </>
+            )}
+            {decision.plannedAnalyses?.map((analysis, index) => (
+              <div key={index}>
+                <dt>
+                  {decision.plannedAnalyses!.length > 1
+                    ? `Analysis ${index + 1}`
+                    : "Planned analysis"}
+                </dt>
+                <dd>
+                  <span className="conversation-fact-question">
+                    {analysis.researchQuestion}
+                  </span>
+                  <strong>{analysis.method}</strong>
+                  <span className="conversation-fact-variables">
+                    outcome <code>{analysis.outcome}</code>
+                    {analysis.predictors.length > 0 && (
+                      <>
+                        {" · "}predictor{analysis.predictors.length > 1 ? "s" : ""}{" "}
+                        {analysis.predictors.map((name) => (
+                          <code key={name}>{name}</code>
+                        ))}
+                      </>
+                    )}
+                    {analysis.covariates.length > 0 && (
+                      <>
+                        {" · "}adjusted for{" "}
+                        {analysis.covariates.map((name) => (
+                          <code key={name}>{name}</code>
+                        ))}
+                      </>
+                    )}
+                  </span>
+                </dd>
+              </div>
+            ))}
+            {decision.studyInterpretation &&
+              !decision.plannedAnalyses?.length && (
+                <div>
+                  <dt>Research questions</dt>
+                  <dd>
+                    <ol>
+                      {decision.studyInterpretation.researchQuestions.map(
+                        (question, index) => (
+                          <li key={index}>{question}</li>
+                        )
+                      )}
+                    </ol>
+                  </dd>
+                </div>
+              )}
+          </dl>
+        )}
 
       {decision.kind === "approve_plan" && (
         <div className="conversation-decision-actions">
@@ -125,7 +200,7 @@ function ConversationDecisionCard({
             className="conversation-inspect-link"
             href={`/app/projects/${projectId}/analysis-plan`}
           >
-            Review details
+            Review the full plan
           </Link>
           {decision.confirmsStudyInterpretation && (
             <Link
@@ -186,7 +261,9 @@ function ConversationDecisionCard({
                     void resolve({ datasetVariable: option.id })
                   }
                 >
-                  <strong>Use {option.label}</strong>
+                  <strong>
+                    Use <code>{option.label}</code>
+                  </strong>
                   {option.detail && <span>{option.detail}</span>}
                 </button>
               ))}
@@ -196,15 +273,29 @@ function ConversationDecisionCard({
           <label>
             <span>
               {decision.options?.length
-                ? "Or enter a different dataset field"
+                ? "Or choose a different dataset field"
                 : "Dataset field"}
             </span>
             <input
               value={mappingValue}
               onChange={(event) => setMappingValue(event.target.value)}
-              placeholder="Exact dataset field name"
+              placeholder={
+                datasetVariables.length > 0
+                  ? "Choose or type a field name"
+                  : "Exact dataset field name"
+              }
+              list={datasetVariables.length > 0 ? fieldListId : undefined}
               disabled={busy}
             />
+            {datasetVariables.length > 0 && (
+              <datalist id={fieldListId}>
+                {datasetVariables.map((variable) => (
+                  <option key={variable.name} value={variable.name}>
+                    {variable.label}
+                  </option>
+                ))}
+              </datalist>
+            )}
           </label>
 
           <div className="conversation-decision-actions">
@@ -223,7 +314,7 @@ function ConversationDecisionCard({
               }
               disabled={busy}
             >
-              It is not represented
+              It is not in this dataset
             </Button>
           </div>
         </div>
@@ -231,8 +322,7 @@ function ConversationDecisionCard({
 
       {decision.kind === "provide_input" && (
         <p className="conversation-decision-hint">
-          Attach the missing research material or explain the missing
-          information in the composer below.
+          Attach the missing material or explain it in the message box below.
         </p>
       )}
 
@@ -245,8 +335,7 @@ function ConversationDecisionCard({
             Review source-linked evidence
           </Link>
           <span className="conversation-decision-hint">
-            This checkpoint stays explicit because it requires source-level
-            qualitative judgment.
+            This review needs the source text, so it opens in the workbench.
           </span>
         </div>
       )}
@@ -255,6 +344,167 @@ function ConversationDecisionCard({
         <p className="workspace-error" role="alert">
           {error}
         </p>
+      )}
+    </article>
+  );
+}
+
+function MessageAttachments({
+  message
+}: {
+  message: ProjectConversationMessage;
+}) {
+  if (message.attachmentFileIds.length === 0) return null;
+  const classified = Array.isArray(message.metadata?.classifiedAttachments)
+    ? (message.metadata.classifiedAttachments as Array<{
+        fileId?: string;
+        filename?: string;
+        fileKind?: string;
+      }>)
+    : [];
+
+  if (classified.length === 0) {
+    return (
+      <span className="conversation-attachment-count">
+        {message.attachmentFileIds.length} attached file
+        {message.attachmentFileIds.length === 1 ? "" : "s"}
+      </span>
+    );
+  }
+
+  return (
+    <ul className="conversation-attachments">
+      {classified.map((attachment, index) => (
+        <li key={attachment.fileId ?? `${attachment.filename}-${index}`}>
+          <strong>{attachment.filename ?? "Research file"}</strong>
+          <span>
+            {attachment.fileKind && attachment.fileKind !== "other"
+              ? human(attachment.fileKind)
+              : "Role not identified"}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ResultTables({ tables }: { tables: ResultTable[] }) {
+  return (
+    <>
+      {tables.map((table) => (
+        <figure className="conversation-result" key={table.jobId}>
+          <figcaption>
+            <strong>{table.method}</strong>
+            <span>n = {table.n}</span>
+          </figcaption>
+          {table.estimates.length > 0 ? (
+            <div className="conversation-result-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Term</th>
+                    <th scope="col">Estimate</th>
+                    <th scope="col">95% CI</th>
+                    <th scope="col">p</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {table.estimates.map((row) => (
+                    <tr key={row.term}>
+                      <th scope="row">{row.term}</th>
+                      <td>{row.estimate}</td>
+                      <td>{row.confidenceInterval ?? "—"}</td>
+                      <td>{row.pValue ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p>This method returned no coefficient-level estimates.</p>
+          )}
+          {table.diagnosticsNeedingReview.length > 0 && (
+            <details>
+              <summary>
+                {table.diagnosticsNeedingReview.length} diagnostic
+                {table.diagnosticsNeedingReview.length === 1 ? "" : "s"} to
+                review before reporting
+              </summary>
+              <ul>
+                {table.diagnosticsNeedingReview.map((label) => (
+                  <li key={label}>{label}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </figure>
+      ))}
+    </>
+  );
+}
+
+function ConversationMessage({
+  projectId,
+  message
+}: {
+  projectId: string;
+  message: ProjectConversationMessage;
+}) {
+  if (message.role === "activity") {
+    return (
+      <p className="conversation-activity">
+        <span aria-hidden="true" />
+        {message.content}
+      </p>
+    );
+  }
+
+  const paragraphs = message.content
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  const isResult = message.messageKind === "result";
+  const hasResultDetails =
+    isResult &&
+    Array.isArray(message.metadata?.analysisJobIds) &&
+    message.metadata.analysisJobIds.length > 0;
+  const resultTables =
+    isResult && Array.isArray(message.metadata?.resultTables)
+      ? (message.metadata.resultTables as ResultTable[])
+      : [];
+  // With structured tables the middle paragraphs (the same numbers as prose)
+  // are redundant; keep only the opening and closing sentences.
+  const shownParagraphs =
+    resultTables.length > 0 && paragraphs.length > 2
+      ? [paragraphs[0]!]
+      : paragraphs;
+
+  return (
+    <article
+      className={`conversation-message ${message.role} ${message.messageKind}`}
+    >
+      <small>{message.role === "researcher" ? "You" : "Methodome"}</small>
+      {shownParagraphs.map((paragraph, index) => (
+        <p
+          key={index}
+          className={
+            isResult && index > 0 && index < shownParagraphs.length - 1
+              ? "conversation-statistics"
+              : undefined
+          }
+        >
+          {paragraph}
+        </p>
+      ))}
+      {resultTables.length > 0 && <ResultTables tables={resultTables} />}
+      {message.role === "researcher" && <MessageAttachments message={message} />}
+      {hasResultDetails && (
+        <Link
+          className="conversation-inspect-link"
+          href={`/app/projects/${projectId}/results`}
+        >
+          Open full results, diagnostics and provenance
+        </Link>
       )}
     </article>
   );
@@ -269,7 +519,11 @@ export function ConversationWorkspace({
 }) {
   const [messages, setMessages] = useState<ProjectConversationMessage[]>([]);
   const [decisions, setDecisions] = useState<OrchestratorDecision[]>([]);
+  const [datasetVariables, setDatasetVariables] = useState<DatasetVariable[]>(
+    []
+  );
   const [status, setStatus] = useState("working");
+  const [loaded, setLoaded] = useState(false);
   const [knowledgeVersion, setKnowledgeVersion] = useState("");
   const [content, setContent] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -287,8 +541,10 @@ export function ConversationWorkspace({
     setDecisions(
       result.orchestrator.decisions.filter((decision) => decision.blocking)
     );
+    setDatasetVariables(result.datasetVariables ?? []);
     setStatus(result.orchestrator.status);
     setKnowledgeVersion(result.methodologyKnowledgeVersion);
+    setLoaded(true);
     return result;
   }
 
@@ -350,6 +606,12 @@ export function ConversationWorkspace({
     });
   }
 
+  function removeFile(file: File) {
+    setFiles((current) =>
+      current.filter((item) => fileKey(item) !== fileKey(file))
+    );
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const message = content.trim();
@@ -398,200 +660,179 @@ export function ConversationWorkspace({
     }
   }
 
+  const started = messages.length > 0;
+  // An open decision renders as its own card, so the checkpoint message that
+  // only repeats the same prompt would say everything twice.
+  const openPrompts = new Set(decisions.map((decision) => decision.prompt));
+  const visibleMessages = messages.filter(
+    (message) =>
+      !(message.messageKind === "checkpoint" && openPrompts.has(message.content))
+  );
+  // Before anything has been handed over, the welcome text already asks for
+  // the study material; a separate "missing material" card would repeat it.
+  const visibleDecisions = started
+    ? decisions
+    : decisions.filter((decision) => decision.kind !== "provide_input");
+
   return (
     <div className="conversation-workspace">
-      <header className="conversation-project-header">
+      <header className="conversation-header">
         <div>
-          <p className="workspace-kicker">RESEARCH CONVERSATION</p>
           <h1>{project?.name ?? "Research project"}</h1>
           {project?.description && <p>{project.description}</p>}
         </div>
-        <Badge
-          kind={
-            status === "complete"
-              ? "success"
-              : status === "blocked"
-                ? "danger"
-                : "blue"
-          }
-        >
-          {human(status)}
-        </Badge>
+        {loaded && started && (
+          <span className={`conversation-status ${status}`}>
+            {STATUS_LABELS[status] ?? human(status)}
+          </span>
+        )}
       </header>
 
       <section
-        className="conversation-primary"
+        className="conversation-thread"
         aria-label="Conversation with Methodome"
+        aria-live="polite"
       >
-        <div
-          className="conversation-thread conversation-thread-primary"
-          aria-live="polite"
-        >
-          {messages.length === 0 && (
-            <article className="conversation-message methodome">
-              <small>METHODOME</small>
-              <p>
-                Tell me what you are trying to learn, or attach the protocol
-                and research data. I’ll work through every safe step and pause
-                only when your scientific judgment is needed.
-              </p>
-            </article>
-          )}
+        {loaded && !started && (
+          <article className="conversation-message methodome welcome">
+            <small>Methodome</small>
+            <p>
+              Tell me what you want to learn from this study and attach the
+              protocol, instruments, data or transcripts. I will read them,
+              work through every step I can do safely, and stop only where
+              your scientific judgement is needed.
+            </p>
+          </article>
+        )}
 
-          {messages.map((message) => (
-            <article
-              className={`conversation-message ${message.role} ${message.messageKind}`}
-              key={message.id}
-            >
-              <small>
-                {message.role === "researcher"
-                  ? "YOU"
-                  : message.role === "activity"
-                    ? "ACTIVITY"
-                    : "METHODOME"}
-              </small>
-              <p>{message.content}</p>
-              {message.attachmentFileIds.length > 0 && (() => {
-                const classified = Array.isArray(
-                  message.metadata?.classifiedAttachments
-                )
-                  ? (message.metadata.classifiedAttachments as Array<{
-                      fileId?: string;
-                      filename?: string;
-                      fileKind?: string;
-                    }>)
-                  : [];
-                return classified.length > 0 ? (
-                  <div className="conversation-attachments">
-                    {classified.map((attachment, index) => (
-                      <span
-                        key={attachment.fileId ?? `${attachment.filename}-${index}`}
-                        className="conversation-attachment-chip"
-                      >
-                        <strong>{attachment.filename ?? "Research file"}</strong>
-                        <small>
-                          {attachment.fileKind
-                            ? human(attachment.fileKind)
-                            : "Research file"}
-                        </small>
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="attachment-count">
-                    {message.attachmentFileIds.length} attached file
-                    {message.attachmentFileIds.length === 1 ? "" : "s"}
-                  </span>
-                );
-              })()}
-            </article>
-          ))}
-
-          {decisions.map((decision) => (
-            <ConversationDecisionCard
-              key={decision.id}
-              projectId={projectId}
-              decision={decision}
-              busy={busy}
-              onResolved={afterDecision}
-            />
-          ))}
-
-          {busy && (
-            <div className="conversation-thinking">
-              <ActivitySpinner label="Methodome is continuing the research" />
-              <span>Methodome is continuing every safe step…</span>
-            </div>
-          )}
-          <div ref={threadEnd} />
-        </div>
-
-        <form
-          className={`conversation-compose conversation-compose-primary ${dragging ? "is-dragging" : ""}`}
-          onSubmit={submit}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={(event) => {
-            if (event.currentTarget === event.target) setDragging(false);
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            setDragging(false);
-            addFiles(Array.from(event.dataTransfer.files));
-          }}
-        >
-          {files.length > 0 && (
-            <div className="composer-files">
-              {files.map((file) => {
-                const state = fileStates[fileKey(file)] ?? "queued";
-                return (
-                  <span className="composer-file" key={fileKey(file)}>
-                    {state === "uploading" && (
-                      <ActivitySpinner label={`Uploading ${file.name}`} />
-                    )}
-                    {state === "uploaded" && (
-                      <span className="composer-file-complete" aria-hidden="true">
-                        ✓
-                      </span>
-                    )}
-                    <span>
-                      <strong>{file.name}</strong>
-                      <small>
-                        {state === "uploading"
-                          ? "Uploading…"
-                          : state === "uploaded"
-                            ? "Uploaded"
-                            : "Ready to upload"}
-                      </small>
-                    </span>
-                  </span>
-                );
-              })}
-            </div>
-          )}
-          <textarea
-            value={content}
-            onChange={(event) => setContent(event.target.value)}
-            placeholder="Describe the research problem, answer Methodome, or ask why…"
-            rows={3}
-            maxLength={8000}
-            disabled={busy}
+        {visibleMessages.map((message) => (
+          <ConversationMessage
+            key={message.id}
+            projectId={projectId}
+            message={message}
           />
-          <div className="composer-actions">
-            <label className="attachment-button">
-              Attach files
-              <input
-                type="file"
-                multiple
-                onChange={(event) =>
-                  addFiles(Array.from(event.target.files ?? []))
-                }
-                disabled={busy}
-              />
-            </label>
-            <Button
-              type="submit"
-              loading={busy}
-              loadingLabel="Working…"
-              disabled={!content.trim() && files.length === 0}
-            >
-              Send
-            </Button>
-          </div>
-        </form>
+        ))}
 
-        {error && (
-          <p className="workspace-error" role="alert">
-            {error}
+        {visibleDecisions.map((decision) => (
+          <ConversationDecisionCard
+            key={decision.id}
+            projectId={projectId}
+            decision={decision}
+            datasetVariables={datasetVariables}
+            busy={busy}
+            onResolved={afterDecision}
+          />
+        ))}
+
+        {busy && (
+          <p className="conversation-activity working">
+            <ActivitySpinner label="Methodome is working" />
+            Methodome is working…
           </p>
         )}
-        <p className="conversation-footnote">
-          Methodology: {knowledgeVersion || "loading"}. Scientific decisions,
-          results and provenance remain auditable in the project record.
-        </p>
+        <div ref={threadEnd} className="conversation-thread-end" />
       </section>
+
+      <form
+        className={`conversation-composer ${dragging ? "is-dragging" : ""}`}
+        onSubmit={submit}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={(event) => {
+          if (event.currentTarget === event.target) setDragging(false);
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+          addFiles(Array.from(event.dataTransfer.files));
+        }}
+      >
+        {files.length > 0 && (
+          <ul className="composer-files">
+            {files.map((file) => {
+              const state = fileStates[fileKey(file)] ?? "queued";
+              return (
+                <li key={fileKey(file)}>
+                  {state === "uploading" && (
+                    <ActivitySpinner label={`Uploading ${file.name}`} />
+                  )}
+                  <strong>{file.name}</strong>
+                  <span>
+                    {state === "uploading"
+                      ? "Uploading…"
+                      : state === "uploaded"
+                        ? "Uploaded"
+                        : ""}
+                  </span>
+                  {state === "queued" && !busy && (
+                    <button
+                      type="button"
+                      aria-label={`Remove ${file.name}`}
+                      onClick={() => removeFile(file)}
+                    >
+                      ×
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <textarea
+          value={content}
+          onChange={(event) => setContent(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+              event.currentTarget.form?.requestSubmit();
+            }
+          }}
+          placeholder={
+            started
+              ? "Answer Methodome, add material, or ask why…"
+              : "Describe the research problem…"
+          }
+          aria-label="Message to Methodome"
+          rows={2}
+          maxLength={8000}
+          disabled={busy}
+        />
+        <div className="composer-actions">
+          <label className="composer-attach">
+            Attach files
+            <input
+              type="file"
+              multiple
+              onChange={(event) => {
+                addFiles(Array.from(event.target.files ?? []));
+                event.target.value = "";
+              }}
+              disabled={busy}
+            />
+          </label>
+          <Button
+            type="submit"
+            loading={busy}
+            loadingLabel="Working…"
+            disabled={!content.trim() && files.length === 0}
+          >
+            Send
+          </Button>
+        </div>
+      </form>
+
+      {error && (
+        <p className="workspace-error" role="alert">
+          {error}
+        </p>
+      )}
+      <p className="conversation-footnote">
+        Statistics are computed deterministically and every decision is kept
+        in the{" "}
+        <Link href={`/app/projects/${projectId}/audit-trail`}>audit record</Link>
+        {knowledgeVersion ? `. Methodology release ${knowledgeVersion}.` : "."}
+      </p>
     </div>
   );
 }

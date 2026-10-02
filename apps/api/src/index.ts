@@ -2502,6 +2502,86 @@ async function executeAutomaticOrchestratorAction(
   return { action, ...(await orchestratorProposeQualitativeThemes(c, projectId, state)) };
 }
 
+function plural(count: number, noun: string, pluralNoun = `${noun}s`): string {
+  return `${count} ${count === 1 ? noun : pluralNoun}`;
+}
+
+/**
+ * Describes a completed automatic step in research terms, using only the
+ * counts the step itself returned.
+ */
+function describeAutomaticAction(
+  mutation: Record<string, unknown>,
+  fallbackLabel: string
+): string {
+  const count = (key: string): number | null =>
+    typeof mutation[key] === "number" ? (mutation[key] as number) : null;
+
+  switch (mutation.action) {
+    case "extract_protocol": {
+      const questions = count("researchQuestionCount");
+      return questions === null
+        ? "Protocol interpreted."
+        : `Protocol interpreted: ${plural(questions, "research question")} identified.`;
+    }
+    case "map_variables": {
+      const resolved = count("autoResolvedCount") ?? 0;
+      const review = count("reviewCount") ?? 0;
+      const unresolved = count("unresolvedCount") ?? 0;
+      const parts = [`${plural(resolved, "variable")} mapped from exact evidence`];
+      if (review > 0) parts.push(`${review} proposed for your confirmation`);
+      if (unresolved > 0) parts.push(`${unresolved} not found in the dataset`);
+      return `Variables resolved: ${parts.join(", ")}.`;
+    }
+    case "create_draft_plan": {
+      const analyses = count("analysisCount");
+      return analyses === null
+        ? "Analysis plan drafted."
+        : `Analysis plan drafted: ${plural(analyses, "planned analysis", "planned analyses")}.`;
+    }
+    case "run_analyses": {
+      const queued = Array.isArray(mutation.queuedJobIds)
+        ? mutation.queuedJobIds.length
+        : 0;
+      return `Approved plan sent for statistical execution: ${plural(queued, "analysis", "analyses")} running.`;
+    }
+    case "prepare_qualitative_analysis": {
+      const segments = count("segmentCount");
+      return segments === null
+        ? "Qualitative sources prepared."
+        : `Qualitative sources prepared: ${plural(segments, "source-linked segment")}.`;
+    }
+    case "propose_qualitative_codebook": {
+      const codes = count("codeCount");
+      return codes === null
+        ? "Initial codebook drafted."
+        : `Initial codebook drafted: ${plural(codes, "code")}.`;
+    }
+    case "propose_qualitative_codings": {
+      const proposed = count("proposedSegments");
+      const remaining = count("remainingUncoded");
+      return proposed === null
+        ? "Coding proposed."
+        : `Coding proposed for ${plural(proposed, "segment")}${
+            remaining ? `; ${remaining} still to code` : ""
+          }.`;
+    }
+    case "propose_qualitative_themes": {
+      const themes = count("themeCount");
+      return themes === null
+        ? "Candidate themes drafted."
+        : `Candidate themes drafted: ${plural(themes, "theme")}.`;
+    }
+    default:
+      return `${fallbackLabel} completed.`;
+  }
+}
+
+function formatPValue(value: number): string {
+  if (!Number.isFinite(value)) return `p=${String(value)}`;
+  return value < 0.001 ? "p<0.001" : `p=${Number(value.toPrecision(2)).toString()}`;
+}
+
 function formatNumber(value: number): string {
   if (!Number.isFinite(value)) return String(value);
   const absolute = Math.abs(value);
@@ -2530,7 +2610,7 @@ function deterministicResultSummary(
         );
       }
       if (typeof estimate.pValue === "number") {
-        pieces.push(`p=${formatNumber(estimate.pValue)}`);
+        pieces.push(formatPValue(estimate.pValue));
       }
       return pieces.join(", ");
     });
@@ -2553,12 +2633,58 @@ function deterministicResultSummary(
   ].join(". ");
 }
 
+interface ConversationResultTable {
+  jobId: string;
+  method: string;
+  n: number;
+  estimates: Array<{
+    term: string;
+    estimate: string;
+    confidenceInterval: string | null;
+    pValue: string | null;
+  }>;
+  diagnosticsNeedingReview: string[];
+}
+
+/**
+ * Display rows for a completed analysis, formatted only from the persisted
+ * structured output of the statistical runner.
+ */
+function conversationResultTable(
+  methodId: string,
+  result: NonNullable<Awaited<ReturnType<typeof getAnalysisResult>>>
+): ConversationResultTable {
+  return {
+    jobId: result.jobId,
+    method:
+      methodRegistry[methodId]?.displayName ?? methodId.replaceAll("_", " "),
+    n: result.n,
+    estimates: result.estimates.slice(0, 24).map((estimate) => ({
+      term: estimate.term,
+      estimate: formatNumber(estimate.estimate),
+      confidenceInterval: estimate.confidenceInterval
+        ? `${formatNumber(estimate.confidenceInterval.lower)} to ${formatNumber(
+            estimate.confidenceInterval.upper
+          )}`
+        : null,
+      pValue:
+        typeof estimate.pValue === "number"
+          ? formatPValue(estimate.pValue).replace(/^p=?/, "")
+          : null
+    })),
+    diagnosticsNeedingReview: result.diagnostics
+      .filter((item) => item.status === "review" || item.status === "failed")
+      .map((item) => item.label)
+  };
+}
+
 async function completedConversationResult(
   c: ApiContext,
   state: Awaited<ReturnType<typeof computeProjectReadiness>>
 ): Promise<{
   content: string;
   analysisJobIds: string[];
+  resultTables: ConversationResultTable[];
   methodologyRuleIds: string[];
   evidenceIds: string[];
   sourceIds: string[];
@@ -2567,6 +2693,7 @@ async function completedConversationResult(
     return {
       content: "The currently supported research work is complete and ready for review.",
       analysisJobIds: [],
+      resultTables: [],
       methodologyRuleIds: [],
       evidenceIds: [],
       sourceIds: []
@@ -2628,6 +2755,10 @@ async function completedConversationResult(
           ].join("\n\n")
         : "The approved analyses are complete and the structured outputs are ready for review.",
     analysisJobIds: completed.map(({ job }) => job.jobId),
+    resultTables: completed.flatMap(({ job }) => {
+      const found = results.find((result) => result.jobId === job.jobId);
+      return found ? [conversationResultTable(job.methodId, found)] : [];
+    }),
     methodologyRuleIds: guidance.rules.map((rule) => rule.ruleId),
     evidenceIds: guidance.evidenceIds,
     sourceIds: guidance.sourceIds
@@ -2685,6 +2816,7 @@ async function runConversationOrchestrator(
             ...(completedResult
               ? {
                   analysisJobIds: completedResult.analysisJobIds,
+                  resultTables: completedResult.resultTables,
                   methodologyRuleIds: completedResult.methodologyRuleIds,
                   evidenceIds: completedResult.evidenceIds,
                   sourceIds: completedResult.sourceIds
@@ -2708,7 +2840,7 @@ async function runConversationOrchestrator(
       await appendProjectMessage(env.DB, {
         id: makeId("msg"), threadId, projectId: message.projectId,
         role: "activity", messageKind: "activity",
-        content: `${view.nextAction.label} completed.`,
+        content: describeAutomaticAction(mutation, view.nextAction.label),
         metadata: { mutation, methodologyKnowledgeVersion }, attachmentFileIds: [],
         createdAt: new Date().toISOString(),
         deduplicationKey: `${message.runId}:iteration:${iterations}:${view.automaticAction}`
@@ -2954,9 +3086,36 @@ app.get("/projects/:projectId/conversation", async (c) => {
     now
   });
 
+  // Mapping checkpoints offer the profiled dataset fields so the researcher
+  // chooses from what exists instead of typing a field name from memory.
+  let datasetVariables: Array<{ name: string; label?: string }> = [];
+  if (
+    state.resolvedDatasetVersionId &&
+    orchestrator.decisions.some(
+      (decision) =>
+        decision.kind === "review_mapping" ||
+        decision.kind === "resolve_mapping_gap"
+    )
+  ) {
+    try {
+      const profile = await profileDatasetForProject(
+        c,
+        projectId,
+        state.resolvedDatasetVersionId
+      );
+      datasetVariables = profile.variables.map((variable) => ({
+        name: variable.variableName,
+        ...(variable.label ? { label: variable.label } : {})
+      }));
+    } catch {
+      // The decision still accepts a typed field name if profiling fails.
+    }
+  }
+
   return c.json({
     messages: await listProjectMessages(c.env.DB, projectId),
     orchestrator,
+    datasetVariables,
     methodologyKnowledgeVersion
   });
 });
@@ -3043,17 +3202,18 @@ app.post("/projects/:projectId/conversation/messages", async (c) => {
     createdAt: now
   });
 
-  for (const attachment of classifiedAttachments) {
+  // The researcher's message already shows each file with its identified
+  // role, so only a file Methodome could not classify needs its own notice.
+  for (const attachment of classifiedAttachments.filter(
+    (item) => item.fileKind === "other"
+  )) {
     await appendProjectMessage(c.env.DB, {
       id: makeId("msg"),
       threadId,
       projectId,
       role: "activity",
       messageKind: "activity",
-      content:
-        attachment.fileKind === "other"
-          ? `${attachment.filename} was uploaded. I could not safely infer its research role yet.`
-          : `${attachment.filename} was uploaded and identified as ${attachment.fileKind.replaceAll("_", " ")}.`,
+      content: `${attachment.filename} was uploaded, but I could not safely infer its research role. Tell me what it is and I will use it.`,
       metadata: {
         fileId: attachment.fileId,
         fileKind: attachment.fileKind

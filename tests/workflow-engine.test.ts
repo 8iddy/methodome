@@ -425,6 +425,16 @@ describe("project orchestrator view", () => {
     expect(approval?.prompt).toContain("health facility");
     expect(approval?.prompt).toContain("Approving confirms that interpretation");
     expect(approval?.studyInterpretation?.version).toBe("1.0");
+    expect(approval?.plannedAnalyses).toEqual([
+      {
+        researchQuestion:
+          "Is stockout frequency associated with routine data use?",
+        method: "Pearson correlation",
+        outcome: "stockout_days",
+        predictors: ["data_use_score"],
+        covariates: []
+      }
+    ]);
     expect(approval?.studyInterpretation?.researchQuestions).toEqual([
       "Is stockout frequency associated with routine data use?"
     ]);
