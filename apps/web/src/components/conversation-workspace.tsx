@@ -551,9 +551,11 @@ export function ConversationWorkspace({
   // Methodome is working is reported by the server as `activity`.
   const [submitting, setSubmitting] = useState(false);
   const [activity, setActivity] = useState<
-    "idle" | "working" | "running_analysis"
+    "idle" | "working" | "running_analysis" | "stopped"
   >("idle");
-  const busy = submitting || activity !== "idle";
+  const serverWorking =
+    activity === "working" || activity === "running_analysis";
+  const busy = submitting || serverWorking;
   const [error, setError] = useState("");
   const threadEnd = useRef<HTMLDivElement>(null);
 
@@ -586,12 +588,12 @@ export function ConversationWorkspace({
   }, [messages.length, decisions.length, busy]);
 
   useEffect(() => {
-    if (activity === "idle") return;
+    if (!serverWorking) return;
     const interval = window.setInterval(() => {
       void refresh().catch(() => undefined);
     }, 1800);
     return () => window.clearInterval(interval);
-  }, [activity, projectId]);
+  }, [serverWorking, projectId]);
 
   async function afterDecision() {
     await refresh();
@@ -694,8 +696,12 @@ export function ConversationWorkspace({
           {project?.description && <p>{project.description}</p>}
         </div>
         {loaded && started && (
-          <span className={`conversation-status ${status}`}>
-            {STATUS_LABELS[status] ?? human(status)}
+          <span
+            className={`conversation-status ${activity === "stopped" ? "blocked" : status}`}
+          >
+            {activity === "stopped"
+              ? "Stopped"
+              : (STATUS_LABELS[status] ?? human(status))}
           </span>
         )}
       </header>

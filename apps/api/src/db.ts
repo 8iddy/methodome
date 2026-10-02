@@ -1847,6 +1847,22 @@ export async function projectHasResearcherConversation(
   return Boolean(row);
 }
 
+export async function latestOrchestrationRunFailed(
+  db: D1Database,
+  projectId: string
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT status FROM project_orchestration_runs
+       WHERE project_id = ?
+       ORDER BY created_at DESC
+       LIMIT 1`
+    )
+    .bind(projectId)
+    .first<{ status: string }>();
+  return row?.status === "failed";
+}
+
 export async function hasActiveOrchestrationRun(
   db: D1Database,
   projectId: string

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui";
 import {
+  getAnalysisResult,
   getAuditTrail,
   getDatasetProfile,
   getProjectFiles,
@@ -65,7 +66,8 @@ function useResearchOutputs(projectId: string) {
   }, [load]);
 
   // Keep the view current for as long as the server reports work in flight.
-  const running = Boolean(outputs?.activity && outputs.activity !== "idle");
+  const running =
+    outputs?.activity === "working" || outputs?.activity === "running_analysis";
   useEffect(() => {
     if (!running) return;
     const interval = window.setInterval(() => void load(), 2500);
@@ -910,9 +912,16 @@ export function ReportsWorkbench({ projectId }: { projectId: string }) {
     setExportError("");
     try {
       const audit = await getAuditTrail(projectId);
+      // Include each stored result object unmodified, so the record carries
+      // full-precision values and not only the formatted display rows.
+      const storedResults = await Promise.all(
+        outputs!.quantitative
+          .filter((item) => item.state === "complete" && item.jobId)
+          .map((item) => getAnalysisResult(item.jobId!))
+      );
       download(
         `methodome-${projectId}-analysis-record.json`,
-        JSON.stringify({ outputs, audit }, null, 2),
+        JSON.stringify({ outputs, storedResults, audit }, null, 2),
         "application/json"
       );
     } catch (reason) {
@@ -926,7 +935,7 @@ export function ReportsWorkbench({ projectId }: { projectId: string }) {
     <section className="wb">
       <p className="wb-summary">
         {hasOutput
-          ? `Ready to export: ${quantitativeDone} statistical result${quantitativeDone === 1 ? "" : "s"} and ${qualitativeDone} confirmed qualitative analysis${qualitativeDone === 1 ? "" : "es"}.`
+          ? `Ready to export: ${quantitativeDone} statistical result${quantitativeDone === 1 ? "" : "s"} and ${qualitativeDone} confirmed qualitative ${qualitativeDone === 1 ? "analysis" : "analyses"}.`
           : "Nothing has been completed yet, so exports would only contain the plan and audit record."}
       </p>
 
