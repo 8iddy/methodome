@@ -797,6 +797,40 @@ export async function getAnalysisPlanById(
     : null;
 }
 
+function normalizeMappingConcept(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+async function projectScopedMappingId(
+  projectId: string,
+  researchConcept: string
+): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(
+      `${projectId}:${normalizeMappingConcept(researchConcept)}`
+    )
+  );
+  const hex = Array.from(new Uint8Array(digest).slice(0, 12))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  return `map_${hex}`;
+}
+
+/**
+ * Saves variable mappings for one project.
+ *
+ * Row identity is owned by the project. A caller-supplied id is only a hint:
+ * it is honoured when that row already belongs to this project. Otherwise the
+ * row is matched by research concept within the project, or given a
+ * project-scoped id. A write can therefore never land on, or be swallowed by,
+ * another project's mapping, and a save that does not persist fails loudly.
+ */
 export async function saveVariableMappings(
   db: D1Database,
   input: {
@@ -811,42 +845,79 @@ export async function saveVariableMappings(
       confirmedBy?: string;
     }>;
   }
-): Promise<void> {
-  const now = new Date().toISOString();
-  const statements: D1PreparedStatement[] = input.mappings.map((mapping) =>
-    db
-      .prepare(
-        `INSERT INTO variable_mappings
-         (id, project_id, study_specification_id, research_concept,
-          dataset_variable, mapping_status, evidence_json, confirmed_by,
-          created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-           study_specification_id = excluded.study_specification_id,
-           research_concept = excluded.research_concept,
-           dataset_variable = excluded.dataset_variable,
-           mapping_status = excluded.mapping_status,
-           evidence_json = excluded.evidence_json,
-           confirmed_by = excluded.confirmed_by,
-           updated_at = excluded.updated_at`
-      )
-      .bind(
-        mapping.id,
-        input.projectId,
-        input.studySpecificationId,
-        mapping.researchConcept,
-        mapping.datasetVariable ?? null,
-        mapping.mappingStatus,
-        JSON.stringify(mapping.evidence),
-        mapping.confirmedBy ?? null,
-        now,
-        now
-      )
+): Promise<string[]> {
+  if (input.mappings.length === 0) return [];
+
+  const existing = await db
+    .prepare(
+      `SELECT id, research_concept
+       FROM variable_mappings
+       WHERE project_id = ?
+       ORDER BY updated_at ASC`
+    )
+    .bind(input.projectId)
+    .all<{ id: string; research_concept: string }>();
+  const ownedIds = new Set(existing.results.map((row) => row.id));
+  const ownedIdByConcept = new Map(
+    existing.results.map((row) => [
+      normalizeMappingConcept(row.research_concept),
+      row.id
+    ])
   );
 
-  if (statements.length > 0) {
-    await db.batch(statements);
+  const now = new Date().toISOString();
+  const statements: D1PreparedStatement[] = [];
+  const savedIds: string[] = [];
+  for (const mapping of input.mappings) {
+    const id = ownedIds.has(mapping.id)
+      ? mapping.id
+      : ownedIdByConcept.get(normalizeMappingConcept(mapping.researchConcept)) ??
+        (await projectScopedMappingId(input.projectId, mapping.researchConcept));
+    savedIds.push(id);
+
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO variable_mappings
+           (id, project_id, study_specification_id, research_concept,
+            dataset_variable, mapping_status, evidence_json, confirmed_by,
+            created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             study_specification_id = excluded.study_specification_id,
+             research_concept = excluded.research_concept,
+             dataset_variable = excluded.dataset_variable,
+             mapping_status = excluded.mapping_status,
+             evidence_json = excluded.evidence_json,
+             confirmed_by = excluded.confirmed_by,
+             updated_at = excluded.updated_at
+           WHERE variable_mappings.project_id = excluded.project_id`
+        )
+        .bind(
+          id,
+          input.projectId,
+          input.studySpecificationId,
+          mapping.researchConcept,
+          mapping.datasetVariable ?? null,
+          mapping.mappingStatus,
+          JSON.stringify(mapping.evidence),
+          mapping.confirmedBy ?? null,
+          now,
+          now
+        )
+    );
   }
+
+  const results = await db.batch(statements);
+  const unsaved = results.filter(
+    (result) => Number(result.meta?.changes ?? 0) < 1
+  ).length;
+  if (unsaved > 0) {
+    throw new Error(
+      `${unsaved} variable mapping${unsaved === 1 ? "" : "s"} could not be saved for this project.`
+    );
+  }
+  return savedIds;
 }
 
 export async function listVariableMappings(
