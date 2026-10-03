@@ -482,11 +482,25 @@ export async function extractProtocolWithAi(
     try {
       const extraction = validateProtocolExtraction(modelPayload(retry));
       return refineResearchQuestionsWithAi(env, protocol, extraction);
-    } catch {
+    } catch (retryError) {
       const reason =
         firstError instanceof Error ? firstError.message : "structured extraction failed";
+      const retryReason =
+        retryError instanceof Error ? retryError.message : "retry failed";
+      // Keep an excerpt of what the model actually returned so a failure can
+      // be diagnosed from the run record without re-running the model.
+      const excerpt = (() => {
+        try {
+          const payload = modelPayload(retry);
+          const text =
+            typeof payload === "string" ? payload : JSON.stringify(payload);
+          return text.slice(0, 700);
+        } catch {
+          return "(unreadable response)";
+        }
+      })();
       throw new Error(
-        `Methodome could not extract a complete study specification from this protocol. ${reason}`
+        `Methodome could not extract a complete study specification from this protocol. First attempt: ${reason} Retry: ${retryReason} Model output: ${excerpt}`
       );
     }
   }
