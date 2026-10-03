@@ -60,6 +60,10 @@ The `docs/` directory is the build source of truth.
 11. [Cloudflare deployment mode](docs/11-free-tier-deployment.md)
 12. [Authentication](docs/12-authentication.md)
 13. [Release readiness](docs/13-release-readiness.md)
+14. [Methodology knowledge layer](docs/14-methodology-knowledge-layer.md)
+15. [Model usage audit](docs/15-model-usage.md)
+
+The current frontend architecture is described in [FRONTEND_HANDOFF.md](FRONTEND_HANDOFF.md).
 
 Machine-readable planning artefacts live under `spec/`.
 
