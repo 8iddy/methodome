@@ -725,17 +725,10 @@ function LiveProjectFiles({
         )}
         {status && <p className="confirmation" role="status">{status}</p>}
         {mode === "instruments" && (
-          <div className="action-row">
-            {files.length > 0 ? (
-              <Button href={`/app/projects/${projectId}/data`}>
-                Continue to data
-              </Button>
-            ) : (
-              <Button href={`/app/projects/${projectId}/data`} variant="quiet">
-                Continue without an instrument
-              </Button>
-            )}
-          </div>
+          <p className="muted">
+            Methodome uses instrument and codebook wording as evidence when it
+            maps research concepts to dataset fields.
+          </p>
         )}
       </section>
 
@@ -775,11 +768,8 @@ function LiveProjectFiles({
             This is Methodome’s reading of the protocol. Correct anything that is wrong in the study design; approving the analysis plan confirms the interpretation it is built on.
           </p>
           <div className="action-row">
-            <Button href={`/app/projects/${projectId}/instruments`}>
-              Continue to instruments
-            </Button>
             <Button href={`/app/projects/${projectId}/study-design`} variant="quiet">
-              Review study information now
+              Inspect or correct the study design
             </Button>
           </div>
         </section>
@@ -1016,8 +1006,8 @@ function LiveData({ projectId }: { projectId: string }) {
 
       {datasets.length > 0 && (
         <div className="action-row">
-          <Button href={`/app/projects/${projectId}/data-preparation`}>
-            Review dataset profile
+          <Button href={`/app/projects/${projectId}/data-preparation`} variant="quiet">
+            Inspect dataset profiles
           </Button>
         </div>
       )}
@@ -1098,7 +1088,7 @@ function LiveData({ projectId }: { projectId: string }) {
                 <input value={derivedLabel} onChange={(event) => setDerivedLabel(event.target.value)} />
               </label>
               <p className="muted">
-                Creating the dataset confirms the displayed field mappings. Category recoding can be reviewed in Data Preparation.
+                Creating the dataset confirms the displayed field mappings and records the derived version's lineage.
               </p>
               <Button onClick={() => void harmonise()}>Create harmonised dataset</Button>
             </>
@@ -1212,13 +1202,6 @@ function LiveDataPreparation({ projectId }: { projectId: string }) {
             Form-version field harmonisation is available on the Data page. General interactive cleaning rules will be added as versioned transformations in a later release.
           </p>
         </section>
-      )}
-      {profile && (
-        <div className="action-row">
-          <Button href={`/app/projects/${projectId}/study-design`}>
-            Continue to study design
-          </Button>
-        </div>
       )}
     </>
   );
@@ -1434,7 +1417,7 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
               : "Manual study review"}
         </Badge>
         <span>
-          Review the research logic here. Dataset field names are assigned later in Variable Mapping.
+          Review the research logic here. Dataset fields are matched to these concepts under Variable mapping.
         </span>
       </div>
 
