@@ -2502,3 +2502,16 @@ html[data-theme="dark"] .auth-theme .theme-toggle{border-color:var(--line);color
 }
 .wb-table.numeric.usage tbody th{font-family:inherit;font-size:13.5px;white-space:normal}
 .wb-when{white-space:nowrap;color:var(--muted);font-size:12.5px}
+.theme-evidence{font-size:12px}
+.theme-evidence-detail{margin-top:6px;font-size:12.5px}
+.theme-evidence-detail>summary{width:max-content;color:var(--blue);font-weight:600;cursor:pointer}
+.theme-evidence-detail blockquote{
+  margin:8px 0 0;
+  padding:2px 0 2px 12px;
+  border-left:2px solid var(--line-strong);
+  font-family:"Source Serif 4","Iowan Old Style",Georgia,serif;
+  font-size:14px;
+  line-height:1.55;
+}
+.theme-evidence-detail cite{display:block;margin-top:2px;color:var(--muted);font-family:"IBM Plex Sans",sans-serif;font-size:11.5px;font-style:normal}
+.theme-evidence-detail blockquote.missing{color:var(--red);font-family:inherit;font-size:12.5px}
