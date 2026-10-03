@@ -2851,6 +2851,9 @@ async function completedConversationResult(
  * what happened and what to do. Anything unrecognised is passed through.
  */
 function researcherFacingError(message: string): string {
+  if (message.startsWith("Methodome could not extract a complete study specification")) {
+    return "I could not turn this protocol into a structured study model: the interpretation came back incomplete twice. Nothing was changed. You can describe the research questions and design under Study design, or send the protocol again, perhaps with the research questions stated explicitly.";
+  }
   if (/\b4006\b|daily free allocation|neurons/i.test(message)) {
     return "I could not continue because today's language-model allowance for this Methodome deployment is used up. Nothing was changed. Reading protocols, proposing mappings and qualitative coding need the model; statistical computation does not. The allowance resets at 00:00 UTC. Send a message then and I will pick up where I stopped.";
   }
