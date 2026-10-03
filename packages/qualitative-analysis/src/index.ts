@@ -38,12 +38,26 @@ export interface QualitativeSegment {
   createdAt: string;
 }
 
+// Models sometimes return a single criterion as a string, or null; both are
+// accepted deterministically so a usable codebook is not rejected on shape.
+const criteriaList = z.preprocess(
+  (value) =>
+    value === null || value === undefined
+      ? []
+      : typeof value === "string"
+        ? value.trim()
+          ? [value]
+          : []
+        : value,
+  z.array(z.string().trim().min(1).max(1000)).default([])
+);
+
 export const qualitativeCodeSchema = z.object({
   id: z.string().trim().min(1).max(120),
   label: z.string().trim().min(1).max(200),
   definition: z.string().trim().min(1).max(2000),
-  inclusionCriteria: z.array(z.string().trim().min(1).max(1000)).default([]),
-  exclusionCriteria: z.array(z.string().trim().min(1).max(1000)).default([])
+  inclusionCriteria: criteriaList,
+  exclusionCriteria: criteriaList
 });
 
 export const qualitativeCodebookSchema = z.object({
@@ -192,11 +206,19 @@ function splitLongRange(
   return output;
 }
 
+/**
+ * Splits source text into codable segments. A paragraph (typically one
+ * speaker turn) is the unit; only very short paragraphs, such as a one-line
+ * interviewer prompt, are joined to what follows so that each segment carries
+ * enough context to code, and over-long paragraphs are split at sentence
+ * boundaries. Offsets always point back into the original text.
+ */
 export function segmentQualitativeText(
   text: string,
-  options: { maxChars?: number } = {}
+  options: { maxChars?: number; minChars?: number } = {}
 ): SegmentDraft[] {
   const maxChars = Math.max(400, options.maxChars ?? 1600);
+  const minChars = Math.min(Math.max(0, options.minChars ?? 240), maxChars);
   const inputRanges = paragraphRanges(text).flatMap((range) =>
     range.end - range.start > maxChars
       ? splitLongRange(text, range, maxChars)
@@ -212,7 +234,8 @@ export function segmentQualitativeText(
       continue;
     }
 
-    if (range.end - current.start <= maxChars) {
+    const currentIsShort = current.end - current.start < minChars;
+    if (currentIsShort && range.end - current.start <= maxChars) {
       current.end = range.end;
       continue;
     }
