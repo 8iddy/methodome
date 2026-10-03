@@ -5385,6 +5385,12 @@ app.put(
       }
     });
 
+    // A completed researcher review unblocks the next automatic step; keep
+    // the project moving on the server when it is run from the conversation.
+    if (await projectHasResearcherConversation(c.env.DB, projectId)) {
+      await queueConversationContinuation(c, projectId, undefined, "qualitative_codebook_confirmed");
+    }
+
     return c.json({
       detail: await qualitativeAnalysisDetail(c, projectId, analysisId)
     });
@@ -5850,6 +5856,12 @@ app.put(
       }
     });
 
+    // A completed researcher review unblocks the next automatic step; keep
+    // the project moving on the server when it is run from the conversation.
+    if (await projectHasResearcherConversation(c.env.DB, projectId)) {
+      await queueConversationContinuation(c, projectId, undefined, "qualitative_coding_reviewed");
+    }
+
     return c.json({
       detail: await qualitativeAnalysisDetail(c, projectId, analysisId)
     });
@@ -6107,6 +6119,12 @@ app.put(
         )
       }
     });
+
+    // A completed researcher review unblocks the next automatic step; keep
+    // the project moving on the server when it is run from the conversation.
+    if (await projectHasResearcherConversation(c.env.DB, projectId)) {
+      await queueConversationContinuation(c, projectId, undefined, "qualitative_themes_confirmed");
+    }
 
     return c.json({
       detail: await qualitativeAnalysisDetail(c, projectId, analysisId)
