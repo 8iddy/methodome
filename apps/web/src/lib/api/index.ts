@@ -1316,6 +1316,37 @@ export interface ResearchOutputs {
   methodologyKnowledgeVersion: string;
 }
 
+export interface ModelUsageSummary {
+  since: string;
+  totals: { calls: number; failures: number; inputChars: number; outputChars: number };
+  byPurpose: Array<{
+    purpose: string;
+    model: string;
+    calls: number;
+    failures: number;
+    inputChars: number;
+    outputChars: number;
+    promptTokens: number | null;
+    completionTokens: number | null;
+    averageDurationMs: number;
+  }>;
+  byDay: Array<{ day: string; calls: number; inputChars: number }>;
+}
+
+export async function getModelUsage(days = 30) {
+  return (
+    await request<{ usage: ModelUsageSummary }>(`/usage/models?days=${days}`)
+  ).usage;
+}
+
+export async function getProjectModelUsage(projectId: string) {
+  return (
+    await request<{ usage: ModelUsageSummary }>(
+      `/projects/${projectId}/model-usage`
+    )
+  ).usage;
+}
+
 export async function getResearchOutputs(projectId: string) {
   return request<ResearchOutputs>(`/projects/${projectId}/research-outputs`);
 }
