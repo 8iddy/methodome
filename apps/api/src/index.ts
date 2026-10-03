@@ -2469,6 +2469,13 @@ app.put("/projects/:projectId/study-specification", async (c) => {
     after: specification
   });
 
+  // A corrected study model changes what can be analysed. When the researcher
+  // works through the conversation, let the orchestrator re-assess on the
+  // server (a stale draft plan is rebuilt; a locked plan is never touched).
+  if (await projectHasResearcherConversation(c.env.DB, projectId)) {
+    await queueConversationContinuation(c, projectId, undefined, "study_specification_corrected");
+  }
+
   return c.json({ specification });
 });
 
