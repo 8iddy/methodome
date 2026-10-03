@@ -392,6 +392,20 @@ async function profileDatasetForProject(
   }
   const dataset = await getDatasetVersionRecord(c.env.DB, datasetVersionId, projectId);
   if (!dataset) throw new Error("Dataset version was not found.");
+
+  // Dataset versions are immutable, so a profile computed for this checksum
+  // is reused instead of re-reading the object and re-running the worker on
+  // every readiness check.
+  const cached = await c.env.DB.prepare(
+    `SELECT profile_json FROM dataset_profiles
+     WHERE dataset_version_id = ? AND checksum_sha256 = ?`
+  )
+    .bind(datasetVersionId, dataset.checksumSha256)
+    .first<{ profile_json: string }>();
+  if (cached) {
+    return JSON.parse(cached.profile_json);
+  }
+
   const object = await c.env.FILES.get(dataset.objectKey);
   if (!object) throw new Error("Stored dataset object was not found.");
   const response = await c.env.STATS.fetch(
@@ -404,7 +418,7 @@ async function profileDatasetForProject(
   if (!response.ok) {
     throw new Error(`Dataset profiling failed with HTTP ${response.status}.`);
   }
-  return (await response.json()) as {
+  const profile = (await response.json()) as {
     rowCount: number;
     columnCount: number;
     variables: Array<{
@@ -417,6 +431,24 @@ async function profileDatasetForProject(
       range?: { min: number; max: number };
     }>;
   };
+  await c.env.DB.prepare(
+    `INSERT INTO dataset_profiles
+     (dataset_version_id, checksum_sha256, profile_json, created_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(dataset_version_id) DO UPDATE SET
+       checksum_sha256 = excluded.checksum_sha256,
+       profile_json = excluded.profile_json,
+       created_at = excluded.created_at`
+  )
+    .bind(
+      datasetVersionId,
+      dataset.checksumSha256,
+      JSON.stringify(profile),
+      new Date().toISOString()
+    )
+    .run()
+    .catch(() => undefined);
+  return profile;
 }
 
 function normalizeConcept(value: string): string {
