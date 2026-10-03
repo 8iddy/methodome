@@ -341,16 +341,65 @@ function validateProtocolExtraction(payload: unknown): ProtocolExtraction {
   return enrichProtocolExtraction(parsed);
 }
 
+const QUESTION_WINDOW_CHAR_LIMIT = 24000;
+const QUESTION_KEYWORDS =
+  /research question|objective|aim|hypothes|outcome|exposure|predictor|covariate|primary|secondary|study design|unit of analysis|estimand|endpoint/i;
+
+/**
+ * The part of a protocol that bears on how its research questions are
+ * framed: paragraphs that mention questions, objectives, outcomes or design,
+ * in original order, up to a limit. Falls back to the opening of the protocol
+ * when nothing matches. Used for the refinement pass so the full document is
+ * not sent twice.
+ */
+export function questionFocusedWindow(
+  protocol: string,
+  limit = QUESTION_WINDOW_CHAR_LIMIT
+): string {
+  if (protocol.length <= limit) return protocol;
+  const paragraphs = protocol.split(/\n{2,}/);
+  const kept: string[] = [];
+  let used = 0;
+  for (const paragraph of paragraphs) {
+    if (!QUESTION_KEYWORDS.test(paragraph)) continue;
+    const next = used + paragraph.length + 2;
+    if (next > limit) break;
+    kept.push(paragraph);
+    used = next;
+  }
+  return kept.length > 0 ? kept.join("\n\n") : protocol.slice(0, limit);
+}
+
+function questionIsComplete(
+  question: ProtocolExtraction["researchQuestions"][number]
+): boolean {
+  if (!question.objectiveType) return false;
+  if (question.objectiveType === "qualitative") return true;
+  return question.outcomes.length > 0;
+}
+
 async function refineResearchQuestionsWithAi(
   env: Env,
   protocol: string,
   extraction: ProtocolExtraction
 ): Promise<ProtocolExtraction> {
+  // A second pass is worth its cost only when the first left a question
+  // without an analytical objective or outcome, or when the same outcome
+  // concept appears under more than one question (the usual sign that
+  // concepts leaked between questions). Complete, distinct interpretations
+  // are not re-derived, and the pass that does run sees the question-bearing
+  // part of the protocol rather than the whole document again.
+  const seenOutcomes = new Set<string>();
+  let outcomeSharedAcrossQuestions = false;
+  for (const question of extraction.researchQuestions) {
+    for (const outcome of new Set(question.outcomes.map(normalize))) {
+      if (seenOutcomes.has(outcome)) outcomeSharedAcrossQuestions = true;
+      seenOutcomes.add(outcome);
+    }
+  }
   const needsFocusedReview =
-    extraction.researchQuestions.length > 1 ||
-    extraction.researchQuestions.some(
-      (question) => !question.objectiveType || question.outcomes.length === 0
-    );
+    outcomeSharedAcrossQuestions ||
+    extraction.researchQuestions.some((question) => !questionIsComplete(question));
 
   if (!needsFocusedReview || !env.AI) return extraction;
 
@@ -374,7 +423,7 @@ async function refineResearchQuestionsWithAi(
         {
           role: "user",
           content: JSON.stringify({
-            protocol: protocol.slice(0, 50000),
+            protocol: questionFocusedWindow(protocol),
             currentInterpretation: extraction.researchQuestions
           })
         }
