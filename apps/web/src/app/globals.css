@@ -2501,3 +2501,4 @@ html[data-theme="dark"] .auth-theme .theme-toggle{border-color:var(--line);color
   .wb-facts>div{grid-template-columns:1fr;gap:2px}
 }
 .wb-table.numeric.usage tbody th{font-family:inherit;font-size:13.5px;white-space:normal}
+.wb-when{white-space:nowrap;color:var(--muted);font-size:12.5px}

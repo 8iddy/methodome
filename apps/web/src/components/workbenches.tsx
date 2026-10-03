@@ -1107,3 +1107,170 @@ export function SourcesWorkbench({ projectId }: { projectId: string }) {
     </section>
   );
 }
+
+/* -------------------------------------------------------------- Audit record */
+
+const AUDIT_LABELS: Record<string, string> = {
+  project_created: "Project created",
+  file_uploaded: "File uploaded",
+  dataset_registered: "Dataset registered",
+  conversation_dataset_registered: "Dataset registered from the conversation",
+  datasets_harmonised_and_appended: "Form versions harmonised into a derived dataset",
+  protocol_information_extracted: "Protocol interpreted",
+  orchestrator_protocol_information_extracted: "Protocol interpreted by Methodome",
+  orchestrator_study_specification_interpreted: "Study model drafted from the protocol",
+  study_specification_saved: "Study model saved by researcher",
+  conversation_study_interpretation_confirmed: "Study interpretation confirmed by researcher",
+  study_interpretation_confirmed: "Study interpretation confirmed by researcher",
+  orchestrator_variable_mappings_proposed: "Variable mappings proposed by Methodome",
+  variable_mappings_updated: "Variable mappings updated by researcher",
+  conversation_variable_mapping_resolved: "Variable mapping decided in the conversation",
+  analysis_plan_created: "Analysis plan created",
+  orchestrator_analysis_plan_created: "Analysis plan drafted by Methodome",
+  analysis_plan_methods_selected: "Methods selected",
+  conversation_analysis_method_selected: "Method chosen in the conversation",
+  analysis_plan_locked: "Analysis plan locked",
+  conversation_analysis_plan_approved: "Analysis plan approved by researcher",
+  orchestrator_analysis_job_created: "Analysis sent for statistical execution",
+  analysis_completed: "Statistical analysis completed",
+  orchestrator_qualitative_analysis_prepared: "Qualitative sources segmented",
+  qualitative_analysis_prepared: "Qualitative sources segmented",
+  orchestrator_qualitative_codebook_proposed: "Codebook drafted by Methodome",
+  qualitative_codebook_proposed: "Codebook drafted by Methodome",
+  qualitative_codebook_confirmed: "Codebook confirmed by researcher",
+  orchestrator_qualitative_codings_proposed: "Coding proposed by Methodome",
+  qualitative_codings_proposed: "Coding proposed by Methodome",
+  qualitative_codings_reviewed: "Coding reviewed by researcher",
+  orchestrator_qualitative_themes_proposed: "Themes drafted by Methodome",
+  qualitative_themes_proposed: "Themes drafted by Methodome",
+  qualitative_themes_confirmed: "Themes confirmed by researcher",
+  conversation_assistant_responded: "Methodome replied in the conversation",
+  project_assistant_consulted: "Methodome consulted",
+  project_policy_updated: "Processing policy updated"
+};
+
+const RESEARCHER_DECISIONS = new Set([
+  "study_specification_saved",
+  "conversation_study_interpretation_confirmed",
+  "study_interpretation_confirmed",
+  "variable_mappings_updated",
+  "conversation_variable_mapping_resolved",
+  "analysis_plan_methods_selected",
+  "conversation_analysis_method_selected",
+  "analysis_plan_locked",
+  "conversation_analysis_plan_approved",
+  "qualitative_codebook_confirmed",
+  "qualitative_codings_reviewed",
+  "qualitative_themes_confirmed",
+  "project_policy_updated"
+]);
+
+type AuditEvent = Record<string, unknown>;
+
+function auditDetail(event: AuditEvent): string[] {
+  const after = (event.after ?? {}) as Record<string, unknown>;
+  const lines: string[] = [];
+  const text = (value: unknown) =>
+    typeof value === "string" || typeof value === "number" ? String(value) : null;
+  const add = (label: string, value: unknown) => {
+    const shown = text(value);
+    if (shown) lines.push(`${label}: ${shown}`);
+  };
+  add("Confirmed via", after.confirmedVia);
+  add("Specification version", after.specificationVersion);
+  add("Plan lock hash", after.lockHash);
+  add("Method", after.methodId);
+  add("Concept", after.concept);
+  add("Dataset field", after.datasetVariable);
+  if (after.confirmedNotRepresented === true) lines.push("Confirmed as not in the dataset");
+  add("Research questions", after.researchQuestionCount);
+  add("Study design", after.studyDesign);
+  add("Mapped automatically", after.autoResolvedCount);
+  add("Proposed for review", after.reviewCount);
+  add("Unresolved", after.unresolvedCount);
+  add("Model", event.modelId);
+  return lines;
+}
+
+export function AuditWorkbench({ projectId }: { projectId: string }) {
+  const [events, setEvents] = useState<AuditEvent[] | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getAuditTrail(projectId)
+      .then(setEvents)
+      .catch((reason) =>
+        setError(errorText(reason, "Could not load the audit record."))
+      );
+  }, [projectId]);
+
+  if (!events) {
+    return (
+      <section className="wb">
+        <p className="wb-note">{error || "Loading the audit record…"}</p>
+      </section>
+    );
+  }
+
+  const decisions = events.filter((event) =>
+    RESEARCHER_DECISIONS.has(String(event.action))
+  ).length;
+
+  return (
+    <section className="wb">
+      <p className="wb-summary">
+        {events.length} recorded event{events.length === 1 ? "" : "s"},{" "}
+        {decisions} of them researcher decisions. Every entry is hash-chained
+        to the one before it.
+      </p>
+      <div className="wb-table-scroll">
+        <table className="wb-table">
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">Event</th>
+              <th scope="col">By</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...events].reverse().map((event, index) => {
+              const action = String(event.action ?? "");
+              const detail = auditDetail(event);
+              const researcher = RESEARCHER_DECISIONS.has(action);
+              return (
+                <tr key={String(event.id ?? index)}>
+                  <td className="wb-when">
+                    {new Date(String(event.timestamp)).toLocaleString()}
+                  </td>
+                  <th scope="row">
+                    {AUDIT_LABELS[action] ?? human(action)}
+                    {detail.length > 0 && (
+                      <small>{detail.join(" · ")}</small>
+                    )}
+                    <details>
+                      <summary>Record</summary>
+                      <code>{action}</code>{" "}
+                      <code>{String(event.objectType ?? "")}</code>{" "}
+                      <code>{String(event.objectId ?? "")}</code>
+                      {typeof event.hash === "string" && (
+                        <>
+                          {" "}
+                          <code>hash {event.hash.slice(0, 16)}…</code>
+                        </>
+                      )}
+                    </details>
+                  </th>
+                  <td>
+                    <StateMark tone={researcher ? "done" : "quiet"}>
+                      {researcher ? "Researcher" : "Methodome"}
+                    </StateMark>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
