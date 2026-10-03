@@ -3,10 +3,42 @@ import type { Env } from "./env";
 import { convertDocumentToMarkdown, runModel } from "./model-runtime";
 import { protocolInterpretationSystemPrompt } from "./methodology-knowledge";
 
+// Models return null for lists that do not apply (a qualitative question has
+// no outcome variables), and name designs outside the quantitative set.
+// Accept both deterministically rather than fail the whole extraction.
+const conceptList = z
+  .array(z.string())
+  .nullable()
+  .default([])
+  .transform((value) => value ?? []);
+
+const KNOWN_DESIGNS = [
+  "cross_sectional",
+  "cohort",
+  "case_control",
+  "trial",
+  "longitudinal",
+  "time_series",
+  "ecological",
+  "other"
+] as const;
+
+const DESIGN_ALIASES: Record<string, (typeof KNOWN_DESIGNS)[number]> = {
+  cross_sectional_survey: "cross_sectional",
+  crosssectional: "cross_sectional",
+  rct: "trial",
+  randomised_controlled_trial: "trial",
+  randomized_controlled_trial: "trial",
+  prospective_cohort: "cohort",
+  retrospective_cohort: "cohort",
+  panel: "longitudinal",
+  interrupted_time_series: "time_series"
+};
+
 export const protocolExtractionSchema = z.object({
   studyTitle: z.string().nullable().default(null),
-  objectives: z.array(z.string()).default([]),
-  hypotheses: z.array(z.string()).default([]),
+  objectives: conceptList,
+  hypotheses: conceptList,
   researchQuestions: z.array(
     z.object({
       text: z.string().min(1),
@@ -20,22 +52,26 @@ export const protocolExtractionSchema = z.object({
         "qualitative",
         "exploratory"
       ]).nullable().default(null),
-      outcomes: z.array(z.string()).default([]),
-      predictors: z.array(z.string()).default([]),
-      covariates: z.array(z.string()).default([]),
+      outcomes: conceptList,
+      predictors: conceptList,
+      covariates: conceptList,
       estimand: z.string().nullable().default(null)
     })
   ).default([]),
-  studyDesign: z.enum([
-    "cross_sectional",
-    "cohort",
-    "case_control",
-    "trial",
-    "longitudinal",
-    "time_series",
-    "ecological",
-    "other"
-  ]).nullable().default(null),
+  studyDesign: z.preprocess((value) => {
+    if (typeof value !== "string") return value;
+    const key = value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    if ((KNOWN_DESIGNS as readonly string[]).includes(key)) return key;
+    if (key in DESIGN_ALIASES) return DESIGN_ALIASES[key];
+    // Qualitative, mixed-methods and other named designs are preserved as
+    // "other"; the design facts that constrain analysis are captured by the
+    // separate repeated-measures, clustering, weighting and strata fields.
+    return key ? "other" : null;
+  }, z.enum(KNOWN_DESIGNS).nullable().default(null)),
   unitOfAnalysis: z.string().nullable().default(null),
   population: z.string().nullable().default(null),
   samplingDesign: z.string().nullable().default(null),
