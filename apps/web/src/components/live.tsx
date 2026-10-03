@@ -7,6 +7,7 @@ import { ResearchAnalysisSurface, ResearchSectionContext } from "@/components/re
 import { ConversationWorkspace } from "@/components/conversation-workspace";
 import {
   AnalysisWorkbench,
+  AuditWorkbench,
   ReportsWorkbench,
   ResultsWorkbench,
   SourcesWorkbench,
@@ -24,7 +25,6 @@ import {
   getAnalysisPlan,
   getProtocolExtraction,
   extractProtocol,
-  getAuditTrail,
   getDatasets,
   getDatasetProfile,
   getMethods,
@@ -502,7 +502,7 @@ export function LiveProjectPage({
       )}
       {section === "results" && <ResultsWorkbench projectId={projectId} />}
       {section === "reports" && <ReportsWorkbench projectId={projectId} />}
-      {section === "audit-trail" && <LiveAudit projectId={projectId} />}
+      {section === "audit-trail" && <AuditWorkbench projectId={projectId} />}
       {section === "settings" && <LiveProjectSettings projectId={projectId} />}
     </main>
   );
@@ -1918,32 +1918,6 @@ function LiveProjectSettings({ projectId }: { projectId: string }) {
     </section>
   );
 }
-
-function LiveAudit({ projectId }: { projectId: string }) {
-  const [events, setEvents] = useState<Array<Record<string, unknown>>>([]);
-  useEffect(() => {
-    getAuditTrail(projectId).then(setEvents).catch(() => setEvents([]));
-  }, [projectId]);
-
-  return (
-    <section className="panel table-wrap">
-      <table>
-        <thead><tr><th>Time</th><th>Action</th><th>Object</th><th>User</th></tr></thead>
-        <tbody>
-          {events.map((event, index) => (
-            <tr key={String(event.id ?? index)}>
-              <td>{String(event.timestamp ?? "")}</td>
-              <td>{String(event.action ?? "")}</td>
-              <td>{String(event.objectType ?? "")}</td>
-              <td>{String(event.userId ?? "")}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
-  );
-}
-
 
 
 export function LiveMethodsPage() {
