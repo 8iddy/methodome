@@ -49,6 +49,7 @@ import { createAuth, emailVerificationEnabled } from "./better-auth";
 import { turnstileConfigurationIncomplete, turnstileEnabled, validateTurnstile } from "./auth-security";
 import type { Env, MethodomeQueueMessage, OrchestrationQueueMessage, Variables } from "./env";
 import { makeId } from "./id";
+import { summarizeModelUsage, withModelUsageContext } from "./model-runtime";
 import {
   extractProtocolWithAi,
   protocolExtractionSchema,
@@ -319,7 +320,18 @@ app.use("*", async (c, next) => {
   ) {
     return next();
   }
-  return requireAuth(c, next);
+  // Once the researcher is known, attribute any model call made while
+  // handling this request to them and to the project in the path.
+  return requireAuth(c, () => {
+    const projectId = c.req.path.match(/^\/api\/projects\/([^/]+)/)?.[1];
+    return withModelUsageContext(
+      {
+        userId: c.get("userId"),
+        ...(projectId ? { projectId } : {})
+      },
+      next
+    );
+  });
 });
 
 async function requireProject(c: Parameters<typeof getUserId>[0], projectId: string) {
@@ -4599,6 +4611,25 @@ async function qualitativeAnalysisDetail(
  * jobs, stored results and qualitative records, so no screen has to work it
  * out from its own cache or request history.
  */
+app.get("/usage/models", async (c) => {
+  const days = Math.min(
+    365,
+    Math.max(1, Number(c.req.query("days") ?? 30) || 30)
+  );
+  return c.json({
+    usage: await summarizeModelUsage(c.env, { userId: getUserId(c) }, days)
+  });
+});
+
+app.get("/projects/:projectId/model-usage", async (c) => {
+  const projectId = c.req.param("projectId");
+  const access = await requireProject(c, projectId);
+  if ("response" in access) return access.response;
+  return c.json({
+    usage: await summarizeModelUsage(c.env, { projectId }, 365)
+  });
+});
+
 app.get("/projects/:projectId/research-outputs", async (c) => {
   const projectId = c.req.param("projectId");
   const access = await requireProject(c, projectId);
@@ -7076,7 +7107,13 @@ async function consumeMethodomeQueue(
         message.body && typeof message.body === "object" &&
         (message.body as Record<string, unknown>).type === "orchestration"
       ) {
-        await runConversationOrchestrator(env, message.body as OrchestrationQueueMessage);
+        {
+          const body = message.body as OrchestrationQueueMessage;
+          await withModelUsageContext(
+            { userId: body.userId, projectId: body.projectId },
+            () => runConversationOrchestrator(env, body)
+          );
+        }
       } else {
         console.error("Invalid Methodome queue message", message.body);
       }

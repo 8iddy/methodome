@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Env } from "./env";
+import { runModel } from "./model-runtime";
 import {
   formatMethodologyGuidance,
   retrieveMethodologyGuidance,
@@ -84,8 +85,7 @@ export async function answerProjectAssistant(input: {
     throw new Error("Workers AI is required for project conversation.");
   }
 
-  const ai = input.env.AI as any;
-  const response = await ai.run(PROJECT_ASSISTANT_MODEL, {
+  const response = await runModel(input.env, "project_assistant", PROJECT_ASSISTANT_MODEL, {
     messages: [
       {
         role: "system",

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Env } from "./env";
+import { convertDocumentToMarkdown, runModel } from "./model-runtime";
 import { protocolInterpretationSystemPrompt } from "./methodology-knowledge";
 
 export const protocolExtractionSchema = z.object({
@@ -317,9 +318,8 @@ async function refineResearchQuestionsWithAi(
 
   if (!needsFocusedReview || !env.AI) return extraction;
 
-  const ai = env.AI as any;
   try {
-    const response = await ai.run(PROTOCOL_EXTRACTION_MODEL, {
+    const response = await runModel(env, "protocol_question_refinement", PROTOCOL_EXTRACTION_MODEL, {
       messages: [
         {
           role: "system",
@@ -398,8 +398,7 @@ export async function researchFileToText(input: {
     throw new Error("Workers AI is not configured for document conversion.");
   }
 
-  const ai = input.env.AI as any;
-  const converted = await ai.toMarkdown({
+  const converted = await convertDocumentToMarkdown(input.env, {
     name: input.filename,
     blob: new Blob([input.bytes], {
       type: input.mediaType || "application/octet-stream"
@@ -438,11 +437,10 @@ export async function extractProtocolWithAi(
   }
 
   const protocol = protocolInputWindow(trimmed);
-  const ai = env.AI as any;
   const systemPrompt = protocolInterpretationSystemPrompt();
 
   try {
-    const response = await ai.run(PROTOCOL_EXTRACTION_MODEL, {
+    const response = await runModel(env, "protocol_extraction", PROTOCOL_EXTRACTION_MODEL, {
       messages: [
         { role: "system", content: systemPrompt },
         {
@@ -461,7 +459,7 @@ export async function extractProtocolWithAi(
     const extraction = validateProtocolExtraction(modelPayload(response));
     return refineResearchQuestionsWithAi(env, protocol, extraction);
   } catch (firstError) {
-    const retry = await ai.run(PROTOCOL_EXTRACTION_MODEL, {
+    const retry = await runModel(env, "protocol_extraction", PROTOCOL_EXTRACTION_MODEL, {
       messages: [
         {
           role: "system",
@@ -686,10 +684,9 @@ export async function suggestMappingsWithAi(input: {
     return output;
   }
 
-  const ai = input.env.AI as any;
   let response: unknown;
   try {
-    response = await ai.run(PROTOCOL_EXTRACTION_MODEL, {
+    response = await runModel(input.env, "variable_mapping", PROTOCOL_EXTRACTION_MODEL, {
     messages: [
       {
         role: "system",

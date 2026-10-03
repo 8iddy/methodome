@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Env } from "./env";
+import { runModel, type ModelPurpose } from "./model-runtime";
 import {
   codingProposalSchema,
   qualitativeCodebookSchema,
@@ -84,13 +85,13 @@ function ensureUniqueCodeIds(codebook: QualitativeCodebook): QualitativeCodebook
 
 async function runJsonModel(
   env: Env,
+  purpose: ModelPurpose,
   system: string,
   user: unknown,
   maxTokens: number
 ): Promise<unknown> {
   if (!env.AI) throw new Error("Workers AI is required for qualitative analysis.");
-  const ai = env.AI as any;
-  const response = await ai.run(QUALITATIVE_MODEL, {
+  const response = await runModel(env, purpose, QUALITATIVE_MODEL, {
     messages: [
       { role: "system", content: system },
       { role: "user", content: JSON.stringify(user) }
@@ -118,6 +119,7 @@ export async function proposeQualitativeCodebook(input: {
 
   const payload = await runJsonModel(
     input.env,
+    "qualitative_codebook",
     [
       "Act as an experienced qualitative researcher proposing an initial codebook for researcher review.",
       "The codebook is a proposal, not a final finding.",
@@ -154,6 +156,7 @@ export async function proposeQualitativeCodings(input: {
 
   const payload = await runJsonModel(
     input.env,
+    "qualitative_coding",
     [
       "Apply the supplied qualitative codebook to each source segment.",
       "Treat every segment independently and only assign codes directly supported by that segment.",
@@ -243,6 +246,7 @@ export async function proposeQualitativeThemes(input: {
 
   const payload = await runJsonModel(
     input.env,
+    "qualitative_themes",
     [
       "Develop candidate qualitative themes from a researcher-confirmed codebook and confirmed coding evidence.",
       "Themes are proposals for researcher review, not final facts.",

@@ -1,2 +1,5 @@
-import { Button, PageHeader } from "@/components/ui";
-export default function Page() { return <main className="app-content narrow"><PageHeader eyebrow="PROFILE AND SETTINGS" title="Profile and preferences" description="Manage account details and default research preferences." /><form className="form-panel"><div className="form-grid"><label>Name<input defaultValue="Dr. E. Nalubega" /></label><label>Email<input defaultValue="e.nalubega@example.org" /></label><label>Organisation<input defaultValue="Moroto District Health Office" /></label><label>Role<input defaultValue="Senior epidemiologist" /></label><label>Research field<input defaultValue="Public health" /></label><label>Default reporting style<select><option>STROBE</option><option>CONSORT</option></select></label><label>Default export format<select><option>Word</option><option>PDF</option><option>HTML</option></select></label><label>Model processing preference<select><option>Ask before processing</option><option>Never allow external processing</option></select></label></div><Button>Save changes</Button></form></main>; }
+import { AccountPage } from "@/components/account";
+
+export default function Page() {
+  return <AccountPage />;
+}
