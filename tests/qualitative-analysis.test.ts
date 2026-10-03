@@ -5,6 +5,7 @@ import {
   validateThemeReferences,
   type QualitativeCodebook,
   type QualitativeCoding,
+  qualitativeCodebookSchema,
   type QualitativeSegment
 } from "@methodome/qualitative-analysis";
 
@@ -64,6 +65,27 @@ describe("qualitative segmentation", () => {
       expect(first[index]!.startChar).toBeGreaterThanOrEqual(
         first[index - 1]!.endChar
       );
+    }
+  });
+
+  it("keeps each substantive paragraph as its own segment and joins short prompts to the answer", () => {
+    const answer = (n: number) =>
+      `Participant: ${"This is a substantive answer about data use at the facility. ".repeat(5)}(${n})`;
+    const text = [
+      "Interviewer: How do you use the data?",
+      answer(1),
+      "Interviewer: What stops you?",
+      answer(2),
+      "Interviewer: Anything else?",
+      answer(3)
+    ].join("\n\n");
+
+    const segments = segmentQualitativeText(text);
+
+    expect(segments).toHaveLength(3);
+    for (const item of segments) {
+      expect(item.text.startsWith("Interviewer:")).toBe(true);
+      expect(item.text).toContain("Participant:");
     }
   });
 
@@ -204,4 +226,24 @@ describe("qualitative reference validation", () => {
     ).toThrow("without confirmed evidence");
   });
 
+});
+
+describe("qualitative codebook schema tolerance", () => {
+  it("accepts criteria given as a single string or null", () => {
+    const parsed = qualitativeCodebookSchema.parse({
+      codes: [
+        {
+          id: "staff_time",
+          label: "Staff time",
+          definition: "Data review competes with clinical duties.",
+          inclusionCriteria: "Mentions lacking time for data review",
+          exclusionCriteria: null
+        }
+      ]
+    });
+    expect(parsed.codes[0]?.inclusionCriteria).toEqual([
+      "Mentions lacking time for data review"
+    ]);
+    expect(parsed.codes[0]?.exclusionCriteria).toEqual([]);
+  });
 });

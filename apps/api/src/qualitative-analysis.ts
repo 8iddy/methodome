@@ -83,6 +83,82 @@ function ensureUniqueCodeIds(codebook: QualitativeCodebook): QualitativeCodebook
   return codebook;
 }
 
+// Output shapes the runtime constrains the model to. They mirror the Zod
+// schemas that still validate every response afterwards.
+const stringList = { type: "array", items: { type: "string" } } as const;
+const OUTPUT_SCHEMAS: Record<ModelPurpose, Record<string, unknown> | null> = {
+  document_conversion: null,
+  protocol_extraction: null,
+  protocol_question_refinement: null,
+  variable_mapping: null,
+  project_assistant: null,
+  qualitative_codebook: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      codes: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            id: { type: "string" },
+            label: { type: "string" },
+            definition: { type: "string" },
+            inclusionCriteria: stringList,
+            exclusionCriteria: stringList
+          },
+          required: ["id", "label", "definition", "inclusionCriteria", "exclusionCriteria"]
+        }
+      }
+    },
+    required: ["codes"]
+  },
+  qualitative_coding: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      assignments: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            segmentId: { type: "string" },
+            codeIds: stringList,
+            rationale: { type: "string" }
+          },
+          required: ["segmentId", "codeIds", "rationale"]
+        }
+      }
+    },
+    required: ["assignments"]
+  },
+  qualitative_themes: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      themes: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            id: { type: "string" },
+            label: { type: "string" },
+            summary: { type: "string" },
+            codeIds: stringList,
+            evidenceSegmentIds: stringList
+          },
+          required: ["id", "label", "summary", "codeIds", "evidenceSegmentIds"]
+        }
+      },
+      synthesis: { type: "string" }
+    },
+    required: ["themes", "synthesis"]
+  }
+};
+
 async function runJsonModel(
   env: Env,
   purpose: ModelPurpose,
@@ -91,6 +167,7 @@ async function runJsonModel(
   maxTokens: number
 ): Promise<unknown> {
   if (!env.AI) throw new Error("Workers AI is required for qualitative analysis.");
+  const schema = OUTPUT_SCHEMAS[purpose];
   const response = await runModel(env, purpose, QUALITATIVE_MODEL, {
     messages: [
       { role: "system", content: system },
@@ -98,7 +175,9 @@ async function runJsonModel(
     ],
     temperature: 0,
     max_tokens: maxTokens,
-    response_format: { type: "json_object" }
+    response_format: schema
+      ? { type: "json_schema", json_schema: schema }
+      : { type: "json_object" }
   });
   return parseModelJson(modelPayload(response));
 }
