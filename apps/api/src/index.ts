@@ -2759,6 +2759,38 @@ function conversationResultTable(
   };
 }
 
+/**
+ * One paragraph per completed qualitative workstream, built only from the
+ * researcher-confirmed theme version: theme labels and their evidence counts.
+ */
+async function qualitativeCompletionSummaries(
+  c: ApiContext,
+  state: Awaited<ReturnType<typeof computeProjectReadiness>>
+): Promise<string[]> {
+  const questionText = new Map(
+    (state.specification?.researchQuestions ?? []).map((question) => [
+      question.id,
+      question.text
+    ])
+  );
+  const output: string[] = [];
+  for (const record of state.qualitativeAnalyses) {
+    if (record.status !== "complete") continue;
+    const detail = await qualitativeAnalysisDetail(c, record.projectId, record.id);
+    if (!detail?.latestThemes) continue;
+    const themes = detail.latestThemes.themes
+      .map(
+        (theme) =>
+          `${theme.label} (${theme.evidenceSegmentIds.length} source segment${theme.evidenceSegmentIds.length === 1 ? "" : "s"})`
+      )
+      .join("; ");
+    output.push(
+      `“${questionText.get(record.researchQuestionId) ?? record.researchQuestionId}”: ${detail.latestThemes.themes.length} confirmed theme${detail.latestThemes.themes.length === 1 ? "" : "s"} from ${detail.segments.length} segments of ${record.sourceFileIds.length} source file${record.sourceFileIds.length === 1 ? "" : "s"}. ${themes}.`
+    );
+  }
+  return output;
+}
+
 async function completedConversationResult(
   c: ApiContext,
   state: Awaited<ReturnType<typeof computeProjectReadiness>>
@@ -2771,8 +2803,16 @@ async function completedConversationResult(
   sourceIds: string[];
 }> {
   if (!state.plan) {
+    const qualitativeOnly = await qualitativeCompletionSummaries(c, state);
     return {
-      content: "The currently supported research work is complete and ready for review.",
+      content:
+        qualitativeOnly.length > 0
+          ? [
+              "The qualitative analysis is complete.",
+              ...qualitativeOnly,
+              "Every theme is tied to codes you confirmed and to source segments; open Results to read the supporting passages."
+            ].join("\n\n")
+          : "The currently supported research work is complete and ready for review.",
       analysisJobIds: [],
       resultTables: [],
       methodologyRuleIds: [],
@@ -2826,15 +2866,33 @@ async function completedConversationResult(
     return found ? [deterministicResultSummary(job.methodId, found)] : [];
   });
 
+  const qualitativeSummaries = await qualitativeCompletionSummaries(c, state);
+
+  const opening =
+    summaries.length > 0 && qualitativeSummaries.length > 0
+      ? "The approved analyses and the qualitative analysis are complete."
+      : summaries.length > 0
+        ? "The approved analyses are complete."
+        : qualitativeSummaries.length > 0
+          ? "The qualitative analysis is complete."
+          : "The approved analyses are complete and the structured outputs are ready for review.";
+
   return {
-    content:
-      summaries.length > 0
+    content: [
+      opening,
+      ...summaries,
+      ...qualitativeSummaries,
+      ...(summaries.length > 0
         ? [
-            "The approved analyses are complete.",
-            ...summaries,
             "These values come from Methodome's deterministic statistical runner. Open the result details for full diagnostics and provenance."
-          ].join("\n\n")
-        : "The approved analyses are complete and the structured outputs are ready for review.",
+          ]
+        : []),
+      ...(qualitativeSummaries.length > 0
+        ? [
+            "Every theme is tied to codes you confirmed and to source segments; open Results to read the supporting passages."
+          ]
+        : [])
+    ].join("\n\n"),
     analysisJobIds: completed.map(({ job }) => job.jobId),
     resultTables: completed.flatMap(({ job }) => {
       const found = results.find((result) => result.jobId === job.jobId);

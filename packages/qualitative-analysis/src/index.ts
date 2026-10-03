@@ -218,7 +218,7 @@ export function segmentQualitativeText(
   options: { maxChars?: number; minChars?: number } = {}
 ): SegmentDraft[] {
   const maxChars = Math.max(400, options.maxChars ?? 1600);
-  const minChars = Math.min(Math.max(0, options.minChars ?? 240), maxChars);
+  const minChars = Math.min(Math.max(0, options.minChars ?? 120), maxChars);
   const inputRanges = paragraphRanges(text).flatMap((range) =>
     range.end - range.start > maxChars
       ? splitLongRange(text, range, maxChars)

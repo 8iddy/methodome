@@ -575,9 +575,35 @@ function QualitativeWorkbench({
                     }
                   />
                   <div className="theme-evidence">
-                    <span>{theme.codeIds.length} codes</span>
-                    <span>{theme.evidenceSegmentIds.length} source segments</span>
+                    <span>
+                      Codes:{" "}
+                      {theme.codeIds
+                        .map(
+                          (codeId) =>
+                            codebook?.codes.find((code) => code.id === codeId)?.label ?? codeId
+                        )
+                        .join(", ")}
+                    </span>
                   </div>
+                  <details className="theme-evidence-detail">
+                    <summary>
+                      {theme.evidenceSegmentIds.length} supporting source segment
+                      {theme.evidenceSegmentIds.length === 1 ? "" : "s"}
+                    </summary>
+                    {theme.evidenceSegmentIds.map((segmentId) => {
+                      const segment = detail.segments.find((item) => item.id === segmentId);
+                      return segment ? (
+                        <blockquote key={segmentId}>
+                          {segment.text}
+                          <cite>Segment {segment.segmentIndex + 1}</cite>
+                        </blockquote>
+                      ) : (
+                        <blockquote key={segmentId} className="missing">
+                          Segment {segmentId} is not in this workstream.
+                        </blockquote>
+                      );
+                    })}
+                  </details>
                 </div>
               </article>
             ))}
