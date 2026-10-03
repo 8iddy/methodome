@@ -17,7 +17,7 @@ import {
 export const QUALITATIVE_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 export const QUALITATIVE_CODEBOOK_PROMPT_VERSION = "qualitative-codebook-v1";
 export const QUALITATIVE_CODING_PROMPT_VERSION = "qualitative-coding-v1";
-export const QUALITATIVE_THEME_PROMPT_VERSION = "qualitative-themes-v1";
+export const QUALITATIVE_THEME_PROMPT_VERSION = "qualitative-themes-v2";
 
 function modelPayload(result: unknown): unknown {
   if (typeof result === "string") return result;
@@ -298,54 +298,66 @@ export async function proposeQualitativeThemes(input: {
   const segmentById = new Map(
     input.segments.map((segment) => [segment.id, segment])
   );
-  const evidenceByCode = new Map<
-    string,
-    { count: number; examples: Array<{ segmentId: string; excerpt: string }> }
-  >();
+  const codeLabel = new Map(
+    input.codebook.codes.map((code) => [code.id, code.label])
+  );
 
+  // The model sees every confirmed-coded segment with all of its codes, so a
+  // theme can draw on the full breadth of evidence and on co-occurrence
+  // between codes, rather than on two examples per code.
+  const codesBySegment = new Map<string, Set<string>>();
   for (const coding of confirmed) {
-    const segment = segmentById.get(coding.segmentId);
-    if (!segment) continue;
-    const existing = evidenceByCode.get(coding.codeId) ?? {
-      count: 0,
-      examples: []
-    };
-    existing.count += 1;
-    if (
-      existing.examples.length < 2 &&
-      !existing.examples.some((item) => item.segmentId === segment.id)
-    ) {
-      existing.examples.push({
-        segmentId: segment.id,
-        excerpt: segment.text.slice(0, 350)
-      });
-    }
-    evidenceByCode.set(coding.codeId, existing);
+    if (!segmentById.has(coding.segmentId)) continue;
+    const codes = codesBySegment.get(coding.segmentId) ?? new Set<string>();
+    codes.add(coding.codeId);
+    codesBySegment.set(coding.segmentId, codes);
   }
+  const MAX_SEGMENTS = 80;
+  const codedSegments = Array.from(codesBySegment.entries())
+    .map(([segmentId, codes]) => ({
+      segmentId,
+      segmentIndex: segmentById.get(segmentId)!.segmentIndex,
+      codeIds: Array.from(codes),
+      excerpt: segmentById.get(segmentId)!.text.slice(0, 500)
+    }))
+    .sort((a, b) => a.segmentIndex - b.segmentIndex);
+  const sample =
+    codedSegments.length > MAX_SEGMENTS
+      ? evenlySample(codedSegments, MAX_SEGMENTS)
+      : codedSegments;
+  const codeSummary = input.codebook.codes.map((code) => ({
+    codeId: code.id,
+    label: code.label,
+    definition: code.definition,
+    confirmedSegments: codedSegments.filter((item) =>
+      item.codeIds.includes(code.id)
+    ).length
+  }));
 
   const payload = await runJsonModel(
     input.env,
     "qualitative_themes",
     [
-      "Develop candidate qualitative themes from a researcher-confirmed codebook and confirmed coding evidence.",
-      "Themes are proposals for researcher review, not final facts.",
-      "Use the coding counts to understand pattern breadth, but do not turn counts into prevalence claims.",
-      "Every theme must cite evidenceSegmentIds drawn only from supplied examples and codeIds from the supplied codebook.",
-      "Do not invent quotations or evidence.",
-      "Keep themes distinct, analytically meaningful and responsive to the research question.",
-      "The synthesis must explicitly acknowledge meaningful variation or tension where the supplied evidence indicates it.",
+      "You are an experienced qualitative researcher developing candidate themes for researcher review from a confirmed codebook and confirmed coding of source segments.",
+      "A theme is an interpretive pattern of meaning that answers the research question. It is not a code restated: a theme usually draws together several codes, or explains how one code plays out across different participants or conditions. Propose a theme that mirrors a single code only when the evidence genuinely shows no higher-order pattern, and say so in its summary.",
+      "Look for co-occurrence: segments carrying more than one code often reveal how barriers interact (for example, how one condition produces or compounds another).",
+      "Theme labels should be short analytic statements that capture the meaning (for example 'Data review is the first casualty of understaffing'), not topic nouns.",
+      "Each summary must explain the pattern, name the conditions or contrasts in the evidence, and stay inside what the segments say.",
+      "evidenceSegmentIds must list every supplied segment that supports the theme (not a sample of two), and codeIds must list the supplied codes the theme draws on. Use only supplied ids.",
+      "Use coded-segment counts to judge breadth, but never express them as prevalence or percentages of a population.",
+      "Do not invent quotations, participants, or evidence.",
+      "The synthesis is two or three paragraphs: how the themes relate to each other and to the research question, where the evidence shows variation, tension or disagreement, and what the evidence cannot support given the number of sources and segments.",
       "Return JSON only as {themes:[{id,label,summary,codeIds,evidenceSegmentIds}],synthesis}."
     ].join("\n"),
     {
       researchQuestion: input.researchQuestion,
-      codebook: input.codebook,
-      evidenceByCode: Array.from(evidenceByCode.entries()).map(
-        ([codeId, evidence]) => ({
-          codeId,
-          count: evidence.count,
-          examples: evidence.examples
-        })
-      )
+      codes: codeSummary,
+      sourceSegmentCount: input.segments.length,
+      codedSegmentCount: codedSegments.length,
+      codedSegments: sample.map(({ segmentIndex: _index, ...rest }) => ({
+        ...rest,
+        codeLabels: rest.codeIds.map((id) => codeLabel.get(id) ?? id)
+      }))
     },
     4800
   );
