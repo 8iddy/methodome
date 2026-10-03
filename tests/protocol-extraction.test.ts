@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractProtocolWithAi,
   protocolExtractionSchema,
+  questionFocusedWindow,
   suggestMappingsWithAi
 } from "../apps/api/src/protocol-extraction";
 
@@ -280,6 +281,45 @@ describe("protocol extraction runtime", () => {
     ]);
   });
 
+  it("does not re-run refinement when every question is complete and distinct", async () => {
+    let call = 0;
+    const env = {
+      AI: {
+        run: async () => {
+          call += 1;
+          return {
+            response: {
+              ...validExtraction,
+              researchQuestions: [
+                {
+                  text: "What are the current eLMIS functionality levels?",
+                  objectiveType: "descriptive",
+                  outcomes: ["eLMIS functionality levels"],
+                  predictors: [],
+                  covariates: [],
+                  estimand: null
+                },
+                {
+                  text: "Is reporting completeness associated with stockout status?",
+                  objectiveType: "association",
+                  outcomes: ["medicine stockout status"],
+                  predictors: ["reporting completeness"],
+                  covariates: [],
+                  estimand: null
+                }
+              ]
+            }
+          };
+        }
+      }
+    } as never;
+
+    const result = await extractProtocolWithAi(env, "# Protocol\nTwo questions.");
+
+    expect(call).toBe(1);
+    expect(result.researchQuestions).toHaveLength(2);
+  });
+
   it("retries once when the first response contains incomplete JSON", async () => {
     let call = 0;
     const env = {
@@ -520,5 +560,36 @@ describe("protocol extraction schema tolerance", () => {
       protocolExtractionSchema.parse({ studyDesign: "Cross-sectional" }).studyDesign
     ).toBe("cross_sectional");
     expect(protocolExtractionSchema.parse({ studyDesign: null }).studyDesign).toBeNull();
+  });
+});
+
+describe("question-focused protocol window", () => {
+  it("returns the protocol unchanged when it fits", () => {
+    expect(questionFocusedWindow("short protocol", 100)).toBe("short protocol");
+  });
+
+  it("keeps question-bearing paragraphs in order within the limit", () => {
+    const filler = "Background prose about the health system. ".repeat(20);
+    const text = [
+      filler,
+      "Primary objective: assess whether x is associated with y.",
+      filler,
+      "Research question 1: Is x associated with y? Primary outcome: y.",
+      filler,
+      "Study design: cross sectional survey."
+    ].join("\n\n");
+
+    const window = questionFocusedWindow(text, 400);
+
+    expect(window).toContain("Primary objective");
+    expect(window).toContain("Research question 1");
+    expect(window).not.toContain("Background prose");
+    expect(window.indexOf("Primary objective")).toBeLessThan(window.indexOf("Research question 1"));
+    expect(window.length).toBeLessThanOrEqual(400);
+  });
+
+  it("falls back to the opening when nothing matches", () => {
+    const text = "Lorem ipsum. ".repeat(100);
+    expect(questionFocusedWindow(text, 50)).toBe(text.slice(0, 50));
   });
 });
