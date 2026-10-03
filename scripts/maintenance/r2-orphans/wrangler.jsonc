@@ -1,0 +1,12 @@
+{
+  // Disposable maintenance Worker. Run only with `wrangler dev --remote`;
+  // it is never deployed. Bindings mirror the production API's R2 bucket
+  // and D1 database so it can compare stored objects with referenced keys.
+  "name": "methodome-maintenance-r2",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-09-28",
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "methodome-files" }],
+  "d1_databases": [
+    { "binding": "DB", "database_name": "methodome", "database_id": "2a7e2a38-14fb-4fca-882b-8bac86d44536" }
+  ]
+}
