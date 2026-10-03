@@ -1224,8 +1224,6 @@ function LiveDataPreparation({ projectId }: { projectId: string }) {
   );
 }
 
-const CURRENT_PROTOCOL_INTERPRETATION_VERSION = "protocol-extraction-v3";
-
 function LiveStudyDesign({ projectId }: { projectId: string }) {
   type ObjectiveType = StudySpecification["researchQuestions"][number]["objectiveType"];
   type QuestionDraft = {
@@ -1279,27 +1277,16 @@ function LiveStudyDesign({ projectId }: { projectId: string }) {
       getProjectFiles(projectId)
     ])
       .then(async ([specification, extraction, files]) => {
-        let activeExtraction = extraction;
+        // Interpretation is the orchestrator's job, done once in the
+        // conversation. This screen only shows and corrects what exists.
+        const activeExtraction = extraction;
         const latestProtocol = files.find((item) => item.fileKind === "protocol");
-        const extractionNeedsMethodologyRefresh =
-          !specification &&
-          latestProtocol &&
-          (
-            !activeExtraction ||
-            activeExtraction.provenance?.promptVersion !==
-              CURRENT_PROTOCOL_INTERPRETATION_VERSION
+        if (!specification && !activeExtraction) {
+          setStatus(
+            latestProtocol
+              ? "Methodome has not interpreted the protocol yet. It does that in the conversation; you can also describe the study here by hand."
+              : "No protocol has been handed over yet. Attach it in the conversation, or describe the study here by hand."
           );
-
-        if (extractionNeedsMethodologyRefresh) {
-          setStatus("Reading the protocol…");
-          try {
-            activeExtraction = await extractProtocol(projectId, latestProtocol.id);
-            setStatus(
-              "Methodome interpreted the research questions and study design. Review the suggestions before confirming."
-            );
-          } catch (err) {
-            setStatus(message(err));
-          }
         }
 
         if (specification) {
