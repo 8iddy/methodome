@@ -177,7 +177,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
               <nav className="project-primary-nav" aria-label="Project navigation">
                 <Nav href={`${projectBase}/overview`} label="Conversation" active={path.endsWith("/overview")} />
-                <Nav href={`${projectBase}/protocol`} label="Project record" active={["protocol", "instruments", "data", "data-preparation"].some((slug) => path.endsWith(`/${slug}`))} />
+                <Nav href={`${projectBase}/data`} label="Project record" active={["protocol", "instruments", "data", "data-preparation"].some((slug) => path.endsWith(`/${slug}`))} />
                 <Nav href={`${projectBase}/results`} label="Results" active={path.endsWith("/results") || path.endsWith("/reports")} />
               </nav>
 
