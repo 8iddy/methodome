@@ -486,3 +486,39 @@ describe("mapping evidence rules", () => {
     expect(suggestions[0]?.datasetVariable).toBeUndefined();
   });
 });
+
+describe("protocol extraction schema tolerance", () => {
+  it("accepts null concept lists and a qualitative design name", () => {
+    const parsed = protocolExtractionSchema.parse({
+      studyTitle: "Barriers to routine data use",
+      objectives: null,
+      hypotheses: null,
+      researchQuestions: [
+        {
+          text: "How do managers describe barriers to using routine data?",
+          objectiveType: "qualitative",
+          outcomes: null,
+          predictors: null,
+          covariates: null,
+          estimand: null
+        }
+      ],
+      studyDesign: "qualitative",
+      unitOfAnalysis: "interview participant"
+    });
+
+    expect(parsed.hypotheses).toEqual([]);
+    expect(parsed.researchQuestions[0]?.outcomes).toEqual([]);
+    expect(parsed.studyDesign).toBe("other");
+  });
+
+  it("normalises design aliases to the registry's design set", () => {
+    expect(
+      protocolExtractionSchema.parse({ studyDesign: "Randomised controlled trial" }).studyDesign
+    ).toBe("trial");
+    expect(
+      protocolExtractionSchema.parse({ studyDesign: "Cross-sectional" }).studyDesign
+    ).toBe("cross_sectional");
+    expect(protocolExtractionSchema.parse({ studyDesign: null }).studyDesign).toBeNull();
+  });
+});
